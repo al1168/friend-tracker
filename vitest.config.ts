@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     environment: 'node',
+    env: { TZ: 'America/Los_Angeles' },
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.ts'],
   },

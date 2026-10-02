@@ -33,11 +33,15 @@ export function sameName(a: string, b: string): boolean {
   return a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase()
 }
 
-const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' })
+// Intl.Segmenter arrived in iOS Safari 16.4; fall back to code points before that.
+const segmenter =
+  typeof Intl.Segmenter === 'function' ? new Intl.Segmenter('en', { granularity: 'grapheme' }) : null
 
 /** The first user-perceived character (keeps multi-part emoji together). */
 export function firstGrapheme(value: string): string {
-  for (const { segment } of segmenter.segment(value.trim())) return segment
+  const trimmed = value.trim()
+  if (!segmenter) return Array.from(trimmed)[0] ?? ''
+  for (const { segment } of segmenter.segment(trimmed)) return segment
   return ''
 }
 
@@ -50,7 +54,7 @@ export function initials(name: string): string {
 }
 
 export function describeLastBackup(lastBackupAt: string | null, today: ISODate): string {
-  if (!lastBackupAt) return 'Never backed up'
+  if (!lastBackupAt || Number.isNaN(new Date(lastBackupAt).getTime())) return 'Never backed up'
   const since = formatSince(daysBetween(toISODate(new Date(lastBackupAt)), today))
   return `Last backup: ${since.charAt(0).toLowerCase()}${since.slice(1)}`
 }

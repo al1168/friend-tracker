@@ -78,6 +78,8 @@ describe('firstGrapheme', () => {
 describe('describeLastBackup', () => {
   it('describes when the last backup happened', () => {
     expect(describeLastBackup(null, '2026-10-02')).toBe('Never backed up')
+    expect(describeLastBackup('garbage', '2026-10-02')).toBe('Never backed up')
+    expect(describeLastBackup(new Date(2026, 9, 1, 23, 30).toISOString(), '2026-10-01')).toBe('Last backup: today')
     expect(describeLastBackup(new Date(2026, 9, 2, 9, 30).toISOString(), '2026-10-02')).toBe('Last backup: today')
     expect(describeLastBackup(new Date(2026, 9, 1, 22, 0).toISOString(), '2026-10-02')).toBe('Last backup: yesterday')
     expect(describeLastBackup(new Date(2026, 8, 11, 12, 0).toISOString(), '2026-10-02')).toBe('Last backup: 3 weeks ago')
