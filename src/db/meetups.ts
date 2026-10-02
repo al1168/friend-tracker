@@ -26,7 +26,8 @@ export async function addMeetup(input: MeetupInput): Promise<Meetup> {
 }
 
 export async function updateMeetup(id: string, input: MeetupInput): Promise<void> {
-  await db.meetups.update(id, clean(input))
+  const { date, typeId, friendIds, note } = clean(input)
+  await db.meetups.update(id, { date, typeId, friendIds, note })
 }
 
 /** Deletes a meetup and returns it, so it can be put back with `restoreMeetup` (Undo). */
