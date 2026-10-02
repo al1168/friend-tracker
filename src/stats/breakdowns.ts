@@ -54,7 +54,10 @@ export function groupBreakdown(
   year: number,
   today: ISODate,
 ): BreakdownRow[] {
-  const groupOf = new Map(friends.map((f) => [f.id, f.groupId ?? NO_GROUP_KEY] as const))
+  const knownGroupIds = new Set(groups.map((g) => g.id))
+  const groupOf = new Map(
+    friends.map((f) => [f.id, f.groupId !== null && knownGroupIds.has(f.groupId) ? f.groupId : NO_GROUP_KEY] as const),
+  )
   const countGroups = (y: number) => {
     const counts = new Map<string, number>()
     for (const meetup of meetupsInYear(meetups, y, today)) {

@@ -13,7 +13,7 @@ export function meetupsInYear(meetups: Meetup[], year: number, today: ISODate): 
 function countByFriend(meetups: Meetup[]): Map<string, number> {
   const counts = new Map<string, number>()
   for (const meetup of meetups) {
-    for (const friendId of meetup.friendIds) counts.set(friendId, (counts.get(friendId) ?? 0) + 1)
+    for (const friendId of new Set(meetup.friendIds)) counts.set(friendId, (counts.get(friendId) ?? 0) + 1)
   }
   return counts
 }

@@ -58,6 +58,17 @@ describe('groupBreakdown', () => {
     ])
   })
 
+  it('puts friends whose group was deleted under No group', () => {
+    const rows = groupBreakdown(
+      [meetup('m1', '2026-01-05', ['zed'])],
+      [friend('zed', 'Zed', 'deleted-group')],
+      groups,
+      2026,
+      TODAY,
+    )
+    expect(rows).toEqual([{ key: NO_GROUP_KEY, label: 'No group', emoji: null, count: 1, previousCount: 0 }])
+  })
+
   it('ignores friends that no longer exist', () => {
     expect(groupBreakdown([meetup('m1', '2026-01-05', ['ghost'])], friends, groups, 2026, TODAY)).toEqual([])
   })

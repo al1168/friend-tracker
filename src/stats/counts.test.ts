@@ -23,6 +23,12 @@ describe('countsByFriendForYear', () => {
   })
 })
 
+describe('duplicate friend ids', () => {
+  it('counts a meetup once for a friend listed twice', () => {
+    expect(countsByFriendForYear([meetup('m1', '2026-02-01', ['alex', 'alex'])], 2026, TODAY).get('alex')).toBe(1)
+  })
+})
+
 describe('allTimeCountsByFriend', () => {
   it('counts every past meetup', () => {
     const counts = allTimeCountsByFriend(meetups, TODAY)
