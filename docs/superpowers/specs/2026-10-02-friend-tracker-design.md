@@ -51,7 +51,7 @@ Stored in IndexedDB via Dexie. Ids are random UUID strings.
 
 | Record | Fields |
 |---|---|
-| Friend | `id`, `name` (required, trimmed, non-empty), `groupId` (nullable), `photo` (nullable Blob, JPEG, longest side ≤ 400px), `notes` (string, may be empty), `createdAt` (ISO timestamp) |
+| Friend | `id`, `name` (required, trimmed, non-empty), `groupId` (nullable), `photo` (nullable string: a JPEG data URL, longest side ≤ 400px), `notes` (string, may be empty), `createdAt` (ISO timestamp) |
 | Group | `id`, `name` (required, unique case-insensitively) |
 | MeetupType | `id`, `name` (required, unique case-insensitively), `emoji`, `order` (number, for display order) |
 | Meetup | `id`, `date` (`YYYY-MM-DD` local date string), `typeId`, `friendIds` (array, at least one), `note` (string, may be empty), `createdAt` (ISO timestamp) |
@@ -71,7 +71,7 @@ Statistics are never stored; they are derived from meetups on demand.
 - Deleting a **meetup** happens immediately and shows an Undo toast for 5 seconds. Undo restores the meetup exactly.
 - Deleting a **friend** asks for confirmation (bottom action sheet), then removes their id from every meetup's `friendIds`. A meetup left with no friends is deleted. Done in one transaction.
 - Deleting a **group** asks for confirmation, then sets `groupId = null` on its friends.
-- A **meetup type** in use by any meetup cannot be deleted (it can be renamed). The UI says how many meetups use it. Deleting an unused type asks for confirmation.
+- A **meetup type** in use by any meetup cannot be deleted (it can be renamed). The UI says how many meetups use it. The last remaining type can't be deleted either. Deleting an unused type asks for confirmation.
 
 ## Visual design
 
@@ -120,7 +120,7 @@ Fields in order of importance:
 
 A large Save button is pinned to the bottom of the sheet, above the keyboard and home indicator. It is disabled until at least one friend is selected. Edit mode adds Delete.
 
-After saving a new meetup, the sheet slides away and a toast says "Logged with Alex and Sam" with Undo (5 seconds; Undo removes it). Editing shows a plain "Saved" toast. Rows reorder with a short transition.
+After saving a new meetup, the sheet slides away and a toast says "Logged with Alex and Sam" with Undo (5 seconds; Undo removes it). The toast's check mark draws itself in as the small happy moment. Editing shows a plain "Saved" toast.
 
 ### Stats
 - Title with year switcher: ‹ 2026 › (defaults to the current year; compares with the year before).
