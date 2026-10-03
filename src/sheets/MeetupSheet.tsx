@@ -27,6 +27,8 @@ function blurOnEnter(event: KeyboardEvent<HTMLInputElement>) {
   if (isPlainEnter(event)) event.currentTarget.blur()
 }
 
+const UNDO_FAILED = "Couldn't undo. Please try again."
+
 export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
   const [initial] = useState(request)
   const editing = initial?.meetup
@@ -113,7 +115,9 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
         toast({
           message: `Logged with ${formatNameList(selected.map((f) => f.name))}`,
           actionLabel: 'Undo',
-          onAction: () => void deleteMeetup(meetup.id),
+          onAction: () => {
+            deleteMeetup(meetup.id).catch(() => toast({ message: UNDO_FAILED, tone: 'plain' }))
+          },
         })
       }
       onClose()
@@ -140,7 +144,13 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
         message: 'Meetup deleted',
         tone: 'plain',
         actionLabel: 'Undo',
-        onAction: () => void restoreMeetup(deleted),
+        onAction: () => {
+          restoreMeetup(deleted)
+            .then((restored) => {
+              if (!restored) toast({ message: "Couldn't undo: a friend or type in it was deleted.", tone: 'plain' })
+            })
+            .catch(() => toast({ message: UNDO_FAILED, tone: 'plain' }))
+        },
       })
     }
   }

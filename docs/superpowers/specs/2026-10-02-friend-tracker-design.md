@@ -68,7 +68,7 @@ Statistics are never stored; they are derived from meetups on demand.
 
 ### Deletion rules
 
-- Deleting a **meetup** happens immediately and shows an Undo toast for 5 seconds. Undo restores the meetup exactly.
+- Deleting a **meetup** happens immediately and shows an Undo toast for 8 seconds (plain toasts last 5 seconds; toasts pause while touched or focused). If Undo can't restore the meetup (every friend in it was deleted, or its type was), a plain toast says so. Undo restores the meetup exactly.
 - Deleting a **friend** asks for confirmation (bottom action sheet), then removes their id from every meetup's `friendIds`. A meetup left with no friends is deleted. Done in one transaction.
 - Deleting a **group** asks for confirmation, then sets `groupId = null` on its friends.
 - A **meetup type** in use by any meetup cannot be deleted (it can be renamed). The UI says how many meetups use it. The last remaining type can't be deleted either. Deleting an unused type asks for confirmation.
@@ -120,7 +120,7 @@ Fields in order of importance:
 
 A large Save button is pinned to the bottom of the sheet, above the keyboard and home indicator. It is disabled until at least one friend is selected. Edit mode adds Delete.
 
-After saving a new meetup, the sheet slides away and a toast says "Logged with Alex and Sam" with Undo (5 seconds; Undo removes it). The toast's check mark draws itself in as the small happy moment. Editing shows a plain "Saved" toast.
+After saving a new meetup, the sheet slides away and a toast says "Logged with Alex and Sam" with Undo (8 seconds; Undo removes it). The toast's check mark draws itself in as the small happy moment. Editing shows a plain "Saved" toast.
 
 ### Stats
 - Title with year switcher: ‹ 2026 › (defaults to the current year; compares with the year before).
@@ -199,7 +199,10 @@ src/
 ## Error handling
 
 - Form validation inline under the field: friend name required; group/type names required and unique; meetup needs at least one friend.
-- Database write failures show a toast and leave the sheet open so nothing typed is lost.
+- Database write failures show an error message and leave the sheet open so nothing typed is lost: inline (`role=alert`) in the meetup, group and type sheets, and a toast in the friend sheet.
+- A failed Undo shows a plain toast ("Couldn't undo. Please try again.").
+- Export validates the backup with the importer's own checks before sharing; a file that fails is never shared.
+- A top-level error boundary wraps the app. If rendering throws (for example iOS drops the IndexedDB connection after a long suspension), it shows a calm "Something went wrong" screen with a Reload button instead of a blank screen.
 - Photo processing failure (unsupported image) shows an inline error and keeps the previous photo.
 - Import errors as described in Backup.
 

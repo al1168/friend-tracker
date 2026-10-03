@@ -47,7 +47,7 @@ describe('deleteMeetup and restoreMeetup', () => {
     const meetup = await addMeetup({ ...base, friendIds: [alex.id] })
     const deleted = await deleteMeetup(meetup.id)
     expect(await db.meetups.get(meetup.id)).toBeUndefined()
-    await restoreMeetup(deleted!)
+    expect(await restoreMeetup(deleted!)).toBe(true)
     expect(await db.meetups.get(meetup.id)).toEqual(meetup)
   })
 
@@ -57,7 +57,7 @@ describe('deleteMeetup and restoreMeetup', () => {
     const meetup = await addMeetup({ ...base, friendIds: [alex.id, sam.id] })
     const deleted = await deleteMeetup(meetup.id)
     await deleteFriend(alex.id)
-    await restoreMeetup(deleted!)
+    expect(await restoreMeetup(deleted!)).toBe(true)
     expect((await db.meetups.get(meetup.id))?.friendIds).toEqual([sam.id])
   })
 
@@ -66,7 +66,16 @@ describe('deleteMeetup and restoreMeetup', () => {
     const meetup = await addMeetup({ ...base, friendIds: [alex.id] })
     const deleted = await deleteMeetup(meetup.id)
     await deleteFriend(alex.id)
-    await restoreMeetup(deleted!)
+    expect(await restoreMeetup(deleted!)).toBe(false)
+    expect(await db.meetups.get(meetup.id)).toBeUndefined()
+  })
+
+  it('restores nothing when the type is gone', async () => {
+    const alex = await addFriend(friendInput('Alex'))
+    const meetup = await addMeetup({ ...base, friendIds: [alex.id] })
+    const deleted = await deleteMeetup(meetup.id)
+    await db.meetupTypes.delete(meetup.typeId)
+    expect(await restoreMeetup(deleted!)).toBe(false)
     expect(await db.meetups.get(meetup.id)).toBeUndefined()
   })
 

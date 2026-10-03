@@ -39,6 +39,7 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
   const photoErrorId = useId()
   const nameInput = useRef<HTMLInputElement>(null)
   const savingRef = useRef(false)
+  const creatingGroupRef = useRef(false)
 
   const [name, setName] = useState(editing?.name ?? '')
   const [groupId, setGroupId] = useState<string | null>(editing?.groupId ?? null)
@@ -119,6 +120,8 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
   }
 
   async function createGroup() {
+    if (creatingGroupRef.current) return
+    creatingGroupRef.current = true
     try {
       const group = await addGroup(newGroupName ?? '')
       setGroupId(group.id)
@@ -126,6 +129,8 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
       setGroupError(null)
     } catch (error) {
       setGroupError(error instanceof ValidationError ? error.message : "Couldn't add the group.")
+    } finally {
+      creatingGroupRef.current = false
     }
   }
 

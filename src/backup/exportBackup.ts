@@ -1,6 +1,6 @@
 import { setSetting } from '../db/settings'
 import { todayISO } from '../lib/dates'
-import { backupFileName, createBackup, type BackupData } from './format'
+import { backupFileName, createBackup, parseBackup, type BackupData } from './format'
 
 export type ExportOutcome = 'shared' | 'downloaded' | 'cancelled'
 
@@ -22,6 +22,9 @@ async function markBackedUp() {
 /** Opens the iOS share sheet with the backup file (falls back to a download). */
 export async function exportBackup(data: BackupData): Promise<ExportOutcome> {
   const backup = createBackup(data, new Date())
+  // Self-check before sharing: never hand out a file our own importer would reject. Synchronous, so share() keeps its user gesture.
+  const check = parseBackup(JSON.parse(JSON.stringify(backup)))
+  if (!check.ok) throw new Error(`Backup failed validation: ${check.error}`)
   const file = new File([JSON.stringify(backup)], backupFileName(todayISO()), { type: 'application/json' })
 
   if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {

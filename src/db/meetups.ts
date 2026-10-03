@@ -43,12 +43,13 @@ export async function deleteMeetup(id: string): Promise<Meetup | undefined> {
 }
 
 /** Undo: puts a meetup back, dropping friends who were deleted since. Does nothing if it would be empty. */
-export async function restoreMeetup(meetup: Meetup): Promise<void> {
-  await db.transaction('rw', db.meetups, db.friends, db.meetupTypes, async () => {
+export async function restoreMeetup(meetup: Meetup): Promise<boolean> {
+  return db.transaction('rw', db.meetups, db.friends, db.meetupTypes, async () => {
     const existing = await db.friends.bulkGet(meetup.friendIds)
     const friendIds = meetup.friendIds.filter((_, i) => existing[i] !== undefined)
-    if (friendIds.length === 0) return
-    if (!(await db.meetupTypes.get(meetup.typeId))) return
+    if (friendIds.length === 0) return false
+    if (!(await db.meetupTypes.get(meetup.typeId))) return false
     await db.meetups.put({ ...meetup, friendIds })
+    return true
   })
 }
