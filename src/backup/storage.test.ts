@@ -30,7 +30,7 @@ describe('backup storage', () => {
       groupId: college.id,
       photo: 'data:image/jpeg;base64,AAAA',
       notes: 'Hi',
-      birthday: null,
+      birthday: { month: 3, day: 14, year: 1996 },
     })
     const sam = await addFriend({ name: 'Sam', groupId: null, photo: null, notes: '', birthday: null })
     await addPreferences(alex.id, 'likes', 'Sushi, Board games')
@@ -46,7 +46,12 @@ describe('backup storage', () => {
     await replaceAllData(parsed.data)
 
     expect(sortById(await readAllData())).toEqual(sortById(before))
-    expect(await db.friends.get(alex.id)).toMatchObject({ likes: ['Sushi', 'Board games'], dislikes: ['Early mornings'] })
+    expect(await db.friends.get(alex.id)).toMatchObject({
+      likes: ['Sushi', 'Board games'],
+      dislikes: ['Early mornings'],
+      birthday: { month: 3, day: 14, year: 1996 },
+    })
+    expect((await db.friends.get(sam.id))?.birthday).toBeNull()
   })
 
   it('keeps the lock settings, which a backup never carries', async () => {

@@ -1,6 +1,7 @@
-import { isISODate, type ISODate } from '../lib/dates'
+import { isValidBirthday } from '../lib/birthdays'
+import { isISODate, todayISO, type ISODate } from '../lib/dates'
 import { cleanItems, indexOfItem, MAX_ITEM_LENGTH, MAX_ITEMS, type PreferenceKind } from '../lib/preferences'
-import type { Friend, Group, Meetup, MeetupType } from '../types'
+import type { Birthday, Friend, Group, Meetup, MeetupType } from '../types'
 
 export interface BackupData {
   friends: Friend[]
@@ -11,24 +12,27 @@ export interface BackupData {
 
 export interface BackupFile extends BackupData {
   app: 'friend-tracker'
-  version: 2
+  version: 3
   exportedAt: string
 }
 
 export type ParseResult = { ok: true; data: BackupData } | { ok: false; error: string }
 
 export function createBackup(data: BackupData, exportedAt: Date): BackupFile {
-  return { app: 'friend-tracker', version: 2, exportedAt: exportedAt.toISOString(), ...data }
+  return { app: 'friend-tracker', version: 3, exportedAt: exportedAt.toISOString(), ...data }
 }
 
 export function backupFileName(today: ISODate): string {
   return `friend-tracker-backup-${today}.json`
 }
 
-/** Validates an untrusted, already-JSON-parsed value. Never throws for bad input. */
-export function parseBackup(raw: unknown): ParseResult {
+/**
+ * Validates an untrusted, already-JSON-parsed value. Never throws for bad input.
+ * `today` is the phone's date, for refusing a birthday in the future.
+ */
+export function parseBackup(raw: unknown, today: ISODate = todayISO()): ParseResult {
   try {
-    return { ok: true, data: readBackup(raw) }
+    return { ok: true, data: readBackup(raw, today) }
   } catch (error) {
     if (error instanceof BackupError) return { ok: false, error: error.message }
     throw error
@@ -69,7 +73,7 @@ function nullableText(record: Obj, key: string, where: string): string | null {
   return value
 }
 
-/** A version 2 friend's list, cleaned like the app cleans typed items. Empties and repeats are dropped quietly. */
+/** A friend's list (version 2 on), cleaned like the app cleans typed items. Empties and repeats are dropped quietly. */
 function preferenceList(record: Obj, key: PreferenceKind, where: string): string[] {
   const value = record[key]
   const invalid = () => new BackupError(`${where} has an invalid "${key}" list.`)
@@ -86,14 +90,22 @@ function preferenceLists(record: Obj, where: string): Pick<Friend, PreferenceKin
   return { likes, dislikes }
 }
 
+/** A version 3 friend's birthday: null, or a valid one (copied, so stray fields are dropped). */
+function birthdayOf(record: Obj, where: string, today: ISODate): Birthday | null {
+  const value = record.birthday
+  if (value === null) return null
+  if (!isValidBirthday(value, today)) throw new BackupError(`${where} has an invalid birthday.`)
+  return { month: value.month, day: value.day, year: value.year }
+}
+
 function assertUnique(ids: string[], what: string) {
   if (new Set(ids).size !== ids.length) throw new BackupError(`The backup has two ${what} with the same id.`)
 }
 
-function readBackup(raw: unknown): BackupData {
+function readBackup(raw: unknown, today: ISODate): BackupData {
   if (!isObj(raw) || raw.app !== 'friend-tracker') throw new BackupError("This isn't a Friend Tracker backup file.")
   const { version } = raw
-  if (version !== 1 && version !== 2) {
+  if (version !== 1 && version !== 2 && version !== 3) {
     throw new BackupError('This backup was made by a different version of Friend Tracker.')
   }
 
@@ -126,8 +138,8 @@ function readBackup(raw: unknown): BackupData {
       notes: text(r, 'notes', where),
       // Version 1 backups were made before likes and dislikes existed.
       ...(version === 1 ? { likes: [], dislikes: [] } : preferenceLists(r, where)),
-      // Backups don't carry birthdays yet.
-      birthday: null,
+      // Versions 1 and 2 were made before birthdays existed.
+      birthday: version === 3 ? birthdayOf(r, where, today) : null,
       createdAt: text(r, 'createdAt', where),
     }
   })

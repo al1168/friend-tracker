@@ -13,6 +13,7 @@ const sample: BackupData = {
       notes: 'Likes jazz',
       likes: ['Jazz', 'Board games'],
       dislikes: ['Early mornings'],
+      birthday: { month: 3, day: 14, year: 1996 },
     },
   ],
   meetups: [{ ...meetup('m1', '2026-09-01', ['f1', 'f2'], 't1'), note: 'Tacos' }],
@@ -41,7 +42,7 @@ function expectError(raw: unknown, message: string) {
 describe('createBackup and parseBackup', () => {
   it('accepts a backup it created', () => {
     const file = createBackup(sample, new Date('2026-10-02T09:00:00Z'))
-    expect(file).toMatchObject({ app: 'friend-tracker', version: 2, exportedAt: '2026-10-02T09:00:00.000Z' })
+    expect(file).toMatchObject({ app: 'friend-tracker', version: 3, exportedAt: '2026-10-02T09:00:00.000Z' })
     expect(parseBackup(jsonCopy(file))).toEqual({ ok: true, data: sample })
   })
 
@@ -49,6 +50,7 @@ describe('createBackup and parseBackup', () => {
     const file = broken((f) => {
       f.extra = true
       list(f, 'friends')[0].color = 'red'
+      ;(list(f, 'friends')[1].birthday as Record<string, unknown>).sign = 'Pisces'
     })
     expect(parseBackup(file)).toEqual({ ok: true, data: sample })
   })
@@ -77,22 +79,36 @@ describe('parseBackup cleanup', () => {
 })
 
 describe('parseBackup reads version 1 backups', () => {
-  it('gives every friend empty likes and dislikes', () => {
+  it('gives every friend empty likes and dislikes and no birthday', () => {
     const file = broken((f) => {
       f.version = 1
       for (const friend of list(f, 'friends')) {
         delete friend.likes
         delete friend.dislikes
+        delete friend.birthday
       }
     })
     const result = parseBackup(file)
     expect(result.ok).toBe(true)
     if (result.ok) {
-      expect(result.data.friends.map((f) => [f.likes, f.dislikes])).toEqual([
-        [[], []],
-        [[], []],
+      expect(result.data.friends.map((f) => [f.likes, f.dislikes, f.birthday])).toEqual([
+        [[], [], null],
+        [[], [], null],
       ])
       expect(result.data.friends[1]).toMatchObject({ name: 'Sam', notes: 'Likes jazz' })
+    }
+  })
+})
+
+describe('parseBackup reads version 2 backups', () => {
+  it('keeps likes and dislikes and gives every friend no birthday', () => {
+    // Version 2 had no birthdays, so one in a version 2 file is ignored.
+    const file = broken((f) => (f.version = 2))
+    const result = parseBackup(file)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.friends.map((f) => f.birthday)).toEqual([null, null])
+      expect(result.data.friends[1]).toMatchObject({ likes: ['Jazz', 'Board games'], dislikes: ['Early mornings'] })
     }
   })
 })
@@ -104,8 +120,29 @@ describe('parseBackup rejects bad files', () => {
   })
 
   it('rejects other versions', () => {
-    expectError(broken((f) => (f.version = 3)), 'This backup was made by a different version of Friend Tracker.')
-    expectError(broken((f) => (f.version = '2')), 'This backup was made by a different version of Friend Tracker.')
+    expectError(broken((f) => (f.version = 4)), 'This backup was made by a different version of Friend Tracker.')
+    expectError(broken((f) => (f.version = '3')), 'This backup was made by a different version of Friend Tracker.')
+  })
+
+  it('rejects a missing or invalid birthday', () => {
+    const invalid = [
+      'March 14',
+      { month: 2, day: 30, year: null },
+      { month: 2, day: 29, year: 2023 },
+      { month: 3, day: 14 },
+      { month: 3, day: 14, year: 1899 },
+      { month: '3', day: 14, year: null },
+    ]
+    for (const birthday of invalid) {
+      expectError(broken((f) => (list(f, 'friends')[1].birthday = birthday)), 'Friend 2 has an invalid birthday.')
+    }
+    expectError(broken((f) => delete list(f, 'friends')[0].birthday), 'Friend 1 has an invalid birthday.')
+  })
+
+  it('rejects a birthday after the day it is read', () => {
+    const file = broken((f) => (list(f, 'friends')[1].birthday = { month: 10, day: 3, year: 2026 }))
+    expect(parseBackup(file, '2026-10-02')).toEqual({ ok: false, error: 'Friend 2 has an invalid birthday.' })
+    expect(parseBackup(file, '2026-10-03').ok).toBe(true)
   })
 
   it('rejects a missing or malformed list', () => {
