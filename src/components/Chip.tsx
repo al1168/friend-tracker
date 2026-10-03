@@ -8,7 +8,7 @@ interface ChipProps {
   children: ReactNode
 }
 
-export function Chip({ selected = false, onClick, ariaLabel, children }: ChipProps) {
+export function Chip({ selected, onClick, ariaLabel, children }: ChipProps) {
   return (
     <button type="button" className="chip" aria-pressed={selected} aria-label={ariaLabel} onClick={onClick}>
       {children}

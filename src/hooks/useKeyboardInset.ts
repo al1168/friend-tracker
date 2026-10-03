@@ -9,6 +9,7 @@ export function useKeyboardInset(active: boolean) {
     const update = () => {
       const inset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
       root.style.setProperty('--keyboard-inset', `${Math.round(inset)}px`)
+      root.style.setProperty('--viewport-height', `${Math.round(viewport.height)}px`)
     }
     update()
     viewport.addEventListener('resize', update)
@@ -17,6 +18,7 @@ export function useKeyboardInset(active: boolean) {
       viewport.removeEventListener('resize', update)
       viewport.removeEventListener('scroll', update)
       root.style.setProperty('--keyboard-inset', '0px')
+      root.style.removeProperty('--viewport-height')
     }
   }, [active])
 }

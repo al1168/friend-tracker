@@ -44,6 +44,7 @@ export function Sheet({ open, title, onRequestClose, footer, children }: SheetPr
   }, [open])
 
   function onPointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (!event.isPrimary || event.button !== 0) return
     if (event.target instanceof Element && event.target.closest('button')) return
     dragStart.current = { y: event.clientY, time: event.timeStamp }
     setDragging(true)
@@ -67,6 +68,12 @@ export function Sheet({ open, title, onRequestClose, footer, children }: SheetPr
     } else {
       setDragY(0)
     }
+  }
+
+  function onPointerCancel() {
+    dragStart.current = null
+    setDragging(false)
+    setDragY(0)
   }
 
   if (!mounted) return null
@@ -94,7 +101,7 @@ export function Sheet({ open, title, onRequestClose, footer, children }: SheetPr
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
+          onPointerCancel={onPointerCancel}
         >
           <span className="sheet__grabber" aria-hidden="true" />
           <div className="sheet__bar">

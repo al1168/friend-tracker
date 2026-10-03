@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useScrollLock } from '../hooks/useScrollLock'
 import { IconCheck } from './icons'
@@ -32,11 +32,31 @@ const ActionSheetContext = createContext<ShowActionSheet | null>(null)
 export function ActionSheetProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<Pending | null>(null)
   const nextId = useRef(0)
+  const pendingRef = useRef<Pending | null>(null)
+  const returnFocus = useRef<HTMLElement | null>(null)
+  const cancelRef = useRef<HTMLButtonElement>(null)
+  const messageId = useId()
   useScrollLock(pending !== null)
+
+  useEffect(() => {
+    pendingRef.current = pending
+  }, [pending])
+
+  const pendingId = pending?.id
+  useEffect(() => {
+    if (pendingId === undefined) return
+    cancelRef.current?.focus({ preventScroll: true })
+  }, [pendingId])
 
   const show = useCallback<ShowActionSheet>(
     (options) =>
       new Promise((resolve) => {
+        const current = pendingRef.current
+        if (current && !current.closing) {
+          current.resolve(null)
+        } else {
+          returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+        }
         nextId.current += 1
         setPending({
           id: nextId.current,
@@ -51,6 +71,8 @@ export function ActionSheetProvider({ children }: { children: ReactNode }) {
   function finish(value: unknown) {
     if (!pending || pending.closing) return
     const { id } = pending
+    returnFocus.current?.focus({ preventScroll: true })
+    returnFocus.current = null
     pending.resolve(value)
     setPending({ ...pending, closing: true })
     window.setTimeout(() => setPending((current) => (current?.id === id ? null : current)), EXIT_MS)
@@ -65,12 +87,16 @@ export function ActionSheetProvider({ children }: { children: ReactNode }) {
         createPortal(
           <div className={pending.closing ? 'action-layer action-layer--closing' : 'action-layer'}>
             <div className="action-scrim" onClick={() => finish(null)} />
-            <div className="action-sheet" role="alertdialog" aria-modal="true" aria-label={options.title ?? 'Choose an option'}>
+            <div className="action-sheet" role={options.actions.some((a) => a.destructive) ? 'alertdialog' : 'dialog'}
+              aria-modal="true"
+              aria-label={options.title ?? 'Choose an option'}
+              aria-describedby={options.message ? messageId : undefined}
+            >
               <div className="action-sheet__group">
                 {(options.title || options.message) && (
                   <div className="action-sheet__header">
                     {options.title && <p className="action-sheet__title">{options.title}</p>}
-                    {options.message && <p className="action-sheet__message">{options.message}</p>}
+                    {options.message && <p id={messageId} className="action-sheet__message">{options.message}</p>}
                   </div>
                 )}
                 {options.actions.map((action) => (
@@ -81,11 +107,16 @@ export function ActionSheetProvider({ children }: { children: ReactNode }) {
                     onClick={() => finish(action.value)}
                   >
                     {action.label}
-                    {action.selected && <IconCheck size={20} />}
+                    {action.selected && (
+                      <>
+                        <span className="visually-hidden">, selected</span>
+                        <IconCheck size={20} />
+                      </>
+                    )}
                   </button>
                 ))}
               </div>
-              <button type="button" className="action-sheet__button action-sheet__cancel" onClick={() => finish(null)}>
+              <button ref={cancelRef} type="button" className="action-sheet__button action-sheet__cancel" onClick={() => finish(null)}>
                 Cancel
               </button>
             </div>

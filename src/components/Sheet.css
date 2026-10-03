@@ -23,7 +23,7 @@
   right: 0;
   bottom: var(--keyboard-inset);
   max-width: 600px;
-  max-height: calc(100dvh - var(--keyboard-inset) - var(--safe-top) - 10px);
+  max-height: calc(var(--viewport-height, 100dvh) - var(--safe-top) - 10px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;

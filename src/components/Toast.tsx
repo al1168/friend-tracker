@@ -11,22 +11,25 @@ export interface ToastOptions {
 }
 
 const TOAST_MS = 5000
+const TOAST_WITH_ACTION_MS = 8000
 const ToastContext = createContext<((options: ToastOptions) => void) | null>(null)
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<(ToastOptions & { id: number }) | null>(null)
+  const [paused, setPaused] = useState(false)
   const nextId = useRef(0)
 
   const show = useCallback((options: ToastOptions) => {
     nextId.current += 1
+    setPaused(false)
     setToast({ ...options, id: nextId.current })
   }, [])
 
   useEffect(() => {
-    if (!toast) return
-    const timer = window.setTimeout(() => setToast(null), TOAST_MS)
+    if (!toast || paused) return
+    const timer = window.setTimeout(() => setToast(null), toast.actionLabel ? TOAST_WITH_ACTION_MS : TOAST_MS)
     return () => window.clearTimeout(timer)
-  }, [toast])
+  }, [toast, paused])
 
   return (
     <ToastContext.Provider value={show}>
@@ -34,7 +37,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {createPortal(
         <div className="toast-region" role="status" aria-live="polite">
           {toast && (
-            <div key={toast.id} className="toast">
+            <div
+              key={toast.id}
+              className="toast"
+              onFocus={() => setPaused(true)}
+              onBlur={() => setPaused(false)}
+              onPointerEnter={() => setPaused(true)}
+              onPointerLeave={() => setPaused(false)}
+            >
               {toast.tone !== 'plain' && (
                 <span className="toast__check" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
@@ -48,8 +58,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   type="button"
                   className="toast__action"
                   onClick={() => {
-                    toast.onAction?.()
                     setToast(null)
+                    toast.onAction?.()
                   }}
                 >
                   {toast.actionLabel}
