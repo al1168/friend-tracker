@@ -4,7 +4,7 @@ A private iPhone app for remembering when you last saw your friends and how ofte
 
 ## Use it on your iPhone
 
-1. Open the app's link (`https://<project>.pages.dev/`) in **Safari** and sign in with the website password. Let Safari save it to your passwords.
+1. Open https://friend.aldenlu.com/ in **Safari** and sign in with the website password. Let Safari save it to your passwords.
 2. Tap **Share** → **Add to Home Screen** → **Add**.
 3. Open it from the new **Friends** icon, and sign in again if asked (the icon keeps its own sign-in). Always use the icon: data entered in a Safari tab is stored separately.
 4. Optional: **Settings → App lock** locks the app after 15 minutes away. Unlock with Face ID or a 6-digit PIN; **Forgot PIN?** takes the website password. The lock stops someone holding your unlocked phone; it doesn't encrypt your data. Face ID unlock also accepts your iPhone passcode (if Face ID fails, iOS offers the passcode), so anyone who knows your iPhone passcode can unlock the app that way. **Forgot PIN?** asks for the website password, which Safari can fill from your saved passwords after Face ID or your iPhone passcode, so it is no stronger than your iPhone passcode, the same limit as Face ID unlock. Also, setting the clock to within 15 minutes after your last use still opens the app, and moving the clock forward can skip a wrong-PIN wait. The iPhone app switcher may still show the last screen you used, and locking again discards an unsaved sheet draft.
@@ -22,7 +22,9 @@ Cloudflare Pages (free plan) builds the private GitHub repo and publishes it on 
   - KV namespace binding `LOGIN_ATTEMPTS`: failed sign-ins. Ten wrong tries pause sign-in for 15 minutes.
 - Settings → Runtime → Fail open / closed: **Fail closed**, for Production and Preview. Settings → Builds: automatic preview deployments are off.
 - After changing a secret or binding, redeploy (Deployments → Retry deployment). Old deployments keep the secrets they were built with, so delete old deployments after changing `SITE_PASSWORD`.
-- Check the live site: `node scripts/verify-live.ts https://<project>.pages.dev/` (set `FT_PASSWORD` to also check signing in).
+- The Pages project is `friend-tracker` (`https://friend-tracker-3bx.pages.dev/`), with the custom domain `friend.aldenlu.com`. Only use the custom domain on the phone: each address keeps its own data, sign-in and Face ID.
+- Keep Cloudflare challenges (I'm Under Attack mode, challenge rules) off for `friend.aldenlu.com`. The app's background requests (offline copy, updates, the icon, "Forgot PIN?") can't pass them.
+- Check the live site: `node scripts/verify-live.ts https://friend.aldenlu.com/` (set `FT_PASSWORD` to also check signing in).
 - The site is set to fail closed. If the free plan's 100,000 daily Functions requests ever run out, the website is unavailable until midnight UTC, but the installed app keeps working offline. Your data isn't on the website; "Forgot PIN?" won't work until then.
 
 ## Develop
