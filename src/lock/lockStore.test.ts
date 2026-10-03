@@ -1,0 +1,81 @@
+import { beforeEach, describe, expect, it } from 'vitest'
+import { readAllData, replaceAllData } from '../backup/storage'
+import { resetDatabase } from '../db/db'
+import { getSetting } from '../db/settings'
+import { changePin, checkPin, resetFailures, setPasskey, turnOffLock, turnOnLock } from './lockStore'
+import { LOCK_OFF, NO_FAILURES } from './types'
+
+const NOW = Date.UTC(2026, 9, 3, 12, 0, 0)
+
+beforeEach(resetDatabase)
+
+async function failTimes(times: number, now = NOW) {
+  for (let i = 0; i < times; i += 1) await checkPin('000000', now)
+}
+
+describe('lock store', () => {
+  it('is off by default', async () => {
+    expect(await getSetting('appLock')).toEqual(LOCK_OFF)
+    expect(await getSetting('appLockFailures')).toEqual(NO_FAILURES)
+  })
+
+  it('turns on with a hashed PIN', async () => {
+    await turnOnLock('123456')
+    const lock = await getSetting('appLock')
+    expect(lock).toMatchObject({ enabled: true, passkeyId: null })
+    expect(JSON.stringify(lock)).not.toContain('123456')
+    expect(await checkPin('123456', NOW)).toEqual({ result: 'ok' })
+  })
+
+  it('counts wrong PINs and resets the count on a right one', async () => {
+    await turnOnLock('123456')
+    expect(await checkPin('000000', NOW)).toEqual({ result: 'wrong', failures: { count: 1, lockedUntil: null } })
+    expect(await getSetting('appLockFailures')).toEqual({ count: 1, lockedUntil: null })
+    expect(await checkPin('123456', NOW)).toEqual({ result: 'ok' })
+    expect(await getSetting('appLockFailures')).toEqual(NO_FAILURES)
+  })
+
+  it('pauses after the 5th wrong PIN without checking during the wait', async () => {
+    await turnOnLock('123456')
+    await failTimes(4)
+    const fifth = await checkPin('000000', NOW)
+    expect(fifth).toEqual({ result: 'wait', failures: { count: 5, lockedUntil: NOW + 30_000 } })
+    expect(await checkPin('123456', NOW + 29_000)).toEqual(fifth)
+    expect(await checkPin('123456', NOW + 30_000)).toEqual({ result: 'ok' })
+  })
+
+  it('changes the PIN and keeps Face ID', async () => {
+    await turnOnLock('123456')
+    await setPasskey('cred-1')
+    await failTimes(2)
+    await changePin('654321')
+    expect(await getSetting('appLockFailures')).toEqual(NO_FAILURES)
+    expect((await getSetting('appLock')).passkeyId).toBe('cred-1')
+    expect((await checkPin('123456', NOW)).result).toBe('wrong')
+    expect(await checkPin('654321', NOW)).toEqual({ result: 'ok' })
+  })
+
+  it('sets and clears Face ID, resets failures, and turns off', async () => {
+    await turnOnLock('123456')
+    await setPasskey('cred-1')
+    expect((await getSetting('appLock')).passkeyId).toBe('cred-1')
+    await setPasskey(null)
+    expect((await getSetting('appLock')).passkeyId).toBeNull()
+    await failTimes(3)
+    await resetFailures()
+    expect(await getSetting('appLockFailures')).toEqual(NO_FAILURES)
+    await failTimes(1)
+    await turnOffLock()
+    expect(await getSetting('appLock')).toEqual(LOCK_OFF)
+    expect(await getSetting('appLockFailures')).toEqual(NO_FAILURES)
+  })
+
+  it('is never part of a backup and survives a restore', async () => {
+    await turnOnLock('123456')
+    const data = await readAllData()
+    expect(Object.keys(data).sort()).toEqual(['friends', 'groups', 'meetupTypes', 'meetups'])
+    expect(JSON.stringify(data)).not.toContain('appLock')
+    await replaceAllData(data)
+    expect((await getSetting('appLock')).enabled).toBe(true)
+  })
+})

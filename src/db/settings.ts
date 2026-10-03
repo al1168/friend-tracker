@@ -1,13 +1,18 @@
+import { LOCK_OFF, NO_FAILURES, type AppLock, type LockFailures } from '../lock/types'
 import { db } from './db'
 
 export interface Settings {
   lastBackupAt: string | null
   installHintDismissed: boolean
+  appLock: AppLock
+  appLockFailures: LockFailures
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   lastBackupAt: null,
   installHintDismissed: false,
+  appLock: LOCK_OFF,
+  appLockFailures: NO_FAILURES,
 }
 
 export async function getSetting<K extends keyof Settings>(key: K): Promise<Settings[K]> {
