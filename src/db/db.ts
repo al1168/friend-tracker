@@ -25,6 +25,25 @@ db.version(1).stores({
   settings: 'key',
 })
 
+// Version 2 gives every friend likes and dislikes lists. Same stores, no new indexes.
+db.version(2)
+  .stores({
+    friends: 'id, groupId',
+    groups: 'id',
+    meetupTypes: 'id, order',
+    meetups: 'id, date, typeId, *friendIds',
+    settings: 'key',
+  })
+  .upgrade((tx) =>
+    tx
+      .table('friends')
+      .toCollection()
+      .modify((friend: Partial<Friend>) => {
+        friend.likes ??= []
+        friend.dislikes ??= []
+      }),
+  )
+
 // Runs once, when the database is first created on this device.
 db.on('populate', (tx) => {
   return tx.table('meetupTypes').bulkAdd(DEFAULT_MEETUP_TYPES)

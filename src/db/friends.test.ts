@@ -25,6 +25,11 @@ describe('addFriend', () => {
   it('rejects an empty name', async () => {
     await expect(addFriend(input({ name: '   ' }))).rejects.toThrow(ValidationError)
   })
+
+  it('starts with empty likes and dislikes', async () => {
+    const friend = await addFriend(input())
+    expect(friend).toMatchObject({ likes: [], dislikes: [] })
+  })
 })
 
 describe('updateFriend', () => {
@@ -32,6 +37,13 @@ describe('updateFriend', () => {
     const friend = await addFriend(input())
     await updateFriend(friend.id, input({ name: 'Alexandra', notes: 'Moved to Austin' }))
     expect(await db.friends.get(friend.id)).toMatchObject({ name: 'Alexandra', notes: 'Moved to Austin' })
+  })
+
+  it('leaves likes and dislikes alone', async () => {
+    const friend = await addFriend(input())
+    await db.friends.update(friend.id, { likes: ['Sushi'], dislikes: ['Cilantro'] })
+    await updateFriend(friend.id, input({ name: 'Alexandra' }))
+    expect(await db.friends.get(friend.id)).toMatchObject({ likes: ['Sushi'], dislikes: ['Cilantro'] })
   })
 })
 

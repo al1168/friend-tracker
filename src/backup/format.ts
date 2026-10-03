@@ -103,6 +103,9 @@ function readBackup(raw: unknown): BackupData {
       groupId: nullableText(r, 'groupId', where),
       photo,
       notes: text(r, 'notes', where),
+      // Version 1 backups were made before likes and dislikes existed.
+      likes: [],
+      dislikes: [],
       createdAt: text(r, 'createdAt', where),
     }
   })

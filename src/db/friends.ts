@@ -17,16 +17,17 @@ function clean(input: FriendInput): FriendInput {
 }
 
 export async function addFriend(input: FriendInput): Promise<Friend> {
-  const friend: Friend = { id: newId(), ...clean(input), createdAt: new Date().toISOString() }
+  const friend: Friend = { id: newId(), ...clean(input), likes: [], dislikes: [], createdAt: new Date().toISOString() }
   await db.friends.add(friend)
   return friend
 }
 
+/** Updates the fields the friend sheet edits. Likes and dislikes are left alone. */
 export async function updateFriend(id: string, input: FriendInput): Promise<void> {
-  const cleaned = clean(input)
+  const { name, groupId, photo, notes } = clean(input)
   await db.transaction('rw', db.friends, async () => {
     if (!(await db.friends.get(id))) throw new ValidationError('This friend no longer exists.')
-    await db.friends.update(id, cleaned)
+    await db.friends.update(id, { name, groupId, photo, notes })
   })
 }
 

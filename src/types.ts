@@ -7,6 +7,9 @@ export interface Friend {
   /** JPEG data URL, longest side ≤ 400px */
   photo: string | null
   notes: string
+  /** Short items in the order added, oldest first. See src/lib/preferences.ts for the rules. */
+  likes: string[]
+  dislikes: string[]
   createdAt: string
 }
 

@@ -3,7 +3,7 @@ import type { Friend, Group, Meetup, MeetupType } from '../types'
 export const TODAY = '2026-10-02'
 
 export function friend(id: string, name: string, groupId: string | null = null): Friend {
-  return { id, name, groupId, photo: null, notes: '', createdAt: '2026-01-01T00:00:00.000Z' }
+  return { id, name, groupId, photo: null, notes: '', likes: [], dislikes: [], createdAt: '2026-01-01T00:00:00.000Z' }
 }
 
 export function meetup(id: string, date: string, friendIds: string[], typeId = 'coffee'): Meetup {
