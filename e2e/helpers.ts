@@ -46,6 +46,22 @@ export async function logMeetup(
   await expect(sheet).toBeHidden()
 }
 
+/** A birthday to pick in the friend sheet. Leave out `year` for "No year". */
+export interface BirthdayChoice {
+  month: number
+  day: number
+  year?: number
+}
+
+/** In an open friend sheet: picks the birthday's month, day and year. */
+export async function setBirthday(sheet: Locator, { month, day, year }: BirthdayChoice) {
+  await sheet.getByRole('combobox', { name: 'Birthday month' }).selectOption(String(month))
+  await sheet.getByRole('combobox', { name: 'Birthday day' }).selectOption(String(day))
+  await sheet
+    .getByRole('combobox', { name: 'Birthday year' })
+    .selectOption(year === undefined ? { label: 'No year' } : String(year))
+}
+
 /** On a friend's page: adds `text` to their Likes or Dislikes with Enter, then closes the field. */
 export async function addToList(page: Page, list: 'Likes' | 'Dislikes', text: string) {
   const kind = list === 'Likes' ? 'like' : 'dislike'

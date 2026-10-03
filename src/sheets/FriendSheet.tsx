@@ -12,8 +12,11 @@ import { useGroups } from '../data/hooks'
 import { ValidationError } from '../db/errors'
 import { addFriend, deleteFriend, updateFriend } from '../db/friends'
 import { addGroup } from '../db/groups'
+import { useToday } from '../hooks/useToday'
+import { birthdayFromFields, EMPTY_BIRTHDAY_FIELDS, type BirthdayFields } from '../lib/birthdays'
 import { isPlainEnter } from '../lib/keys'
 import { resizeImageToDataUrl } from '../lib/image'
+import { BirthdayField } from './BirthdayField'
 import type { FriendSheetRequest } from './sheetsContext'
 import './FriendSheet.css'
 
@@ -30,6 +33,7 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
   const confirmDiscard = useConfirmDiscard()
   const toast = useToast()
   const navigate = useNavigate()
+  const today = useToday()
   const fileInput = useRef<HTMLInputElement>(null)
   const nameId = useId()
   const notesId = useId()
@@ -38,6 +42,7 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
   const groupErrorId = useId()
   const photoErrorId = useId()
   const nameInput = useRef<HTMLInputElement>(null)
+  const birthdayRow = useRef<HTMLDivElement>(null)
   const savingRef = useRef(false)
   const creatingGroupRef = useRef(false)
 
@@ -45,6 +50,9 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
   const [groupId, setGroupId] = useState<string | null>(editing?.groupId ?? null)
   const [photo, setPhoto] = useState<string | null>(editing?.photo ?? null)
   const [notes, setNotes] = useState(editing?.notes ?? '')
+  const initialBirthday: BirthdayFields = editing?.birthday ?? EMPTY_BIRTHDAY_FIELDS
+  const [birthday, setBirthday] = useState(initialBirthday)
+  const [birthdayError, setBirthdayError] = useState<string | null>(null)
   const [newGroupName, setNewGroupName] = useState<string | null>(null)
   const [nameError, setNameError] = useState<string | null>(null)
   const [groupError, setGroupError] = useState<string | null>(null)
@@ -57,6 +65,9 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
     groupId !== (editing?.groupId ?? null) ||
     photo !== (editing?.photo ?? null) ||
     notes !== (editing?.notes ?? '') ||
+    birthday.month !== initialBirthday.month ||
+    birthday.day !== initialBirthday.day ||
+    birthday.year !== initialBirthday.year ||
     !!newGroupName?.trim()
 
   async function requestClose() {
@@ -65,9 +76,15 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
 
   async function save() {
     if (savingRef.current || processingPhoto) return
-    if (!name.trim()) {
-      flushSync(() => setNameError('Please enter a name.'))
-      nameInput.current?.focus()
+    const checked = birthdayFromFields(birthday, today)
+    if (!name.trim() || !checked.ok) {
+      flushSync(() => {
+        if (!name.trim()) setNameError('Please enter a name.')
+        if (!checked.ok) setBirthdayError(checked.error)
+      })
+      // Focus goes to the first problem. The birthday row itself takes it, not a select, so iOS doesn't open a wheel.
+      if (!name.trim()) nameInput.current?.focus()
+      else birthdayRow.current?.focus()
       return
     }
     savingRef.current = true
@@ -86,8 +103,7 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
           return
         }
       }
-      // The sheet doesn't edit birthdays yet, so an edited friend keeps theirs.
-      const input = { name, groupId: finalGroupId, photo, notes, birthday: editing?.birthday ?? null }
+      const input = { name, groupId: finalGroupId, photo, notes, birthday: checked.birthday }
       if (editing) {
         await updateFriend(editing.id, input)
         toast({ message: 'Saved' })
@@ -290,6 +306,17 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
         )}
       </div>
 
+      <BirthdayField
+        value={birthday}
+        error={birthdayError}
+        today={today}
+        rowRef={birthdayRow}
+        onChange={(value) => {
+          setBirthday(value)
+          setBirthdayError(null)
+        }}
+      />
+
       <div className="form-section">
         <label className="field-label" htmlFor={notesId}>
           Notes
@@ -299,7 +326,7 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
           className="field"
           rows={3}
           value={notes}
-          placeholder="Birthday, partner's name"
+          placeholder="Partner's name, how you met"
           onChange={(event) => setNotes(event.target.value)}
         />
       </div>

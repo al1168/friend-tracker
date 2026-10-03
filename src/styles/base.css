@@ -36,6 +36,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
   color: inherit;
@@ -51,6 +52,7 @@ button {
 
 /* 16px minimum stops iOS from zooming into focused fields. */
 input,
+select,
 textarea {
   font-size: max(16px, 1rem);
 }

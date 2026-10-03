@@ -1,0 +1,41 @@
+/* Month, Day and Year share one row, Month widest. The bases fit "September", "Day" and "No year"
+   at the default text size; at large text sizes the row wraps. */
+.birthday-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  border-radius: var(--radius-field);
+}
+.birthday-select {
+  position: relative;
+  flex: 1 1 6em;
+  min-width: 0;
+}
+.birthday-select--month {
+  flex-basis: 7.5em;
+}
+.birthday-select--day {
+  flex-basis: 4.5em;
+}
+.birthday-select .field {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-inline: 0.75rem 1.75rem;
+}
+/* The empty choice ("Month", "Day", "No year") reads like a placeholder. */
+.birthday-select .field[data-empty='true'] {
+  color: var(--ink-3);
+}
+.birthday-select svg {
+  position: absolute;
+  top: 50%;
+  right: 0.6rem;
+  translate: 0 -50%;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+/* Lines its text up with the "Birthday" label above the row. */
+.birthday-remove {
+  align-self: flex-start;
+  margin-inline-start: calc(-1 * var(--space-1));
+}
