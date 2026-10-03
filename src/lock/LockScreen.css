@@ -49,3 +49,6 @@
 .lock-screen__face-id {
   min-height: 52px;
 }
+.lock-screen__forgot {
+  margin-top: calc(-1 * var(--space-2));
+}

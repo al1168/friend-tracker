@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { resetFailures } from './lockStore'
 import { verifyPasskey } from './passkey'
 import { PinMessage, PinPad } from './PinPad'
+import { ResetPinSheet } from './ResetPinSheet'
 import type { AppLock } from './types'
 import { usePinCheck } from './usePinCheck'
 import './LockScreen.css'
@@ -12,6 +13,8 @@ export function LockScreen({ lock, onUnlock }: { lock: AppLock; onUnlock: () => 
   const entry = usePinCheck(onUnlock)
   const faceIdBusy = useRef(false)
   const titleRef = useRef<HTMLHeadingElement>(null)
+  const [resetOpen, setResetOpen] = useState(false)
+  const [resetKey, setResetKey] = useState(0)
 
   useEffect(() => {
     document.title = 'Friend Tracker'
@@ -56,6 +59,17 @@ export function LockScreen({ lock, onUnlock }: { lock: AppLock; onUnlock: () => 
         {...entry.pinPad}
         status={<PinMessage message={entry.message} waitMs={entry.waitMs} announceKey={entry.messageKey} />}
       />
+      <button
+        type="button"
+        className="text-button lock-screen__forgot"
+        onClick={() => {
+          setResetKey((key) => key + 1)
+          setResetOpen(true)
+        }}
+      >
+        Forgot PIN?
+      </button>
+      <ResetPinSheet key={resetKey} open={resetOpen} onClose={() => setResetOpen(false)} onReset={onUnlock} />
     </div>
   )
 }

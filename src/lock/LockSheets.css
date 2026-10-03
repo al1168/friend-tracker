@@ -24,3 +24,11 @@
   color: var(--ink-2);
   text-wrap: balance;
 }
+
+/* Reset PIN: the explanation above the website password field. */
+.lock-sheet__intro {
+  margin: 0 var(--space-1) var(--space-2);
+  font-size: var(--text-subhead);
+  line-height: 1.45;
+  color: var(--ink-2);
+}

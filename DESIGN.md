@@ -255,7 +255,7 @@ Six soft pastel pairs (`.tint-0` to `.tint-5`, hues 50, 85, 145, 215, 285, 350),
 - **Caption** (0.7rem): tab bar labels (500, capped at 13px), the "this year" label under counts, the "Upcoming" badge (600), month initials (capped at 18px).
 
 ### Named Rules
-**The Dynamic Type Rule.** The root font is `-apple-system-body`, so 1rem follows the iPhone text-size setting; every type size and spacing step is in rem. Layouts must survive the largest standard size (about 23px body): rows grow taller, subtitles wrap, the stat row stays three across up to about 28px and stacks beyond, the "+ Log meetup" pill stays on one line. The only fixed-pixel exceptions are avatars, icons (except the Log pill's plus, which is 1.15em), tab labels (capped at 13px), month initials (capped at 18px), and input text (never below 16px, so iOS doesn't zoom).
+**The Dynamic Type Rule.** The root font is `-apple-system-body`, so 1rem follows the iPhone text-size setting; every type size and spacing step is in rem. Layouts must survive the largest standard size (about 23px body): rows grow taller, subtitles wrap, the stat row stays three across up to about 28px and stacks beyond, the "+ Log meetup" pill stays on one line. The only fixed-pixel exceptions are avatars, icons (except the Log pill's plus, which is 1.15em), tab labels (capped at 13px), month initials (capped at 18px), input text (never below 16px, so iOS doesn't zoom), and the lock screen's keypad and the Face ID switch (listed under "Lock screen and PIN pad").
 
 **The Rounded Numbers Rule.** Counts and years use the `.numeric` treatment: the rounded face with tabular numerals, so columns of numbers line up.
 
@@ -331,6 +331,15 @@ One Paper White group (not three cards) with three centered items: a 1.6rem roun
 
 ### Empty states
 Centered: two overlapping circles (Peach Wash and Peach at 75%) as a quiet mark, a balanced Title 3 headline, a balanced Warm Ink Secondary message, then at most one primary button. The copy is kind and plain ("Add the people you want to keep up with.").
+
+### Lock screen and PIN pad
+Shown instead of the app, never over it, when the app lock is on and the app has been away 15 minutes or more. One centered column on Warm Paper: the two-circle mark (72×48px), "Friend Tracker is locked" in Title 3 (rounded, 600), "Enter your PIN" in Subhead Warm Ink Secondary, an optional "Unlock with Face ID" primary pill (52px), the PIN pad, and a "Forgot PIN?" text button.
+- **Dots:** six 14px circles with a 1.5px Warm Ink Secondary ring, filled Warm Ink as digits go in. A wrong PIN clears them with one 400ms shake (none with Reduce Motion).
+- **Message line:** one reserved Subhead line under the dots in Warm Ink Secondary, never red: "Wrong PIN. Try again.", or the "Try again in 0:30" countdown (`role="timer"`) while PIN entry is paused.
+- **Keys:** Paper White circles, 72px (shrinking to no less than 64px on short screens, so large text still fits) with rounded tabular digits (capped at 34px), Linen Pressed on press, in a 3×4 grid: 1 to 9, a blank, 0, and a quiet delete glyph that appears once a digit is entered.
+- **Fixed pixel sizes (exceptions to the Dynamic Type Rule):** the keypad is a touch target and a fixed shape, so it does not grow with text size. The key size `clamp(64px, 10dvh, 72px)`, the 14px row and 24px column gaps between keys, the 14px dots, and the 51×31px Face ID switch in Settings stay in pixels. Everything around them (prompts, messages, buttons, the sheet's intro) follows the text size.
+- The same pad sits in the Turn on app lock, Change PIN, Turn off app lock and Reset PIN sheets, under a Title 3 prompt that takes focus when the step changes, so VoiceOver reads it once.
+- The website sign-in page (`server/loginPage.ts`) is a standalone copy of this look: the mark, a Title, a password field and a block primary button, in both themes.
 
 ## 6. Do's and Don'ts
 
