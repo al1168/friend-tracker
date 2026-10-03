@@ -1,0 +1,48 @@
+/* The whole screen while locked: one calm centered column, keypad in the lower half for the thumb. */
+.lock-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  min-height: 100dvh;
+  padding: calc(var(--safe-top) + var(--space-6)) var(--space-4) calc(var(--safe-bottom) + var(--space-4));
+  background: var(--bg);
+  text-align: center;
+  animation: fade-in var(--dur) var(--ease-out-quart);
+}
+
+.lock-screen__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.lock-screen__mark {
+  width: 72px;
+  height: 48px;
+  margin-bottom: var(--space-3);
+}
+.lock-screen__circle-a {
+  fill: var(--accent-soft);
+}
+.lock-screen__circle-b {
+  fill: var(--accent);
+  opacity: 0.75;
+}
+.lock-screen__title {
+  max-width: 22ch;
+  margin: 0;
+  font-family: var(--font-rounded);
+  font-size: var(--text-title-3);
+  font-weight: 600;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+.lock-screen__hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-subhead);
+  color: var(--ink-2);
+}
+.lock-screen__face-id {
+  min-height: 52px;
+}

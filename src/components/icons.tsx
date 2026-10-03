@@ -121,3 +121,10 @@ export const IconSettings = (props: IconProps) => (
     <circle cx="9" cy="17" r="2" />
   </Icon>
 )
+
+export const IconDelete = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M9 5.5h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-6-6.5z" />
+    <path d="M12.5 9.5l5 5M17.5 9.5l-5 5" />
+  </Icon>
+)

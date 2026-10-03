@@ -1,7 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
-import { addFriend, goToTab, logMeetup } from './helpers.ts'
+import { addFriend, goToTab, lockHeading, logMeetup, reopenAfterAWhile, seedAppLock } from './helpers.ts'
 
 const DIR = 'e2e/screenshots'
+// Roughly the iPhone's largest standard text size.
+const LARGE_TEXT = 'html { font: 23px/1.35 -apple-system, system-ui, sans-serif !important; }'
 
 function daysAgo(days: number): string {
   const date = new Date()
@@ -54,6 +56,16 @@ async function captureAll(page: Page, prefix: string) {
   await page.screenshot({ path: `${DIR}/${prefix}-07-settings.png` })
 }
 
+async function captureLock(page: Page, prefix: string, largeText = false) {
+  await page.goto('/')
+  await seedAppLock(page, '135790')
+  await reopenAfterAWhile(page)
+  if (largeText) await page.addStyleTag({ content: LARGE_TEXT })
+  await expect(lockHeading(page)).toBeVisible()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-08-lock.png` })
+}
+
 for (const scheme of ['light', 'dark'] as const) {
   test.describe(scheme, () => {
     test.use({ colorScheme: scheme })
@@ -69,13 +81,20 @@ for (const scheme of ['light', 'dark'] as const) {
       await seed(page)
       await captureAll(page, scheme)
     })
+
+    test('lock screen', async ({ page }) => {
+      await captureLock(page, scheme)
+    })
   })
 }
 
 test('large text', async ({ page }) => {
   test.setTimeout(120_000)
   await seed(page)
-  // Roughly the iPhone's largest standard text size.
-  await page.addStyleTag({ content: 'html { font: 23px/1.35 -apple-system, system-ui, sans-serif !important; }' })
+  await page.addStyleTag({ content: LARGE_TEXT })
   await captureAll(page, 'large-text')
+})
+
+test('large text lock screen', async ({ page }) => {
+  await captureLock(page, 'large-text', true)
 })

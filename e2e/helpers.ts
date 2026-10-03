@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 
 /** A valid 1×1 PNG. */
 export const ONE_PIXEL_PNG =
@@ -44,4 +44,58 @@ export async function logMeetup(
   if (options.note) await sheet.getByLabel('Note').fill(options.note)
   await sheet.getByRole('button', { name: 'Save' }).click()
   await expect(sheet).toBeHidden()
+}
+
+/** The lock screen's heading. */
+export function lockHeading(page: Page): Locator {
+  return page.getByRole('heading', { level: 1, name: 'Friend Tracker is locked' })
+}
+
+/** Taps a PIN on the keypad inside `scope` (the page, or a sheet). */
+export async function enterPin(scope: Page | Locator, pin: string) {
+  for (const digit of pin) await scope.getByRole('button', { name: digit, exact: true }).click()
+}
+
+/**
+ * Turns on the app lock with this PIN by writing it straight into IndexedDB, hashed the same way
+ * the app does (PBKDF2-SHA256, 210,000 iterations). The open page doesn't notice until it reloads.
+ */
+export async function seedAppLock(page: Page, pin: string) {
+  await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
+  await page.evaluate(async (pin) => {
+    const toBase64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes))
+    const salt = crypto.getRandomValues(new Uint8Array(16))
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits'])
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 210_000 }, key, 256)
+    const value = {
+      enabled: true,
+      pin: { hash: toBase64(new Uint8Array(bits)), salt: toBase64(salt), iterations: 210_000 },
+      passkeyId: null,
+    }
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open('friend-tracker')
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => {
+        const database = request.result
+        const transaction = database.transaction('settings', 'readwrite')
+        transaction.objectStore('settings').put({ key: 'appLock', value })
+        transaction.oncomplete = () => {
+          database.close()
+          resolve()
+        }
+        transaction.onerror = () => reject(transaction.error)
+      }
+    })
+  }, pin)
+}
+
+/**
+ * Reloads as if the app had been closed for 16 minutes. The stale time is set before the app
+ * starts on every later load of this page too, so each reload behaves like a fresh, late launch.
+ */
+export async function reopenAfterAWhile(page: Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem('ft:lastActiveAt', String(Date.now() - 16 * 60_000))
+  })
+  await page.reload()
 }

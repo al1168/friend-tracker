@@ -1,0 +1,100 @@
+.pin-pad {
+  --pin-key: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.pin-dots {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+}
+.pin-dot {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--ink-2);
+  border-radius: 50%;
+  transition:
+    background-color var(--dur-fast) var(--ease-out-quart),
+    border-color var(--dur-fast) var(--ease-out-quart);
+}
+.pin-dot--filled {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+.pin-dots--shake {
+  animation: pin-shake 400ms var(--ease-out-quart);
+}
+@keyframes pin-shake {
+  20% {
+    transform: translateX(-10px);
+  }
+  40% {
+    transform: translateX(8px);
+  }
+  60% {
+    transform: translateX(-5px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+
+/* Holds one line of text so the keys don't jump when a message appears. */
+.pin-message {
+  min-height: calc(var(--text-subhead) * 1.4);
+  max-width: 32ch;
+  font-size: var(--text-subhead);
+  line-height: 1.4;
+  color: var(--ink-2);
+  text-align: center;
+}
+.pin-message p {
+  margin: 0;
+}
+
+.pin-keys {
+  display: grid;
+  grid-template-columns: repeat(3, var(--pin-key));
+  gap: var(--space-4) var(--space-6);
+  margin-top: var(--space-2);
+}
+.pin-key {
+  display: grid;
+  place-items: center;
+  width: var(--pin-key);
+  height: var(--pin-key);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-rounded);
+  font-size: min(1.75rem, 34px);
+  font-variant-numeric: tabular-nums;
+  transition: background-color var(--dur-fast) var(--ease-out-quart);
+}
+.pin-key:active:not(:disabled) {
+  background: var(--surface-pressed);
+}
+.pin-key:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.pin-key--quiet {
+  background: transparent;
+  color: var(--ink-2);
+}
+.pin-key--quiet:active:not(:disabled) {
+  background: var(--surface-2);
+}
+/* Delete appears once there's something to delete, as on the iPhone passcode screen. */
+.pin-key--quiet:disabled {
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pin-dots--shake {
+    animation: none;
+  }
+}
