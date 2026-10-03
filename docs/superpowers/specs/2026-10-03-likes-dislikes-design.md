@@ -111,3 +111,22 @@ The Notes placeholder becomes "Birthday, partner's name", since favourite things
 - export and import keeps the lists.
 
 **Screenshots:** the friend page with both lists, in light, dark and large text.
+
+## Decisions made while planning
+
+Recorded in [the plan](../plans/2026-10-03-likes-dislikes.md):
+
+- **Repeats in one entry.** "sushi, Sushi" adds one item (the first spelling). Only items already in the list count as skipped.
+- **Field length.** The add field allows 300 characters, so several items fit in one entry. Each item is still limited to 60 characters.
+- **After Enter or Add.** A save that works clears the field, even when every item was already there (then "Already in Likes." shows). A refused save ("This list is full.", "Keep each one under 60 characters.") keeps the text so it can be fixed. Enter on an empty field closes it, like the keyboard's Done.
+- **A field that closes with text in it** (blur, or opening the other list's field) saves it. If that text can't be saved (an item over 60 characters, or the list is full), the field stays open with its text and the hint, so nothing is lost.
+- **Clear button.** A "Clear text" button (iOS style) appears in the field whenever it has text.
+- **Switching apps.** Blur while the app is in the background (`!document.hasFocus()`) doesn't close the field.
+- **Taps inside the lists keep the field focused.** While a field is open, tapping Add, the other list's "+ Add" or an item doesn't blur the field first, so nothing moves under the finger before the tap lands. The other list's "+ Add" saves and switches; an item's action sheet takes focus, so the field saves and closes behind it.
+- **Focus.** After Remove, focus moves to the neighbouring chip or "+ Add". After Move, it goes to the moved chip. After Escape, or Enter on an empty field, it goes to "+ Add" (with no visible ring for the Enter case). A tap away doesn't move focus.
+- **Announcements.** After items are added, a polite live region announces "Added ...". It is cleared when the field closes.
+- **Toast layering.** Toasts sit between sheets and action sheets (z-index 55), so an action sheet's scrim covers a pending Undo toast. A toast that wraps becomes a soft box with 26px corners.
+- **Failure toasts.** A move or remove that fails for a reason other than these rules shows "Couldn't save. Please try again."; a failed Undo shows "Couldn't undo. Please try again." All are plain toasts.
+- **Backups.** List limits are checked after cleaning. Items aren't split on commas. An item in both lists of an edited file stays in Likes.
+- **Stale actions.** Removing an item that's already gone does nothing. Moving an item the other list already has just removes it from this one.
+- **Missing lists.** A Dexie reading hook fills in missing `likes` and `dislikes` on read. This covers friends written later by older code, such as a second tab or a rollback.

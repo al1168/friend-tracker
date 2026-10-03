@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { addFriend, goToTab, lockHeading, logMeetup, reopenAfterAWhile, seedAppLock, stubFaceId } from './helpers.ts'
+import { addFriend, addToList, goToTab, lockHeading, logMeetup, reopenAfterAWhile, seedAppLock, stubFaceId } from './helpers.ts'
 
 const DIR = 'e2e/screenshots'
 // Roughly the iPhone's largest standard text size.
@@ -28,6 +28,12 @@ async function seed(page: Page) {
   await logMeetup(page, ['Theo Brooks'], { type: 'Call', date: daysAgo(120) })
   await logMeetup(page, ['Alex Rivera', 'Kim Park', 'Jordan Lee'], { type: 'Party', date: daysAgo(300) })
   await logMeetup(page, ['Sam Chen'], { type: 'Trip', date: daysAgo(400) })
+  await page.getByRole('link', { name: /Alex Rivera/ }).click()
+  await addToList(page, 'Likes', 'Ramen, Board games, Hiking')
+  // Long enough to show an item wrapping inside its chip.
+  await addToList(page, 'Likes', 'Live jazz in tiny basement bars on rainy weeknights')
+  await addToList(page, 'Dislikes', 'Cilantro, Early mornings')
+  await goToTab(page, 'Friends')
   // The last toast has an Undo action, so it stays up for 8 seconds.
   await expect(page.getByRole('status')).toBeEmpty({ timeout: 12_000 })
 }
