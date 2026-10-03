@@ -3,7 +3,15 @@
 import { clearFailures, isLockedOut, recordFailure, type KVLike } from './attempts.ts'
 import { loginPage } from './loginPage.ts'
 import { checkPassword } from './password.ts'
-import { SESSION_COOKIE, createSessionValue, readCookie, sessionCookie, verifySessionValue } from './session.ts'
+import {
+  SESSION_COOKIE,
+  createSessionValue,
+  derivePasswordKey,
+  deriveSessionKey,
+  readCookies,
+  sessionCookie,
+  verifySessionValue,
+} from './session.ts'
 
 export interface GateEnv {
   SITE_PASSWORD?: string
@@ -13,6 +21,9 @@ export interface GateEnv {
 
 export const LOGIN_PATH = '/__login'
 export const VERIFY_PATH = '/__verify-password'
+
+/** The shortest SITE_PASSWORD the gate accepts. Guessing is limited per address only, so the passphrase must be strong. */
+export const MIN_PASSWORD_LENGTH = 16
 
 export const MESSAGES = {
   wrongPassword: "That password didn't work.",
@@ -40,20 +51,29 @@ function page(status: number, next: string, error: string | null): Response {
   })
 }
 
-/** Only same-site paths survive: they start with one "/", and have no backslash or control characters. */
+/** Only same-site paths survive: one leading "/", then printable ASCII only, and no "//" or backslash. */
 export function sanitizeNext(next: string | null | undefined): string {
-  if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return '/'
-  if (/[\u0000-\u001f\u007f]/.test(next)) return '/'
-  return next
+  if (!next || next.startsWith('//') || next.includes('\\')) return '/'
+  return /^\/[\x21-\x7e]*$/.test(next) ? next : '/'
 }
 
 function clientIp(request: Request): string {
   return request.headers.get('CF-Connecting-IP') ?? 'unknown'
 }
 
-async function hasSession(request: Request, secret: string, now: number): Promise<boolean> {
-  const value = readCookie(request.headers.get('Cookie'), SESSION_COOKIE)
-  return value !== null && (await verifySessionValue(secret, value, now))
+/** Signed in when any cookie with the session name verifies (a stray duplicate can't lock the owner out). */
+async function hasSession(request: Request, key: CryptoKey, now: number): Promise<boolean> {
+  for (const value of readCookies(request.headers.get('Cookie'), SESSION_COOKIE)) {
+    if (await verifySessionValue(key, value, now)) return true
+  }
+  return false
+}
+
+/** True for a POST that a browser says came from another site (checked before anything is counted). */
+function isCrossSite(request: Request, url: URL): boolean {
+  if (request.headers.get('Sec-Fetch-Site') === 'cross-site') return true
+  const origin = request.headers.get('Origin')
+  return origin !== null && origin !== url.origin
 }
 
 function isNavigation(request: Request): boolean {
@@ -90,12 +110,14 @@ export async function handleRequest(request: Request, env: GateEnv, now: number)
   const secret = env.SESSION_SECRET
   const attempts = env.LOGIN_ATTEMPTS
   // Fail closed: a missing secret or binding must never open the site.
-  if (!password || !secret || secret.length < 32 || !attempts) {
+  if (!password || password.length < MIN_PASSWORD_LENGTH || !secret || secret.length < 32 || !attempts) {
     return respond(500, MESSAGES.notSetUp, { 'Content-Type': 'text/plain; charset=utf-8' })
   }
 
   const url = new URL(request.url)
-  const signedIn = await hasSession(request, secret, now)
+  const sessionKey = await deriveSessionKey(secret, password)
+  const passwordKey = await derivePasswordKey(secret)
+  const signedIn = await hasSession(request, sessionKey, now)
 
   if (url.pathname === LOGIN_PATH) {
     if (request.method === 'GET') {
@@ -103,13 +125,14 @@ export async function handleRequest(request: Request, env: GateEnv, now: number)
       return page(200, sanitizeNext(url.searchParams.get('next')), null)
     }
     if (request.method === 'POST') {
+      if (isCrossSite(request, url)) return respond(403, 'Forbidden', { 'Content-Type': 'text/plain; charset=utf-8' })
       const form = await readForm(request)
       const next = sanitizeNext(form.next)
       const ip = clientIp(request)
       if (await isLockedOut(attempts, ip, now)) return page(429, next, MESSAGES.tooManyAttempts)
-      if (await checkPassword(secret, password, form.password)) {
+      if (await checkPassword(passwordKey, password, form.password)) {
         await clearFailures(attempts, ip)
-        const cookie = sessionCookie(await createSessionValue(secret, now))
+        const cookie = sessionCookie(await createSessionValue(sessionKey, now))
         return respond(303, null, { Location: next, 'Set-Cookie': cookie })
       }
       await recordFailure(attempts, ip, now)
@@ -120,12 +143,13 @@ export async function handleRequest(request: Request, env: GateEnv, now: number)
 
   if (url.pathname === VERIFY_PATH) {
     if (request.method !== 'POST') return respond(405, null, { Allow: 'POST' })
-    if (!signedIn) return respond(403)
+    if (isCrossSite(request, url) || !signedIn) return respond(403)
+    if (!(request.headers.get('Content-Type') ?? '').toLowerCase().startsWith('application/json')) return respond(415)
     const ip = clientIp(request)
     if (await isLockedOut(attempts, ip, now)) return respond(429)
     const submitted = await readJsonPassword(request)
     if (submitted === null) return respond(400)
-    if (await checkPassword(secret, password, submitted)) {
+    if (await checkPassword(passwordKey, password, submitted)) {
       await clearFailures(attempts, ip)
       return respond(204)
     }

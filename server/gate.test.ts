@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { MAX_ATTEMPTS, recordFailure } from './attempts.ts'
 import { MESSAGES, handleRequest, sanitizeNext, type GateEnv } from './gate.ts'
 import { createMemoryKv } from './memoryKv.ts'
-import { createSessionValue, verifySessionValue } from './session.ts'
+import { createSessionValue, deriveSessionKey, verifySessionValue } from './session.ts'
 
 const ORIGIN = 'https://friend-tracker.pages.dev'
 const SECRET = 'test-secret-0123456789-abcdefghijklmnop'
@@ -16,8 +16,12 @@ function setup() {
   return { kv, env }
 }
 
+function sessionKey() {
+  return deriveSessionKey(SECRET, PASSWORD)
+}
+
 async function signedInCookie(): Promise<string> {
-  return `ft_session=${await createSessionValue(SECRET, NOW)}`
+  return `__Host-ft_session=${await createSessionValue(await sessionKey(), NOW)}`
 }
 
 function get(path: string, headers: Record<string, string> = {}): Request {
@@ -66,6 +70,17 @@ describe('sanitizeNext', () => {
       expect(sanitizeNext(bad)).toBe('/')
     }
   })
+
+  it('allows only printable ASCII', () => {
+    expect(sanitizeNext('/€')).toBe('/')
+    expect(sanitizeNext('/\t/evil')).toBe('/')
+    expect(sanitizeNext('/a b')).toBe('/')
+    expect(sanitizeNext('/a\r\nSet-Cookie: x=1')).toBe('/')
+    expect(sanitizeNext('/\r\n')).toBe('/')
+    // Percent-encoded text is not decoded, so it stays a harmless same-site path.
+    expect(sanitizeNext('/%2F%2Fevil')).toBe('/%2F%2Fevil')
+    expect(sanitizeNext('/%E2%82%AC')).toBe('/%E2%82%AC')
+  })
 })
 
 describe('GET /__login', () => {
@@ -94,6 +109,61 @@ describe('GET /__login', () => {
   })
 })
 
+describe('non-ASCII return paths', () => {
+  it('falls back to / instead of throwing', async () => {
+    const { env } = setup()
+    const html = await (await run(get('/__login?next=/%E2%82%AC'), env)).text()
+    expect(html).toContain('name="next" value="/"')
+    const response = await run(postForm('/__login', { password: PASSWORD, next: '/€' }), env)
+    expect(response.status).toBe(303)
+    expect(response.headers.get('Location')).toBe('/')
+  })
+})
+
+describe('cross-site POSTs', () => {
+  it('rejects a cross-site /__login before counting anything', async () => {
+    const { env, kv } = setup()
+    const response = await run(postForm('/__login', { password: 'nope' }, { 'Sec-Fetch-Site': 'cross-site' }), env)
+    expect(response.status).toBe(403)
+    expect(failureCount(kv)).toBe(0)
+  })
+
+  it('rejects a /__login whose Origin is another site, even with the right password', async () => {
+    const { env, kv } = setup()
+    const response = await run(
+      postForm('/__login', { password: PASSWORD }, { Origin: 'https://evil.example' }),
+      env,
+    )
+    expect(response.status).toBe(403)
+    expect(response.headers.get('Set-Cookie')).toBeNull()
+    expect(failureCount(kv)).toBe(0)
+  })
+
+  it('rejects a cross-site lockout attempt even while locked out', async () => {
+    const { env, kv } = setup()
+    await lockOut(kv)
+    const response = await run(postForm('/__login', { password: PASSWORD }, { Origin: 'null' }), env)
+    expect(response.status).toBe(403)
+  })
+
+  it('accepts same-origin and same-site requests', async () => {
+    const { env } = setup()
+    const same = await run(postForm('/__login', { password: PASSWORD }, { Origin: ORIGIN, 'Sec-Fetch-Site': 'same-origin' }), env)
+    expect(same.status).toBe(303)
+    const none = await run(postForm('/__login', { password: PASSWORD }, { 'Sec-Fetch-Site': 'none' }), env)
+    expect(none.status).toBe(303)
+  })
+
+  it('rejects a cross-site /__verify-password before counting', async () => {
+    const { env, kv } = setup()
+    const cookie = await signedInCookie()
+    const body = JSON.stringify({ password: 'nope' })
+    expect((await run(postJson('/__verify-password', body, { Cookie: cookie, 'Sec-Fetch-Site': 'cross-site' }), env)).status).toBe(403)
+    expect((await run(postJson('/__verify-password', body, { Cookie: cookie, Origin: 'https://evil.example' }), env)).status).toBe(403)
+    expect(failureCount(kv)).toBe(0)
+  })
+})
+
 describe('POST /__login', () => {
   it('signs in with the right password', async () => {
     const { env, kv } = setup()
@@ -102,9 +172,9 @@ describe('POST /__login', () => {
     expect(response.status).toBe(303)
     expect(response.headers.get('Location')).toBe('/stats')
     const cookie = response.headers.get('Set-Cookie') ?? ''
-    expect(cookie).toMatch(/^ft_session=v1\.\d+\.[\w-]{43}; HttpOnly; Secure; SameSite=Lax; Path=\/; Max-Age=31536000$/)
-    const value = cookie.slice('ft_session='.length, cookie.indexOf(';'))
-    expect(await verifySessionValue(SECRET, value, NOW)).toBe(true)
+    expect(cookie).toMatch(/^__Host-ft_session=v1\.\d+\.[\w-]{43}; HttpOnly; Secure; SameSite=Lax; Path=\/; Max-Age=31536000$/)
+    const value = cookie.slice('__Host-ft_session='.length, cookie.indexOf(';'))
+    expect(await verifySessionValue(await sessionKey(), value, NOW)).toBe(true)
     expect(failureCount(kv)).toBe(0)
   })
 
@@ -187,6 +257,24 @@ describe('POST /__verify-password', () => {
     expect(failureCount(kv)).toBe(0)
   })
 
+  it('answers 415 without counting when the body is not JSON', async () => {
+    const { env, kv } = setup()
+    const cookie = await signedInCookie()
+    const body = JSON.stringify({ password: 'nope' })
+    const plain = postJson('/__verify-password', body, { Cookie: cookie, 'Content-Type': 'text/plain' })
+    expect((await run(plain, env)).status).toBe(415)
+    const form = postForm('/__verify-password', { password: 'nope' }, { Cookie: cookie })
+    expect((await run(form, env)).status).toBe(415)
+    expect(failureCount(kv)).toBe(0)
+  })
+
+  it('accepts a JSON content type in any case, with parameters', async () => {
+    const { env } = setup()
+    const body = JSON.stringify({ password: PASSWORD })
+    const headers = { Cookie: await signedInCookie(), 'Content-Type': 'Application/JSON; charset=utf-8' }
+    expect((await run(postJson('/__verify-password', body, headers), env)).status).toBe(204)
+  })
+
   it('allows only POST', async () => {
     const { env } = setup()
     const response = await run(get('/__verify-password', { Cookie: await signedInCookie() }), env)
@@ -223,9 +311,9 @@ describe('everything else', () => {
 
   it('ignores a forged or expired session', async () => {
     const { env } = setup()
-    const forged = `ft_session=${await createSessionValue('another-secret-0123456789-abcdefghijk', NOW)}`
+    const forged = `__Host-ft_session=${await createSessionValue(await deriveSessionKey("another-secret-0123456789-abcdefghijk", PASSWORD), NOW)}`
     expect((await run(get('/assets/index.js', { Cookie: forged }), env)).status).toBe(401)
-    const expired = `ft_session=${await createSessionValue(SECRET, NOW - 366 * 24 * 3600 * 1000)}`
+    const expired = `__Host-ft_session=${await createSessionValue(await sessionKey(), NOW - 366 * 24 * 3600 * 1000)}`
     expect((await run(get('/assets/index.js', { Cookie: expired }), env)).status).toBe(401)
   })
 
@@ -246,9 +334,59 @@ describe('everything else', () => {
     }
   })
 
+  it('accepts any valid cookie when the name appears twice', async () => {
+    const { env } = setup()
+    const good = await signedInCookie()
+    expect(await handleRequest(get('/a.js', { Cookie: `__Host-ft_session=garbage; ${good}` }), env, NOW)).toBe('next')
+    expect(await handleRequest(get('/a.js', { Cookie: `${good}; __Host-ft_session=garbage` }), env, NOW)).toBe('next')
+    expect((await run(get('/a.js', { Cookie: '__Host-ft_session=garbage; __Host-ft_session=junk' }), env)).status).toBe(401)
+  })
+
+  it('does not accept the old cookie name', async () => {
+    const { env } = setup()
+    const old = (await signedInCookie()).replace('__Host-', '')
+    expect(old.startsWith('ft_session=')).toBe(true)
+    expect((await run(get('/a.js', { Cookie: old }), env)).status).toBe(401)
+  })
+
+  it('revokes sessions when the site password changes', async () => {
+    const { env } = setup()
+    const cookie = await signedInCookie()
+    expect(await handleRequest(get('/a.js', { Cookie: cookie }), env, NOW)).toBe('next')
+    const rotated: GateEnv = { ...env, SITE_PASSWORD: 'a brand new password, much longer' }
+    expect((await run(get('/a.js', { Cookie: cookie }), rotated)).status).toBe(401)
+  })
+
+  it('never lets a path variant through without a session', async () => {
+    const { env } = setup()
+    for (const path of ['/__LOGIN', '/%5F%5Flogin', '/__login/', '//__login', '/__verify-password/', '/__VERIFY-PASSWORD']) {
+      expect(await handleRequest(get(path), env, NOW)).not.toBe('next')
+    }
+    for (const method of ['HEAD', 'OPTIONS', 'PUT', 'DELETE', 'PATCH']) {
+      expect(await handleRequest(new Request(`${ORIGIN}/`, { method }), env, NOW)).not.toBe('next')
+    }
+  })
+
+  it('treats empty and oversized passwords as wrong', async () => {
+    const { env, kv } = setup()
+    expect((await run(postForm('/__login', { password: '' }), env)).status).toBe(401)
+    expect((await run(postForm('/__login', { password: 'x'.repeat(1025) }), env)).status).toBe(401)
+    expect((await run(postForm('/__login', { password: 'x'.repeat(5000) }), env)).status).toBe(401)
+    expect(failureCount(kv)).toBe(3)
+  })
+
+  it('still requires the password when KV is down', async () => {
+    const { env, kv } = setup()
+    kv.failing = true
+    expect((await run(postForm('/__login', { password: 'nope' }), env)).status).toBe(401)
+    expect((await run(postForm('/__login', { password: PASSWORD }), env)).status).toBe(303)
+  })
+
   it('stays closed when it is not set up', async () => {
     const kv = createMemoryKv()
     const broken: GateEnv[] = [
+      { SITE_PASSWORD: 'fifteen chars!!', SESSION_SECRET: SECRET, LOGIN_ATTEMPTS: kv },
+      { SITE_PASSWORD: '', SESSION_SECRET: SECRET, LOGIN_ATTEMPTS: kv },
       { SESSION_SECRET: SECRET, LOGIN_ATTEMPTS: kv },
       { SITE_PASSWORD: PASSWORD, LOGIN_ATTEMPTS: kv },
       { SITE_PASSWORD: PASSWORD, SESSION_SECRET: 'too-short', LOGIN_ATTEMPTS: kv },

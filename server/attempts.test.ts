@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_ATTEMPTS, clearFailures, isLockedOut, recordFailure } from './attempts.ts'
+import { MAX_ATTEMPTS, attemptsKey, clearFailures, isLockedOut, normalizeIp, recordFailure } from './attempts.ts'
 import { createMemoryKv } from './memoryKv.ts'
 
 const NOW = Date.UTC(2026, 9, 3, 12, 0, 0)
@@ -57,6 +57,25 @@ describe('sign-in lockout', () => {
     expect(await isLockedOut(kv, IP, NOW)).toBe(false)
     await kv.put(`fail:${IP}`, JSON.stringify({ count: 'many' }))
     expect(await isLockedOut(kv, IP, NOW)).toBe(false)
+  })
+
+  it('keys IPv6 addresses by their /64 prefix', async () => {
+    expect(attemptsKey('2001:db8:abcd:12:1::5')).toBe(attemptsKey('2001:db8:abcd:12:ffff::1'))
+    expect(attemptsKey('2001:DB8:ABCD:0012::1')).toBe(attemptsKey('2001:db8:abcd:12::9'))
+    expect(attemptsKey('2001:db8:abcd:13::1')).not.toBe(attemptsKey('2001:db8:abcd:12::1'))
+    const kv = await fail(MAX_ATTEMPTS, createMemoryKv(), '2001:db8:abcd:12:1::5')
+    expect(await isLockedOut(kv, '2001:db8:abcd:12:ffff::1', NOW)).toBe(true)
+    expect(await isLockedOut(kv, '2001:db8:abcd:99::1', NOW)).toBe(false)
+  })
+
+  it('normalizes addresses', () => {
+    expect(normalizeIp('2001:db8:abcd:12:1::5')).toBe('2001:db8:abcd:12::/64')
+    expect(normalizeIp('::1')).toBe('0:0:0:0::/64')
+    expect(normalizeIp('::ffff:1.2.3.4')).toBe('1.2.3.4')
+    expect(normalizeIp('::ffff:0102:0304')).toBe('1.2.3.4')
+    expect(normalizeIp('203.0.113.7')).toBe('203.0.113.7')
+    expect(normalizeIp('unknown')).toBe('unknown')
+    expect(attemptsKey('::ffff:203.0.113.7')).toBe(`fail:${IP}`)
   })
 
   it('keeps working when KV fails', async () => {

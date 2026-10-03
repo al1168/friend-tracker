@@ -43,9 +43,12 @@ Three protections:
   - Environment variable: `NODE_VERSION=24`. Also add `.node-version` containing `24`.
 - Functions live in `/functions` and are deployed automatically with the site.
 - Bindings, set in the Pages project settings for Production and Preview:
-  - Secret `SITE_PASSWORD`: the owner's chosen passphrase. Recommended: at least 4 random words.
+  - Secret `SITE_PASSWORD`: the owner's chosen passphrase, at least 16 characters (4 or more random words). The gate refuses to open with anything shorter.
   - Secret `SESSION_SECRET`: 32 random bytes, base64. Generated during setup, never committed.
   - KV namespace binding `LOGIN_ATTEMPTS`.
+- Pages project → Settings → Runtime → "Fail open / closed" → **Fail closed**, for Production and Preview. If Cloudflare can't run the gate (for example, the free daily Functions quota runs out), the site is unavailable until midnight UTC instead of serving files without the password. The installed app keeps working offline.
+- Pages project → Settings → Builds → **Automatic preview deployments: off**, so only `main` is built.
+- Rotating `SITE_PASSWORD` or `SESSION_SECRET` signs every session out. Old deployments keep the secrets they were built with, so delete old deployments after rotating.
 - The app URL becomes `https://<project>.pages.dev/`. Vite `base: './'` and hash routing need no change.
 
 ## Part 2: Website password gate
@@ -65,12 +68,12 @@ Three protections:
 | Request | Behavior |
 |---|---|
 | `GET /__login` | Signed in: `303` to `/`. Otherwise `200` with the sign-in page. |
-| `POST /__login` (form: `password`, `next`) | Locked out: `429` page, "Too many attempts. Try again in 15 minutes." Correct password: clear attempts, set session cookie, `303` to the sanitized `next` (default `/`). Wrong: record attempt, `401` page, "That password didn't work." |
-| `POST /__verify-password` (JSON `{ "password": string }`) | Requires a valid session, otherwise `403` (signed out). Locked out: `429`. Correct: `204` and clear attempts. Wrong: record attempt, `401`. Used by the app's "Forgot PIN?". |
+| `POST /__login` (form: `password`, `next`) | Cross-site (`Sec-Fetch-Site: cross-site`, or an `Origin` header that isn't the site's own origin): `403`, before the lockout check and without counting. Locked out: `429` page, "Too many attempts. Try again in 15 minutes." Correct password: clear attempts, set session cookie, `303` to the sanitized `next` (default `/`). Wrong: record attempt, `401` page, "That password didn't work." |
+| `POST /__verify-password` (JSON `{ "password": string }`) | Cross-site (same rule as above) or no valid session: `403`, nothing counted. Content type other than `application/json`: `415`, nothing counted. Locked out: `429`. Correct: `204` and clear attempts. Wrong: record attempt, `401`. Used by the app's "Forgot PIN?". |
 | Any other request with a valid session | Passed through to the static asset (`next()`). |
 | Any other request without a valid session | Navigations (`Sec-Fetch-Mode: navigate` or `Accept` includes `text/html`): `302` to `/__login?next=<path+query>`. Everything else: `401` with an empty body. |
 
-- **`next` sanitization:** accept only paths that start with `/` and not `//`, and contain no backslash. Anything else becomes `/`.
+- **`next` sanitization:** accept only paths matching `^/[\x21-\x7e]*$` (one leading `/`, then printable ASCII with no spaces), that don't start with `//` and contain no backslash. Anything else becomes `/`. Percent-encoded text is never decoded.
 - **Headers on every response the gate itself produces:**
   - `Cache-Control: no-store`
   - `X-Content-Type-Options: nosniff`
@@ -79,25 +82,25 @@ Three protections:
 
 ### Session cookie
 
-- **Name:** `ft_session`
+- **Name:** `__Host-ft_session` (the `__Host-` prefix makes browsers require `Secure`, `Path=/` and no `Domain`)
 - **Value:** `v1.<expiresAt>.<sig>`
   - `expiresAt` is Unix seconds.
-  - `sig` is base64url HMAC-SHA256(`SESSION_SECRET`, `"v1.<expiresAt>"`).
+  - `sig` is base64url HMAC-SHA256(session key, `"v1.<expiresAt>"`), where session key = HMAC-SHA256(`SESSION_SECRET`, `"ft-session\0" + SITE_PASSWORD`).
 - **Attributes:** `HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=31536000`
-- **Valid when:** the format parses, `expiresAt > now`, and the signature verifies via `crypto.subtle.verify`, which compares in constant time.
-- **Rotation:** changing `SESSION_SECRET` signs everyone out.
+- **Valid when:** any cookie with that name verifies (a stray duplicate can't lock the owner out), the format parses, `expiresAt > now`, and the signature verifies via `crypto.subtle.verify`, which compares in constant time.
+- **Rotation:** changing `SESSION_SECRET` or `SITE_PASSWORD` signs everyone out, because the session key depends on both. The old name `ft_session` is not accepted.
 
 ### Password check
 
-Compute HMAC-SHA256(`SESSION_SECRET`, submitted) and HMAC-SHA256(`SESSION_SECRET`, `SITE_PASSWORD`), then compare the two 32-byte digests in constant time. This avoids leaking length or prefix through timing. Empty submissions are wrong.
+Using a separate password-check key = HMAC-SHA256(`SESSION_SECRET`, `"ft-password-check"`), compute HMAC-SHA256(key, submitted) and HMAC-SHA256(key, `SITE_PASSWORD`), then compare the two 32-byte digests in constant time. This avoids leaking length or prefix through timing. Empty submissions and submissions over 1,024 characters are wrong. A `SITE_PASSWORD` shorter than 16 characters is a misconfiguration: the gate fails closed (`500`, "Friend Tracker isn't set up yet.").
 
 ### Lockout
 
-- **Key:** `fail:<CF-Connecting-IP or "unknown">` in `LOGIN_ATTEMPTS`
+- **Key:** `fail:<client address>` in `LOGIN_ATTEMPTS`, from `CF-Connecting-IP` (or `"unknown"`). An IPv4 address is used as is, an IPv4-mapped IPv6 address (`::ffff:1.2.3.4`) as its IPv4 address, and any other IPv6 address as its lowercase /64 prefix (the first four groups), so changing the lower 64 bits doesn't dodge the limit.
 - **Value:** JSON `{ count, firstAt }`, written with `expirationTtl: 900`
 - **Rule:** once `count >= 10` within the 15-minute window, both POST routes respond `429` without checking the password.
 - **Reset:** a successful sign-in or verification deletes the key.
-- **Accepted limit:** KV is eventually consistent, so counts may be slightly lenient.
+- **Accepted limit:** KV is eventually consistent and the limit is per address, so parallel or distributed guessing can exceed it. The real defense is the passphrase of at least 16 characters (4 or more random words), not the counter.
 
 ### Sign-in page
 
@@ -244,7 +247,8 @@ Recorded in [the security plan](../plans/2026-10-03-security.md):
 - **The gate fails closed.** A missing `SITE_PASSWORD`, a missing or shorter-than-32-character `SESSION_SECRET`, or a missing `LOGIN_ATTEMPTS` binding makes every request answer `500` "Friend Tracker isn't set up yet."
 - **Extra gate answers.** Other methods on `/__login` and `/__verify-password` get `405`. A `/__verify-password` body that isn't `{ "password": string }` gets `400` and isn't counted. Submissions over 1,024 characters are wrong. `next` also rejects control characters.
 - **Sign-in page.** Sent with `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`. It has a visible "Password" label and a visually hidden `username` field ("Friend Tracker") so Keychain files the password under a name.
-- **Lockout.** `firstAt` is a ms timestamp; the window starts at the first failure. If KV errors, the lockout check is skipped (the password is still required) and a failed write isn't counted.
+- **Lockout.** `firstAt` is a ms timestamp; the window starts at the first failure. If KV errors, the lockout check is skipped (the password is still required) and a failed write isn't counted. IPv6 addresses are counted per /64 prefix.
+- **Hardening.** `SITE_PASSWORD` shorter than 16 characters fails closed like a missing secret. The cookie is `__Host-ft_session`, signed with a key derived from `SESSION_SECRET` and `SITE_PASSWORD` (rotating the password signs everyone out); the password check uses a separate derived key. `next` allows printable ASCII only. A cross-site POST (`Sec-Fetch-Site: cross-site`, or an `Origin` that isn't the site) gets `403` before anything is counted, and `/__verify-password` needs a JSON content type (`415` otherwise).
 - **Forgot PIN.** Only `204` counts as correct. Any other status (a captive portal's `200`, a `405`, a `500`) shows "Couldn't check your password. Please try again." When the sign-in expired (`403`), the sheet's main button becomes **Sign in**.
 - **App lock.** `ft:lastActiveAt` is written whether or not the lock is on; the lock counts as on only when a PIN is stored. Wrong PINs in Change PIN and Turn off app lock count toward the same backoff. Turning the lock on saves it right after the PIN is confirmed, before the Face ID question. Resetting a forgotten PIN keeps Face ID.
 - **Settings.** The "App lock" group sits between Backup and About your data. Without Face ID on the device, the Face ID row is hidden and the footer reads "Locks the app after 15 minutes away. Unlock with your PIN."
