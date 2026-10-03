@@ -184,3 +184,26 @@ test('clears text that cannot be saved with the clear button', async ({ page }) 
   await page.getByRole('heading', { level: 1, name: 'Alex' }).click()
   await expect(field).toBeHidden()
 })
+
+test('finds a friend by what they like, never by what they dislike', async ({ page }) => {
+  await page.goto('/')
+  await addFriend(page, 'Kim', 'Work')
+  await addFriend(page, 'Sam')
+  await openFriend(page, 'Kim')
+  await addToList(page, 'Likes', 'Board games, Hiking')
+  await goToTab(page, 'Friends')
+  await openFriend(page, 'Sam')
+  await addToList(page, 'Dislikes', 'Hiking')
+  await goToTab(page, 'Friends')
+
+  const search = page.getByLabel('Search friends')
+  await search.fill('HIK')
+  await expect(page.getByRole('link', { name: /Kim/ })).toContainText('Work · Not seen yet · Likes Hiking')
+  await expect(page.getByRole('link', { name: /Sam/ })).toHaveCount(0)
+
+  await search.fill('kim')
+  await expect(page.getByRole('link', { name: /Kim/ })).not.toContainText('Likes')
+
+  await search.fill('ramen')
+  await expect(page.getByText('No friends match “ramen”.')).toBeVisible()
+})

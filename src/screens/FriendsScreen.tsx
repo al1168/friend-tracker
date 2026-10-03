@@ -12,6 +12,7 @@ import { useFriends, useGroups, useMeetups, useSetting } from '../data/hooks'
 import { setSetting } from '../db/settings'
 import { useToday } from '../hooks/useToday'
 import { daysBetween, yearOf } from '../lib/dates'
+import { matchFriend, matchSubtitle } from '../lib/friendSearch'
 import { isPlainEnter } from '../lib/keys'
 import { isStandalone } from '../lib/platform'
 import { formatSince } from '../lib/text'
@@ -61,11 +62,13 @@ export function FriendsScreen() {
     if (!friends || !meetups) return []
     const lastSeen = lastSeenByFriend(meetups, today)
     const counts = countsByFriendForYear(meetups, yearOf(today), today)
-    const q = query.trim().toLocaleLowerCase()
     return sortFriends(friends, meetups, sort, today)
       .filter((friend) => activeGroup === null || friend.groupId === activeGroup.id)
-      .filter((friend) => q === '' || friend.name.toLocaleLowerCase().includes(q))
-      .map((friend) => ({ friend, lastSeen: lastSeen.get(friend.id) ?? null, count: counts.get(friend.id) ?? 0 }))
+      .flatMap((friend) => {
+        const match = matchFriend(friend, query)
+        if (!match) return []
+        return [{ friend, match, lastSeen: lastSeen.get(friend.id) ?? null, count: counts.get(friend.id) ?? 0 }]
+      })
   }, [friends, meetups, today, sort, activeGroup, query])
 
   async function chooseSort() {
@@ -152,7 +155,7 @@ export function FriendsScreen() {
 
           {rows.length > 0 ? (
             <InsetGroup>
-              {rows.map(({ friend, lastSeen, count }) => (
+              {rows.map(({ friend, match, lastSeen, count }) => (
                 <Row
                   key={friend.id}
                   to={`/friends/${friend.id}`}
@@ -161,6 +164,7 @@ export function FriendsScreen() {
                   subtitle={[
                     friend.groupId ? groupNames.get(friend.groupId) : undefined,
                     lastSeen ? formatSince(daysBetween(lastSeen, today)) : 'Not seen yet',
+                    matchSubtitle(match),
                   ]
                     .filter(Boolean)
                     .join(' · ')}
