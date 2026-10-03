@@ -20,3 +20,10 @@ test('unknown routes go to Friends', async ({ page }) => {
   await page.goto('/#/nowhere')
   await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
 })
+
+test('back button works when a screen is opened directly', async ({ page }) => {
+  await page.goto('/#/settings/groups')
+  await expect(page.getByRole('heading', { level: 1, name: 'Groups' })).toBeVisible()
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible()
+})

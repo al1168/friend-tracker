@@ -20,10 +20,13 @@
   justify-content: center;
   gap: 1px;
   color: var(--ink-3);
-  font-size: var(--text-caption);
+  font-size: min(var(--text-caption), 13px);
   font-weight: 500;
   text-decoration: none;
   transition: color var(--dur-fast);
+}
+.tabbar__item svg {
+  flex: none;
 }
 .tabbar__item[aria-current='page'] {
   color: var(--accent-ink);

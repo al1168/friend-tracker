@@ -17,15 +17,20 @@ interface PageProps {
 
 export function Page({ title, back, actions, hero, pushed = false, children }: PageProps) {
   const topRef = useRef<HTMLDivElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
   const [compact, setCompact] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
 
   useEffect(() => {
+    document.title = `${title} · Friend Tracker`
+  }, [title])
+
+  useEffect(() => {
     const element = topRef.current
     if (!element) return
     const observer = new IntersectionObserver(([entry]) => setCompact(!entry.isIntersecting), {
-      rootMargin: '-44px 0px 0px 0px',
+      rootMargin: `-${headerRef.current?.offsetHeight ?? 44}px 0px 0px 0px`,
     })
     observer.observe(element)
     return () => observer.disconnect()
@@ -39,12 +44,12 @@ export function Page({ title, back, actions, hero, pushed = false, children }: P
 
   return (
     <div className={pushed ? 'page page--pushed' : 'page'}>
-      <header className="navbar" data-compact={compact}>
+      <header ref={headerRef} className="navbar" data-compact={compact}>
         <div className="navbar__side">
           {back && (
             <button type="button" className="text-button navbar__back" onClick={goBack}>
               <IconChevronLeft size={26} strokeWidth={2.4} />
-              {back.label}
+              {(location.state as { backLabel?: string } | null)?.backLabel ?? back.label}
             </button>
           )}
         </div>

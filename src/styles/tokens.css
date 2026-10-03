@@ -48,7 +48,7 @@
   --separator: oklch(89.5% 0.009 60);
   --ink: oklch(25% 0.014 50);
   --ink-2: oklch(47% 0.014 50);
-  --ink-3: oklch(56% 0.012 50);
+  --ink-3: oklch(52% 0.012 50);
   --accent: oklch(81% 0.095 50);
   --accent-pressed: oklch(77% 0.105 48);
   --on-accent: oklch(29% 0.06 40);
@@ -70,7 +70,7 @@
     --separator: oklch(32% 0.01 55);
     --ink: oklch(95% 0.008 70);
     --ink-2: oklch(76% 0.012 60);
-    --ink-3: oklch(64% 0.012 60);
+    --ink-3: oklch(67% 0.012 60);
     --accent: oklch(80% 0.1 50);
     --accent-pressed: oklch(75% 0.11 48);
     --on-accent: oklch(26% 0.05 40);

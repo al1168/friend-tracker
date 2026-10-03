@@ -45,13 +45,15 @@ interface RowProps {
   leading?: ReactNode
   trailing?: ReactNode
   to?: string
+  /** Router location state for `to` (e.g. back label and origin tab). */
+  state?: unknown
   onClick?: () => void
   chevron?: boolean
   accent?: boolean
   destructive?: boolean
 }
 
-export function Row({ title, subtitle, leading, trailing, to, onClick, chevron, accent, destructive }: RowProps) {
+export function Row({ title, subtitle, leading, trailing, to, state, onClick, chevron, accent, destructive }: RowProps) {
   const className = [
     'row',
     (to || onClick) && 'row--interactive',
@@ -79,7 +81,7 @@ export function Row({ title, subtitle, leading, trailing, to, onClick, chevron, 
 
   if (to) {
     return (
-      <Link to={to} className={className}>
+      <Link to={to} state={state} className={className}>
         {content}
       </Link>
     )

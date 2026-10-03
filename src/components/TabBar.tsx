@@ -9,11 +9,13 @@ const TABS = [
 ]
 
 export function TabBar() {
-  const { pathname } = useLocation()
+  const location = useLocation()
+  const { pathname } = location
+  const originTab = (location.state as { tab?: string } | null)?.tab
   return (
     <nav className="tabbar" aria-label="Main">
       {TABS.map(({ to, label, Icon, matches }) => {
-        const active = matches(pathname)
+        const active = originTab ? to === originTab : matches(pathname)
         return (
           <Link key={to} to={to} className="tabbar__item" aria-current={active ? 'page' : undefined}>
             <Icon size={26} strokeWidth={active ? 2.2 : 1.8} />

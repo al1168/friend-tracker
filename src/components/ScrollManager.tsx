@@ -1,13 +1,36 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useLocation, useNavigationType } from 'react-router'
 
-function restoreScroll(y: number) {
-  let tries = 0
-  const attempt = () => {
-    window.scrollTo(0, y)
-    if (Math.abs(window.scrollY - y) > 1 && tries++ < 20) requestAnimationFrame(attempt)
+const RESTORE_WINDOW_MS = 1000
+
+/** Scrolls to `y`, retrying until the page is tall enough. Returns a cancel function. */
+function restoreScroll(y: number): () => void {
+  const start = performance.now()
+  let frame = 0
+  let finished = false
+
+  const cancel = () => {
+    if (finished) return
+    finished = true
+    cancelAnimationFrame(frame)
+    window.removeEventListener('touchstart', cancel)
+    window.removeEventListener('wheel', cancel)
   }
+
+  const attempt = () => {
+    if (finished) return
+    window.scrollTo(0, y)
+    if (Math.abs(window.scrollY - y) <= 1 || performance.now() - start > RESTORE_WINDOW_MS) {
+      cancel()
+      return
+    }
+    frame = requestAnimationFrame(attempt)
+  }
+
+  window.addEventListener('touchstart', cancel, { passive: true })
+  window.addEventListener('wheel', cancel, { passive: true })
   attempt()
+  return cancel
 }
 
 export function ScrollManager() {
@@ -25,8 +48,8 @@ export function ScrollManager() {
   useLayoutEffect(() => {
     currentKey.current = location.key
     const saved = positions.current.get(location.key)
-    if (navigationType === 'POP' && saved !== undefined) restoreScroll(saved)
-    else window.scrollTo(0, 0)
+    if (navigationType === 'POP' && saved !== undefined) return restoreScroll(saved)
+    window.scrollTo(0, 0)
   }, [location.key, navigationType])
 
   return null

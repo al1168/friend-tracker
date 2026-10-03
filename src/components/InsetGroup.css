@@ -37,15 +37,22 @@
   text-align: left;
   text-decoration: none;
 }
-.row + .row::before {
+.row:focus-visible {
+  outline-offset: -2px;
+}
+.inset-group__body > * {
+  position: relative;
+}
+.inset-group__body > * + *::before {
   content: '';
   position: absolute;
   top: 0;
   right: 0;
   left: var(--space-4);
   border-top: 0.5px solid var(--separator);
+  pointer-events: none;
 }
-.row:has(.row__leading) + .row:has(.row__leading)::before {
+.inset-group__body > *:has(.row__leading) + *:has(.row__leading)::before {
   left: calc(var(--space-4) + 44px + var(--space-3));
 }
 .row--interactive {
