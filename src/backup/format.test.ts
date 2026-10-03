@@ -5,7 +5,16 @@ import { backupFileName, createBackup, parseBackup, type BackupData } from './fo
 const sample: BackupData = {
   groups: [group('g1', 'College')],
   meetupTypes: [meetupType('t1', 'Coffee', 0, '☕')],
-  friends: [friend('f1', 'Alex', 'g1'), { ...friend('f2', 'Sam'), photo: 'data:image/jpeg;base64,AAAA', notes: 'Likes jazz' }],
+  friends: [
+    friend('f1', 'Alex', 'g1'),
+    {
+      ...friend('f2', 'Sam'),
+      photo: 'data:image/jpeg;base64,AAAA',
+      notes: 'Likes jazz',
+      likes: ['Jazz', 'Board games'],
+      dislikes: ['Early mornings'],
+    },
+  ],
   meetups: [{ ...meetup('m1', '2026-09-01', ['f1', 'f2'], 't1'), note: 'Tacos' }],
 }
 
@@ -32,7 +41,7 @@ function expectError(raw: unknown, message: string) {
 describe('createBackup and parseBackup', () => {
   it('accepts a backup it created', () => {
     const file = createBackup(sample, new Date('2026-10-02T09:00:00Z'))
-    expect(file).toMatchObject({ app: 'friend-tracker', version: 1, exportedAt: '2026-10-02T09:00:00.000Z' })
+    expect(file).toMatchObject({ app: 'friend-tracker', version: 2, exportedAt: '2026-10-02T09:00:00.000Z' })
     expect(parseBackup(jsonCopy(file))).toEqual({ ok: true, data: sample })
   })
 
@@ -52,6 +61,40 @@ describe('parseBackup cleanup', () => {
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.data.meetups[0].friendIds).toEqual(['f1', 'f2'])
   })
+
+  it('cleans likes and dislikes, quietly dropping empties and repeats', () => {
+    const file = broken((f) => {
+      list(f, 'friends')[1].likes = [' Jazz ', 'jazz', '', 'Board \n games']
+      list(f, 'friends')[1].dislikes = ['JAZZ', 'Early mornings', 'early mornings']
+    })
+    const result = parseBackup(file)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.friends[1].likes).toEqual(['Jazz', 'Board games'])
+      expect(result.data.friends[1].dislikes).toEqual(['Early mornings'])
+    }
+  })
+})
+
+describe('parseBackup reads version 1 backups', () => {
+  it('gives every friend empty likes and dislikes', () => {
+    const file = broken((f) => {
+      f.version = 1
+      for (const friend of list(f, 'friends')) {
+        delete friend.likes
+        delete friend.dislikes
+      }
+    })
+    const result = parseBackup(file)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.friends.map((f) => [f.likes, f.dislikes])).toEqual([
+        [[], []],
+        [[], []],
+      ])
+      expect(result.data.friends[1]).toMatchObject({ name: 'Sam', notes: 'Likes jazz' })
+    }
+  })
 })
 
 describe('parseBackup rejects bad files', () => {
@@ -61,7 +104,20 @@ describe('parseBackup rejects bad files', () => {
   })
 
   it('rejects other versions', () => {
-    expectError(broken((f) => (f.version = 2)), 'different version')
+    expectError(broken((f) => (f.version = 3)), 'This backup was made by a different version of Friend Tracker.')
+    expectError(broken((f) => (f.version = '2')), 'This backup was made by a different version of Friend Tracker.')
+  })
+
+  it('rejects a missing or malformed list', () => {
+    expectError(broken((f) => delete list(f, 'friends')[0].likes), 'Friend 1 has an invalid "likes" list.')
+    expectError(broken((f) => (list(f, 'friends')[1].dislikes = 'Mornings')), 'Friend 2 has an invalid "dislikes" list.')
+    expectError(broken((f) => (list(f, 'friends')[1].likes = ['Jazz', 7])), 'Friend 2 has an invalid "likes" list.')
+  })
+
+  it('rejects an item over 60 characters or a list over 50 items', () => {
+    expectError(broken((f) => (list(f, 'friends')[1].likes = ['x'.repeat(61)])), 'Friend 2 has an invalid "likes" list.')
+    const tooMany = Array.from({ length: 51 }, (_, i) => `Item ${i + 1}`)
+    expectError(broken((f) => (list(f, 'friends')[0].dislikes = tooMany)), 'Friend 1 has an invalid "dislikes" list.')
   })
 
   it('rejects missing lists', () => {

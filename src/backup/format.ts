@@ -1,4 +1,5 @@
 import { isISODate, type ISODate } from '../lib/dates'
+import { cleanItems, indexOfItem, MAX_ITEM_LENGTH, MAX_ITEMS, type PreferenceKind } from '../lib/preferences'
 import type { Friend, Group, Meetup, MeetupType } from '../types'
 
 export interface BackupData {
@@ -10,14 +11,14 @@ export interface BackupData {
 
 export interface BackupFile extends BackupData {
   app: 'friend-tracker'
-  version: 1
+  version: 2
   exportedAt: string
 }
 
 export type ParseResult = { ok: true; data: BackupData } | { ok: false; error: string }
 
 export function createBackup(data: BackupData, exportedAt: Date): BackupFile {
-  return { app: 'friend-tracker', version: 1, exportedAt: exportedAt.toISOString(), ...data }
+  return { app: 'friend-tracker', version: 2, exportedAt: exportedAt.toISOString(), ...data }
 }
 
 export function backupFileName(today: ISODate): string {
@@ -68,13 +69,33 @@ function nullableText(record: Obj, key: string, where: string): string | null {
   return value
 }
 
+/** A version 2 friend's list, cleaned like the app cleans typed items. Empties and repeats are dropped quietly. */
+function preferenceList(record: Obj, key: PreferenceKind, where: string): string[] {
+  const value = record[key]
+  const invalid = () => new BackupError(`${where} has an invalid "${key}" list.`)
+  if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) throw invalid()
+  const items = cleanItems(value)
+  if (items.length > MAX_ITEMS || items.some((item) => item.length > MAX_ITEM_LENGTH)) throw invalid()
+  return items
+}
+
+/** An item is never in both lists; one in both (only possible in an edited file) stays in Likes. */
+function preferenceLists(record: Obj, where: string): Pick<Friend, PreferenceKind> {
+  const likes = preferenceList(record, 'likes', where)
+  const dislikes = preferenceList(record, 'dislikes', where).filter((item) => indexOfItem(likes, item) === -1)
+  return { likes, dislikes }
+}
+
 function assertUnique(ids: string[], what: string) {
   if (new Set(ids).size !== ids.length) throw new BackupError(`The backup has two ${what} with the same id.`)
 }
 
 function readBackup(raw: unknown): BackupData {
   if (!isObj(raw) || raw.app !== 'friend-tracker') throw new BackupError("This isn't a Friend Tracker backup file.")
-  if (raw.version !== 1) throw new BackupError('This backup was made by a different version of Friend Tracker.')
+  const { version } = raw
+  if (version !== 1 && version !== 2) {
+    throw new BackupError('This backup was made by a different version of Friend Tracker.')
+  }
 
   const groups: Group[] = list(raw, 'groups').map((value, i) => {
     const where = `Group ${i + 1}`
@@ -104,8 +125,7 @@ function readBackup(raw: unknown): BackupData {
       photo,
       notes: text(r, 'notes', where),
       // Version 1 backups were made before likes and dislikes existed.
-      likes: [],
-      dislikes: [],
+      ...(version === 1 ? { likes: [], dislikes: [] } : preferenceLists(r, where)),
       createdAt: text(r, 'createdAt', where),
     }
   })

@@ -4,6 +4,7 @@ import { addFriend } from '../db/friends'
 import { getSetting, setSetting } from '../db/settings'
 import { addGroup } from '../db/groups'
 import { addMeetup } from '../db/meetups'
+import { addPreferences } from '../db/preferences'
 import type { AppLock, LockFailures } from '../lock/types'
 import { friend, meetupType } from '../test/fixtures'
 import { createBackup, type BackupData } from './format'
@@ -26,6 +27,8 @@ describe('backup storage', () => {
     const college = await addGroup('College')
     const alex = await addFriend({ name: 'Alex', groupId: college.id, photo: 'data:image/jpeg;base64,AAAA', notes: 'Hi' })
     const sam = await addFriend({ name: 'Sam', groupId: null, photo: null, notes: '' })
+    await addPreferences(alex.id, 'likes', 'Sushi, Board games')
+    await addPreferences(alex.id, 'dislikes', 'Early mornings')
     await addMeetup({ date: '2026-09-01', typeId: 'type-meal', friendIds: [alex.id, sam.id], note: 'Tacos' })
     const before = await readAllData()
     const text = JSON.stringify(createBackup(before, new Date()))
@@ -37,6 +40,7 @@ describe('backup storage', () => {
     await replaceAllData(parsed.data)
 
     expect(sortById(await readAllData())).toEqual(sortById(before))
+    expect(await db.friends.get(alex.id)).toMatchObject({ likes: ['Sushi', 'Board games'], dislikes: ['Early mornings'] })
   })
 
   it('keeps the lock settings, which a backup never carries', async () => {
