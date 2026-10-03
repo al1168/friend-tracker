@@ -1,0 +1,74 @@
+.recent-friends {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-2);
+}
+.recent-friend {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-2) 0 var(--space-1);
+  border-radius: var(--radius-field);
+  transition: background-color var(--dur-fast);
+}
+.recent-friend:active {
+  background: var(--surface-2);
+}
+.recent-friend__avatar {
+  position: relative;
+  border-radius: 50%;
+  outline: 3px solid transparent;
+  outline-offset: 2px;
+  transition: outline-color var(--dur-fast) var(--ease-out-quart);
+}
+.recent-friend[aria-pressed='true'] .recent-friend__avatar {
+  outline-color: var(--accent);
+}
+.recent-friend__check {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  animation: pop-in var(--dur) var(--ease-out-quart);
+}
+.recent-friend__name {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--text-footnote);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.date-chip {
+  overflow: hidden;
+  cursor: pointer;
+}
+/* Invisible but tappable, so iOS opens its native date wheel. */
+.date-chip__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recent-friend__check {
+    animation: fade-in var(--dur) linear;
+  }
+}

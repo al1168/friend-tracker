@@ -1,0 +1,32 @@
+.log-button {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-height) + var(--safe-bottom) + var(--space-4));
+  z-index: 15;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 52px;
+  padding: 0 var(--space-6) 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-rounded);
+  font-size: 1.06rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-float);
+  transform: translateX(-50%);
+  transition:
+    transform var(--dur-fast) var(--ease-out-quart),
+    background-color var(--dur-fast) var(--ease-out-quart);
+}
+.log-button:active {
+  background: var(--accent-pressed);
+  transform: translateX(-50%) scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .log-button:active {
+    transform: translateX(-50%);
+  }
+}

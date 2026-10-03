@@ -5,6 +5,7 @@ import { Chip } from '../components/Chip'
 import { EmptyState } from '../components/EmptyState'
 import { IconPlus, IconSearch, IconSort } from '../components/icons'
 import { InsetGroup, Row } from '../components/InsetGroup'
+import { LogButton } from '../components/LogButton'
 import { InstallHint } from '../components/InstallHint'
 import { Page } from '../components/Page'
 import { useFriends, useGroups, useMeetups, useSetting } from '../data/hooks'
@@ -181,6 +182,7 @@ export function FriendsScreen() {
           )}
         </>
       )}
+      {friends.length > 0 && <LogButton />}
     </Page>
   )
 }
