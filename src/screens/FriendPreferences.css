@@ -13,6 +13,33 @@
   /* Lines up with the section label and the field's text. */
   margin: 0 var(--space-4);
 }
+.preference-add__input {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.preference-add__input .field {
+  /* Room for the clear button, so text never runs under it. */
+  padding-inline-end: var(--tap);
+}
+/* iOS-style clear button: a 44px hit area around a small circled x. */
+.preference-add__clear {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  color: var(--surface);
+}
+.preference-add__clear-glyph {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
 .preference-add__row .field {
   flex: 1;
   min-width: 0;

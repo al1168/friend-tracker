@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type FocusEvent, type MouseEvent } from 'react'
 import { useActionSheet } from '../components/ActionSheet'
 import { Chip } from '../components/Chip'
-import { IconPlus } from '../components/icons'
+import { IconClose, IconPlus } from '../components/icons'
 import { Section } from '../components/InsetGroup'
 import { useToast } from '../components/Toast'
 import { ValidationError } from '../db/errors'
@@ -54,7 +54,8 @@ interface Draft {
 
 /** Where focus goes once the lists have re-rendered, so it never falls to the page when a chip goes away. */
 type FocusTarget =
-  | { kind: PreferenceKind; mode: 'add' }
+  /** `quiet` focuses without the focus ring (for touch users after Done). */
+  | { kind: PreferenceKind; mode: 'add'; quiet?: boolean }
   | { kind: PreferenceKind; mode: 'removed'; item: string; index: number }
   | { kind: PreferenceKind; mode: 'item'; item: string }
 
@@ -67,6 +68,7 @@ export function FriendPreferences({ friend }: { friend: Friend }) {
   const submittingRef = useRef(false)
   const listRefs = useRef<Record<PreferenceKind, HTMLDivElement | null>>({ likes: null, dislikes: null })
   const pendingFocus = useRef<FocusTarget | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const [focusTick, setFocusTick] = useState(0)
   const [announcement, setAnnouncement] = useState({ text: '', n: 0 })
 
@@ -95,7 +97,10 @@ export function FriendPreferences({ friend }: { friend: Friend }) {
       target = chips[index]
     }
     pendingFocus.current = null
-    target?.focus({ preventScroll: true })
+    // `focusVisible` is in WebKit and Firefox but not yet in TypeScript's FocusOptions.
+    const options: FocusOptions & { focusVisible?: boolean } = { preventScroll: true }
+    if (pending.mode === 'add' && pending.quiet) options.focusVisible = false
+    target?.focus(options)
   }, [friend, draft, focusTick])
 
   /** What would stop this text from being saved, or null. Mirrors the rules in `addPreferences`. */
@@ -123,10 +128,17 @@ export function FriendPreferences({ friend }: { friend: Friend }) {
       }
       void saveClosed(draft.kind, draft.text)
     }
+    clearAnnouncement()
     setDraft({ kind, text: '', message: null })
   }
 
+  /** The hidden "Added …" note only makes sense right after adding, not when VoiceOver swipes past it later. */
+  function clearAnnouncement() {
+    setAnnouncement((current) => (current.text ? { text: '', n: current.n } : current))
+  }
+
   function close(kind: PreferenceKind) {
+    clearAnnouncement()
     setDraft((current) => (current?.kind === kind ? null : current))
   }
 
@@ -257,7 +269,9 @@ export function FriendPreferences({ friend }: { friend: Friend }) {
               {adding ? (
                 <div className="preference-add">
                   <div className="preference-add__row" onBlur={(event) => leaveField(kind, adding.text, event)}>
+                    <div className="preference-add__input">
                     <input
+                      ref={inputRef}
                       className="field"
                       value={adding.text}
                       placeholder={copy.placeholder}
@@ -274,7 +288,7 @@ export function FriendPreferences({ friend }: { friend: Friend }) {
                           // Enter ("done") on an empty field just closes it.
                           if (adding.text.trim()) void submit(kind, adding.text)
                           else {
-                            focusAfterRender({ kind, mode: 'add' })
+                            focusAfterRender({ kind, mode: 'add', quiet: true })
                             close(kind)
                           }
                         } else if (event.key === 'Escape') {
@@ -285,6 +299,25 @@ export function FriendPreferences({ friend }: { friend: Friend }) {
                         }
                       }}
                     />
+                    {adding.text && (
+                      <button
+                        type="button"
+                        className="preference-add__clear"
+                        aria-label="Clear text"
+                        // Keeps focus in the field, so the keyboard stays up.
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          setDraft({ kind, text: '', message: null })
+                          // The field may have lost focus while it kept unsavable text.
+                          inputRef.current?.focus()
+                        }}
+                      >
+                        <span className="preference-add__clear-glyph">
+                          <IconClose size={12} strokeWidth={3} />
+                        </span>
+                      </button>
+                    )}
+                    </div>
                     <button
                       type="button"
                       className="button button--secondary"
@@ -311,7 +344,7 @@ export function FriendPreferences({ friend }: { friend: Friend }) {
       })}
       <span className="visually-hidden" aria-live="polite">
         {announcement.text}
-        {announcement.n % 2 === 0 ? '' : '\u00a0'}
+        {announcement.text && announcement.n % 2 === 1 ? '\u00a0' : ''}
       </span>
     </>
   )

@@ -161,3 +161,26 @@ test('moves focus to a neighbour when an item is removed', async ({ page }) => {
   await remove('Sushi')
   await expect(likes.getByRole('button', { name: 'Add a like', exact: true })).toBeFocused()
 })
+
+test('clears text that cannot be saved with the clear button', async ({ page }) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await openFriend(page, 'Alex')
+  const likes = section(page, 'Likes')
+
+  await likes.getByRole('button', { name: 'Add a like', exact: true }).click()
+  const field = likes.getByRole('textbox', { name: 'New like', exact: true })
+  await expect(likes.getByRole('button', { name: 'Clear text' })).toHaveCount(0)
+  await field.fill('x'.repeat(61))
+  await page.getByRole('heading', { level: 1, name: 'Alex' }).click()
+  await expect(likes.getByRole('alert')).toHaveText('Keep each one under 60 characters.')
+
+  await likes.getByRole('button', { name: 'Clear text' }).click()
+  await expect(field).toHaveValue('')
+  await expect(likes.getByRole('alert')).toHaveCount(0)
+  await expect(field).toBeFocused()
+  await expect(likes.getByRole('button', { name: 'Clear text' })).toHaveCount(0)
+
+  await page.getByRole('heading', { level: 1, name: 'Alex' }).click()
+  await expect(field).toBeHidden()
+})
