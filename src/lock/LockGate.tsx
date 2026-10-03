@@ -23,26 +23,30 @@ export function LockGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (state !== 'open') return
-    markActive()
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        markActive()
-      } else if (shouldLock({ enabled, lastActiveAt: readLastActive(), now: Date.now() })) {
-        setState('locked')
-      } else {
-        markActive()
-      }
+    // The only way to record activity: lock if the gap since the last record is too long (a frozen page
+    // can skip pings), otherwise record now. Never record without this check first.
+    const check = () => {
+      if (shouldLock({ enabled, lastActiveAt: readLastActive(), now: Date.now() })) setState('locked')
+      else markActive()
     }
-    const onPageHide = () => markActive()
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) check()
+    }
+    const onVisibilityChange = () => check()
     const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') markActive()
+      if (document.visibilityState === 'visible') check()
     }, ACTIVE_PING_MS)
+    check()
     document.addEventListener('visibilitychange', onVisibilityChange)
-    window.addEventListener('pagehide', onPageHide)
+    window.addEventListener('pagehide', check)
+    window.addEventListener('pageshow', onPageShow)
+    window.addEventListener('focus', check)
     return () => {
       window.clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisibilityChange)
-      window.removeEventListener('pagehide', onPageHide)
+      window.removeEventListener('pagehide', check)
+      window.removeEventListener('pageshow', onPageShow)
+      window.removeEventListener('focus', check)
     }
   }, [state, enabled])
 

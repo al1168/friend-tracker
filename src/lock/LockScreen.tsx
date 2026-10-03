@@ -11,9 +11,12 @@ const PROMPT = 'Enter your PIN'
 export function LockScreen({ lock, onUnlock }: { lock: AppLock; onUnlock: () => void }) {
   const entry = usePinCheck(onUnlock)
   const faceIdBusy = useRef(false)
+  const titleRef = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {
     document.title = 'Friend Tracker'
+    // VoiceOver starts at "Friend Tracker is locked".
+    titleRef.current?.focus()
   }, [])
 
   async function unlockWithFaceId() {
@@ -21,7 +24,8 @@ export function LockScreen({ lock, onUnlock }: { lock: AppLock; onUnlock: () => 
     faceIdBusy.current = true
     try {
       if (await verifyPasskey(lock.passkeyId)) {
-        await resetFailures()
+        // A storage error must not block a successful Face ID.
+        await resetFailures().catch(() => {})
         onUnlock()
         return
       }
@@ -38,7 +42,7 @@ export function LockScreen({ lock, onUnlock }: { lock: AppLock; onUnlock: () => 
           <circle cx="48" cy="40" r="28" className="lock-screen__circle-a" />
           <circle cx="72" cy="40" r="28" className="lock-screen__circle-b" />
         </svg>
-        <h1 className="lock-screen__title">Friend Tracker is locked</h1>
+        <h1 ref={titleRef} tabIndex={-1} className="lock-screen__title">Friend Tracker is locked</h1>
         <p className="lock-screen__hint">{PROMPT}</p>
       </div>
       {lock.passkeyId && (

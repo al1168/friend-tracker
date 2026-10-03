@@ -60,9 +60,9 @@ export async function enterPin(scope: Page | Locator, pin: string) {
  * Turns on the app lock with this PIN by writing it straight into IndexedDB, hashed the same way
  * the app does (PBKDF2-SHA256, 210,000 iterations). The open page doesn't notice until it reloads.
  */
-export async function seedAppLock(page: Page, pin: string) {
+export async function seedAppLock(page: Page, pin: string, passkeyId: string | null = null) {
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
-  await page.evaluate(async (pin) => {
+  await page.evaluate(async ({ pin, passkeyId }) => {
     const toBase64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes))
     const salt = crypto.getRandomValues(new Uint8Array(16))
     const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits'])
@@ -70,7 +70,7 @@ export async function seedAppLock(page: Page, pin: string) {
     const value = {
       enabled: true,
       pin: { hash: toBase64(new Uint8Array(bits)), salt: toBase64(salt), iterations: 210_000 },
-      passkeyId: null,
+      passkeyId,
     }
     await new Promise<void>((resolve, reject) => {
       const request = indexedDB.open('friend-tracker')
@@ -86,7 +86,7 @@ export async function seedAppLock(page: Page, pin: string) {
         transaction.onerror = () => reject(transaction.error)
       }
     })
-  }, pin)
+  }, { pin, passkeyId })
 }
 
 /**

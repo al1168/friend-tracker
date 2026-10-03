@@ -4,9 +4,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-5);
+  gap: var(--space-4);
   min-height: 100dvh;
-  padding: calc(var(--safe-top) + var(--space-6)) var(--space-4) calc(var(--safe-bottom) + var(--space-4));
+  padding: calc(var(--safe-top) + var(--space-4)) var(--space-4) calc(var(--safe-bottom) + var(--space-4));
   background: var(--bg);
   text-align: center;
   animation: fade-in var(--dur) var(--ease-out-quart);
@@ -37,6 +37,9 @@
   font-weight: 600;
   line-height: 1.25;
   text-wrap: balance;
+}
+.lock-screen__title:focus {
+  outline: none;
 }
 .lock-screen__hint {
   margin: var(--space-1) 0 0;

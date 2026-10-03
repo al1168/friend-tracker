@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState } from 'react'
 import { getSetting } from '../db/settings'
 import { checkPin, normalizeFailures } from './lockStore'
-import { formatWait, waitRemainingMs } from './policy'
+import { waitRemainingMs } from './policy'
 
 export const WRONG_PIN = 'Wrong PIN. Try again.'
 
@@ -52,8 +52,8 @@ export function usePinCheck(onSuccess: () => void) {
       if (outcome.result === 'ok') {
         unlocked = true
       } else {
-        const wait = waitRemainingMs(outcome.failures, Date.now())
-        setMessage(wait > 0 ? `Try again in ${formatWait(wait)}` : WRONG_PIN)
+        // During a wait the countdown (PinMessage) says it; no text is kept that could outlive the wait.
+        setMessage(waitRemainingMs(outcome.failures, Date.now()) > 0 ? '' : WRONG_PIN)
         setShake((count) => count + 1)
       }
     } catch {
@@ -74,7 +74,8 @@ export function usePinCheck(onSuccess: () => void) {
       value: pin,
       onChange: change,
       onComplete: submit,
-      disabled: checking || waitMs > 0,
+      disabled: waitMs > 0,
+      busy: checking,
       shake,
     },
     message,

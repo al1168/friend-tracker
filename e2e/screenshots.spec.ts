@@ -56,9 +56,10 @@ async function captureAll(page: Page, prefix: string) {
   await page.screenshot({ path: `${DIR}/${prefix}-07-settings.png` })
 }
 
-async function captureLock(page: Page, prefix: string, largeText = false) {
+async function captureLock(page: Page, prefix: string, largeText = false, faceId = false) {
   await page.goto('/')
-  await seedAppLock(page, '135790')
+  // The Face ID button shows whenever a passkey id is stored, so seeding one is enough.
+  await seedAppLock(page, '135790', faceId ? 'AAAAAAAAAAAAAAAAAAAAAA' : null)
   await reopenAfterAWhile(page)
   if (largeText) await page.addStyleTag({ content: LARGE_TEXT })
   await expect(lockHeading(page)).toBeVisible()
@@ -97,4 +98,8 @@ test('large text', async ({ page }) => {
 
 test('large text lock screen', async ({ page }) => {
   await captureLock(page, 'large-text', true)
+})
+
+test('large text lock screen with Face ID', async ({ page }) => {
+  await captureLock(page, 'large-text-face-id', true, true)
 })

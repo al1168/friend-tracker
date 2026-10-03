@@ -9,6 +9,8 @@ export async function applyGateResult(result: GateResult, next: () => Promise<Re
     typeof result === 'object' &&
     result !== null &&
     !(result instanceof Response) &&
+    'kind' in result &&
+    result.kind === 'next' &&
     'setCookie' in result &&
     typeof result.setCookie === 'string'
   ) {

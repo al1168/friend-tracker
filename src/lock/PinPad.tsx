@@ -14,14 +14,17 @@ interface PinPadProps {
   onComplete: (pin: string) => void
   /** What the PIN is for, read out with the dots, e.g. "Enter your PIN". */
   label: string
+  /** Pauses the whole keypad (the wait after too many wrong PINs). */
   disabled?: boolean
+  /** A PIN is being checked: only Delete is blocked, so the digits don't dim and flicker. */
+  busy?: boolean
   /** Each change shakes the dots once (skipped with Reduce Motion). */
   shake?: number
   /** Shown between the dots and the keys (see PinMessage). */
   status?: ReactNode
 }
 
-export function PinPad({ value, onChange, onComplete, label, disabled = false, shake = 0, status }: PinPadProps) {
+export function PinPad({ value, onChange, onComplete, label, disabled = false, busy = false, shake = 0, status }: PinPadProps) {
   function press(digit: string) {
     if (disabled || value.length >= PIN_LENGTH) return
     const next = value + digit
@@ -30,7 +33,7 @@ export function PinPad({ value, onChange, onComplete, label, disabled = false, s
   }
 
   function remove() {
-    if (!disabled) onChange(value.slice(0, -1))
+    if (!disabled && !busy) onChange(value.slice(0, -1))
   }
 
   return (
@@ -45,6 +48,9 @@ export function PinPad({ value, onChange, onComplete, label, disabled = false, s
           <span key={index} className={index < value.length ? 'pin-dot pin-dot--filled' : 'pin-dot'} />
         ))}
       </div>
+      <span className="visually-hidden" aria-live="polite">
+        {value.length > 0 ? `${value.length} of ${PIN_LENGTH} entered` : ''}
+      </span>
       {status}
       <div className="pin-keys">
         {DIGITS.map((digit) => (
@@ -60,7 +66,7 @@ export function PinPad({ value, onChange, onComplete, label, disabled = false, s
           type="button"
           className="pin-key pin-key--quiet"
           onClick={remove}
-          disabled={disabled || value.length === 0}
+          disabled={disabled || busy || value.length === 0}
           aria-label="Delete"
         >
           <IconDelete size={28} strokeWidth={1.8} />
@@ -70,13 +76,18 @@ export function PinPad({ value, onChange, onComplete, label, disabled = false, s
   )
 }
 
-/** The line under the dots: an announced message, or a quiet countdown while PIN entry is paused. */
+/**
+ * The line under the dots: an announced message, plus a quiet countdown while PIN entry is paused.
+ * The wait is shown only while `waitMs > 0`, so no countdown text outlives it. The alert says it once
+ * (the countdown itself is a timer, not announced every second); a real `message` (such as a failed
+ * Face ID) stays visible during the wait too.
+ */
 export function PinMessage({ message, waitMs = 0 }: { message: string; waitMs?: number }) {
   const waiting = waitMs > 0
   return (
     <div className="pin-message">
-      <p role="alert" className={waiting ? 'visually-hidden' : undefined}>
-        {message}
+      <p role="alert" className={waiting && !message ? 'visually-hidden' : undefined}>
+        {message || (waiting ? 'Too many wrong PINs. Wait, then try again.' : '')}
       </p>
       {waiting && <p role="timer">Try again in {formatWait(waitMs)}</p>}
     </div>

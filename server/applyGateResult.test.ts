@@ -59,7 +59,7 @@ describe('applyGateResult', () => {
   })
 
   it('fails closed on anything it does not recognise', async () => {
-    for (const odd of [undefined, null, 'allow', {}, { kind: 'next' }, { setCookie: 1 }, 42]) {
+    for (const odd of [undefined, null, 'allow', {}, { kind: 'next' }, { setCookie: 1 }, { kind: 'x', setCookie: 'a' }, 42]) {
       const response = await applyGateResult(odd as never, async () => {
         throw new Error('next must not be called')
       })

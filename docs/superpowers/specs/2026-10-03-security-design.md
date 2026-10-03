@@ -194,7 +194,7 @@ Using a separate password-check key = HMAC-SHA256(`SESSION_SECRET`, `"ft-passwor
 
 This is a UI gate, not encryption. It stops someone holding the unlocked phone. It doesn't stop someone with developer tools attached to the unlocked phone. The PIN hash could also be brute-forced offline by such a person, since there are only 10⁶ PINs. Encrypting the database is out of scope.
 
-Face ID unlock also accepts your iPhone passcode (`userVerification: 'required'`: if Face ID fails, iOS offers the passcode), so anyone who knows your iPhone passcode can unlock the app that way. The PIN adds nothing against such a person. Two clock-related limits remain: setting the phone's clock back to within 15 minutes after the last use still opens the app, and moving the clock forward can skip a wrong-PIN wait. (The app does lock when the clock is behind the last recorded use.)
+Face ID unlock also accepts your iPhone passcode (`userVerification: 'required'`: if Face ID fails, iOS offers the passcode), so anyone who knows your iPhone passcode can unlock the app that way. The PIN adds nothing against such a person. Two clock-related limits remain: setting the phone's clock back to within 15 minutes after the last use still opens the app, and moving the clock forward can skip a wrong-PIN wait. (The app does lock when the clock is behind the last recorded use.) The iOS app switcher snapshot may still show the last screen, since the lock can only draw after the app is shown again. Relocking discards unsaved sheet drafts (an open Log meetup or edit sheet is closed, not saved).
 
 ## Rollout
 

@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { enterPin, lockHeading, reopenAfterAWhile, seedAppLock } from './helpers.ts'
-
+import { addFriend, enterPin, lockHeading, reopenAfterAWhile, seedAppLock } from './helpers.ts'
 // PIN hashing and many taps make these tests slower than most.
 test.describe.configure({ timeout: 60_000 })
 
@@ -64,6 +63,64 @@ test('waits after 5 wrong PINs, even after reopening, then lets you try again', 
   await expect(page.getByRole('timer')).toHaveCount(0)
   await enterPin(page, PIN)
   await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
+})
+
+test('the wait text goes away when the wait ends, without reloading', async ({ page }) => {
+  await page.clock.install()
+  await reopenAfterAWhile(page)
+  for (let i = 0; i < 4; i += 1) {
+    await enterPin(page, '000000')
+    await expect(page.getByRole('alert')).toHaveText('Wrong PIN. Try again.')
+  }
+  await enterPin(page, '000000')
+  await expect(page.getByRole('timer')).toBeVisible()
+
+  await page.clock.fastForward(31_000)
+  await expect(page.getByRole('timer')).toHaveCount(0)
+  await expect(page.locator('.pin-message')).toHaveText('')
+  await expect(page.getByRole('button', { name: '1', exact: true })).toBeEnabled()
+})
+
+test('locks after 20 minutes even if no visibility event ever fired', async ({ page }) => {
+  await page.clock.install()
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
+  await page.clock.fastForward(20 * 60_000)
+  await expect(lockHeading(page)).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Main' })).toHaveCount(0)
+})
+
+test('relocking with a sheet open closes it, and the app works after unlocking', async ({ page }) => {
+  await addFriend(page, 'Alex Rivera')
+  await page.clock.install()
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
+  await page.getByRole('button', { name: 'Log meetup' }).click()
+  await expect(page.getByRole('dialog', { name: 'Log meetup' })).toBeVisible()
+  await page.clock.fastForward(20 * 60_000)
+  await expect(lockHeading(page)).toBeVisible()
+  await expect(page.locator('[role=dialog]')).toHaveCount(0)
+  await expect(page.locator('html')).not.toHaveClass(/scroll-locked/)
+
+  await enterPin(page, PIN)
+  await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
+  await expect(page.locator('html')).not.toHaveClass(/scroll-locked/)
+  await page.getByRole('button', { name: 'Log meetup' }).click()
+  await expect(page.getByRole('dialog', { name: 'Log meetup' })).toBeVisible()
+})
+
+test('a cancelled Face ID says so and stays locked', async ({ page }) => {
+  await seedAppLock(page, PIN, 'AAAAAAAAAAAAAAAAAAAAAA')
+  await page.addInitScript(() => {
+    // The user cancels the Face ID prompt.
+    const credentials = { get: () => Promise.reject(new DOMException('Cancelled', 'NotAllowedError')) }
+    Object.defineProperty(navigator, 'credentials', { configurable: true, value: credentials })
+  })
+  await reopenAfterAWhile(page)
+  await expect(lockHeading(page)).toBeFocused()
+  await page.getByRole('button', { name: 'Unlock with Face ID' }).click()
+  await expect(page.getByRole('alert')).toHaveText("Face ID didn't work. Use your PIN.")
+  await expect(lockHeading(page)).toBeVisible()
 })
 
 test('locks again after 15 minutes in the background', async ({ page }) => {
