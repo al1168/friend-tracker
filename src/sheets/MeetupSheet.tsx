@@ -11,6 +11,7 @@ import { ValidationError } from '../db/errors'
 import { addMeetup, deleteMeetup, restoreMeetup, updateMeetup } from '../db/meetups'
 import { useToday } from '../hooks/useToday'
 import { addDays, formatDate, isISODate, todayISO } from '../lib/dates'
+import { isPlainEnter } from '../lib/keys'
 import { compareNames, formatNameList } from '../lib/text'
 import { recentFriends } from '../stats/recent'
 import type { Friend } from '../types'
@@ -23,8 +24,7 @@ interface MeetupSheetProps {
 }
 
 function blurOnEnter(event: KeyboardEvent<HTMLInputElement>) {
-  if (event.nativeEvent.isComposing || event.keyCode === 229) return
-  if (event.key === 'Enter') event.currentTarget.blur()
+  if (isPlainEnter(event)) event.currentTarget.blur()
 }
 
 export function MeetupSheet({ request, onClose }: MeetupSheetProps) {

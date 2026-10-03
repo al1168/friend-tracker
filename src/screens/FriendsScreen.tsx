@@ -12,6 +12,7 @@ import { useFriends, useGroups, useMeetups, useSetting } from '../data/hooks'
 import { setSetting } from '../db/settings'
 import { useToday } from '../hooks/useToday'
 import { daysBetween, yearOf } from '../lib/dates'
+import { isPlainEnter } from '../lib/keys'
 import { isStandalone } from '../lib/platform'
 import { formatSince } from '../lib/text'
 import { useSheets } from '../sheets/sheetsContext'
@@ -127,8 +128,7 @@ export function FriendsScreen() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.nativeEvent.isComposing || event.keyCode === 229) return
-                  if (event.key === 'Enter') event.currentTarget.blur()
+                  if (isPlainEnter(event)) event.currentTarget.blur()
                 }}
               />
             </label>

@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { useConfirm, useConfirmDiscard } from '../components/ActionSheet'
 import { IconArrowDown, IconArrowUp, IconPlus } from '../components/icons'
 import { InsetGroup, Row } from '../components/InsetGroup'
@@ -8,6 +8,7 @@ import { useToast } from '../components/Toast'
 import { useMeetups, useMeetupTypes } from '../data/hooks'
 import { ValidationError } from '../db/errors'
 import { addMeetupType, deleteMeetupType, moveMeetupType, updateMeetupType } from '../db/meetupTypes'
+import { isPlainEnter } from '../lib/keys'
 import { plural } from '../lib/text'
 import type { MeetupType } from '../types'
 import './MeetupTypesScreen.css'
@@ -21,6 +22,21 @@ export function MeetupTypesScreen() {
   const meetups = useMeetups()
   const [request, setRequest] = useState<TypeRequest | null>(null)
   const [sheetKey, setSheetKey] = useState(0)
+  const toast = useToast()
+  const pendingFocus = useRef<{ id: string; dir: 'up' | 'down' } | null>(null)
+  const orderRef = useRef<HTMLDivElement>(null)
+
+  // Keep keyboard/VoiceOver focus on the moved type's arrow once the live query re-renders.
+  useEffect(() => {
+    const pending = pendingFocus.current
+    if (!pending || !types) return
+    pendingFocus.current = null
+    const find = (dir: string) =>
+      orderRef.current?.querySelector<HTMLButtonElement>(`[data-move="${pending.id}:${dir}"]`) ?? null
+    let target = find(pending.dir)
+    if (target?.disabled) target = find(pending.dir === 'up' ? 'down' : 'up')
+    target?.focus()
+  }, [types])
 
   if (!types || !meetups) return null
 
@@ -31,7 +47,16 @@ export function MeetupTypesScreen() {
     setSheetKey((key) => key + 1)
     setRequest({ type })
   }
-  const editingType = request?.type
+
+  const move = async (id: string, dir: 'up' | 'down') => {
+    pendingFocus.current = { id, dir }
+    try {
+      await moveMeetupType(id, dir === 'up' ? -1 : 1)
+    } catch {
+      pendingFocus.current = null
+      toast({ message: "Couldn't move that type. Please try again.", tone: 'plain' })
+    }
+  }
 
   return (
     <Page
@@ -44,6 +69,7 @@ export function MeetupTypesScreen() {
         </button>
       }
     >
+      <div ref={orderRef}>
       <InsetGroup footer="Use the arrows to change the order types appear in when you log a meetup.">
         {types.map((type, index) => (
           <div key={type.id} className="type-row">
@@ -62,8 +88,9 @@ export function MeetupTypesScreen() {
                 type="button"
                 className="icon-button"
                 aria-label={`Move ${type.name} up`}
+                data-move={`${type.id}:up`}
                 disabled={index === 0}
-                onClick={() => void moveMeetupType(type.id, -1)}
+                onClick={() => void move(type.id, 'up')}
               >
                 <IconArrowUp size={20} />
               </button>
@@ -71,8 +98,9 @@ export function MeetupTypesScreen() {
                 type="button"
                 className="icon-button"
                 aria-label={`Move ${type.name} down`}
+                data-move={`${type.id}:down`}
                 disabled={index === types.length - 1}
-                onClick={() => void moveMeetupType(type.id, 1)}
+                onClick={() => void move(type.id, 'down')}
               >
                 <IconArrowDown size={20} />
               </button>
@@ -80,10 +108,11 @@ export function MeetupTypesScreen() {
           </div>
         ))}
       </InsetGroup>
+      </div>
       <TypeSheet
         key={sheetKey}
         request={request}
-        usage={editingType ? (usage.get(editingType.id) ?? 0) : 0}
+        usageByType={usage}
         isLast={types.length <= 1}
         onClose={() => setRequest(null)}
       />
@@ -93,14 +122,15 @@ export function MeetupTypesScreen() {
 
 interface TypeSheetProps {
   request: TypeRequest | null
-  usage: number
+  usageByType: Map<string, number>
   isLast: boolean
   onClose: () => void
 }
 
-function TypeSheet({ request, usage, isLast, onClose }: TypeSheetProps) {
+function TypeSheet({ request, usageByType, isLast, onClose }: TypeSheetProps) {
   const [initial] = useState(request)
   const type = initial?.type
+  const usage = type ? (usageByType.get(type.id) ?? 0) : 0
   const confirm = useConfirm()
   const confirmDiscard = useConfirmDiscard()
   const toast = useToast()
@@ -112,6 +142,7 @@ function TypeSheet({ request, usage, isLast, onClose }: TypeSheetProps) {
   const [name, setName] = useState(type?.name ?? '')
   const [emoji, setEmoji] = useState(type?.emoji ?? '')
   const [error, setError] = useState<string | null>(null)
+  const [errorField, setErrorField] = useState<'name' | 'emoji' | null>(null)
 
   const dirty = name !== (type?.name ?? '') || emoji !== (type?.emoji ?? '')
   const deleteBlocker =
@@ -135,7 +166,13 @@ function TypeSheet({ request, usage, isLast, onClose }: TypeSheetProps) {
       else await addMeetupType(input)
       onClose()
     } catch (caught) {
-      setError(caught instanceof ValidationError ? caught.message : "Couldn't save. Please try again.")
+      if (caught instanceof ValidationError) {
+        setError(caught.message)
+        setErrorField(/emoji/i.test(caught.message) ? 'emoji' : 'name')
+      } else {
+        setError("Couldn't save. Please try again.")
+        setErrorField(null)
+      }
     } finally {
       savingRef.current = false
       setSaving(false)
@@ -143,8 +180,7 @@ function TypeSheet({ request, usage, isLast, onClose }: TypeSheetProps) {
   }
 
   function submitOnEnter(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.nativeEvent.isComposing || event.keyCode === 229) return
-    if (event.key === 'Enter') {
+    if (isPlainEnter(event)) {
       event.preventDefault()
       void save()
     }
@@ -160,6 +196,7 @@ function TypeSheet({ request, usage, isLast, onClose }: TypeSheetProps) {
       toast({ message: `Deleted ${type.name}`, tone: 'plain' })
     } catch (caught) {
       setError(caught instanceof ValidationError ? caught.message : "Couldn't delete. Please try again.")
+      setErrorField(null)
     }
   }
 
@@ -185,6 +222,8 @@ function TypeSheet({ request, usage, isLast, onClose }: TypeSheetProps) {
             value={emoji}
             placeholder="🙂"
             autoComplete="off"
+            aria-invalid={error !== null && errorField === 'emoji'}
+            aria-describedby={error && errorField === 'emoji' ? errorId : undefined}
             onKeyDown={submitOnEnter}
             onChange={(event) => {
               setEmoji(event.target.value)
@@ -203,8 +242,8 @@ function TypeSheet({ request, usage, isLast, onClose }: TypeSheetProps) {
             autoCapitalize="words"
             autoComplete="off"
             enterKeyHint="done"
-            aria-invalid={error !== null}
-            aria-describedby={error ? errorId : undefined}
+            aria-invalid={error !== null && errorField === 'name'}
+            aria-describedby={error && errorField === 'name' ? errorId : undefined}
             onKeyDown={submitOnEnter}
             onChange={(event) => {
               setName(event.target.value)

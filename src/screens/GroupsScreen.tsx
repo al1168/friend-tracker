@@ -9,6 +9,7 @@ import { useToast } from '../components/Toast'
 import { useFriends, useGroups } from '../data/hooks'
 import { ValidationError } from '../db/errors'
 import { addGroup, deleteGroup, renameGroup } from '../db/groups'
+import { isPlainEnter } from '../lib/keys'
 import { plural } from '../lib/text'
 import type { Group } from '../types'
 
@@ -85,6 +86,7 @@ function GroupSheet({ request, onClose }: { request: GroupRequest | null; onClos
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState(group?.name ?? '')
   const [error, setError] = useState<string | null>(null)
+  const [errorField, setErrorField] = useState<'name' | null>(null)
 
   async function requestClose() {
     if (await confirmDiscard(name !== (group?.name ?? ''))) onClose()
@@ -99,7 +101,9 @@ function GroupSheet({ request, onClose }: { request: GroupRequest | null; onClos
       else await addGroup(name)
       onClose()
     } catch (caught) {
-      setError(caught instanceof ValidationError ? caught.message : "Couldn't save. Please try again.")
+      const validation = caught instanceof ValidationError
+      setError(validation ? caught.message : "Couldn't save. Please try again.")
+      setErrorField(validation ? 'name' : null)
     } finally {
       savingRef.current = false
       setSaving(false)
@@ -119,6 +123,7 @@ function GroupSheet({ request, onClose }: { request: GroupRequest | null; onClos
       await deleteGroup(group.id)
     } catch {
       setError("Couldn't delete. Please try again.")
+      setErrorField(null)
       return
     }
     onClose()
@@ -147,11 +152,10 @@ function GroupSheet({ request, onClose }: { request: GroupRequest | null; onClos
           autoCapitalize="words"
           autoComplete="off"
           enterKeyHint="done"
-          aria-invalid={error !== null}
-          aria-describedby={error ? errorId : undefined}
+          aria-invalid={error !== null && errorField === 'name'}
+          aria-describedby={error && errorField === 'name' ? errorId : undefined}
           onKeyDown={(event) => {
-            if (event.nativeEvent.isComposing || event.keyCode === 229) return
-            if (event.key === 'Enter') {
+            if (isPlainEnter(event)) {
               event.preventDefault()
               void save()
             }

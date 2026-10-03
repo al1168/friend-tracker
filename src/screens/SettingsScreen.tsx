@@ -20,17 +20,22 @@ export function SettingsScreen() {
   const toast = useToast()
   const confirm = useConfirm()
   const fileInput = useRef<HTMLInputElement>(null)
-  const [importError, setImportError] = useState<string | null>(null)
+  const exportingRef = useRef(false)
+  const [importError, setImportError] = useState<{ message: string; n: number } | null>(null)
 
   if (!friends || !groups || !meetupTypes || !meetups || lastBackupAt === undefined) return null
 
   // Uses data that's already loaded, so the iOS share sheet opens straight from the tap.
   const exportData = async () => {
+    if (exportingRef.current) return
+    exportingRef.current = true
     try {
       const outcome = await exportBackup({ friends, groups, meetupTypes, meetups })
       if (outcome !== 'cancelled') toast({ message: 'Backup saved' })
     } catch {
       toast({ message: "Couldn't create the backup.", tone: 'plain' })
+    } finally {
+      exportingRef.current = false
     }
   }
 
@@ -40,7 +45,7 @@ export function SettingsScreen() {
     if (!file) return
     const result = await parseBackupFile(file)
     if (!result.ok) {
-      setImportError(result.error)
+      setImportError((previous) => ({ message: result.error, n: (previous?.n ?? 0) + 1 }))
       return
     }
     setImportError(null)
@@ -81,8 +86,8 @@ export function SettingsScreen() {
         onChange={importData}
       />
       {importError && (
-        <p className="field-error settings-error" role="alert">
-          {importError}
+        <p key={importError.n} className="field-error settings-error" role="alert">
+          {importError.message}
         </p>
       )}
 

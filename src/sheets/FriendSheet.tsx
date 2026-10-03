@@ -12,6 +12,7 @@ import { useGroups } from '../data/hooks'
 import { ValidationError } from '../db/errors'
 import { addFriend, deleteFriend, updateFriend } from '../db/friends'
 import { addGroup } from '../db/groups'
+import { isPlainEnter } from '../lib/keys'
 import { resizeImageToDataUrl } from '../lib/image'
 import type { FriendSheetRequest } from './sheetsContext'
 import './FriendSheet.css'
@@ -211,8 +212,7 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
           aria-invalid={nameError !== null}
           aria-describedby={nameError ? nameErrorId : undefined}
           onKeyDown={(event) => {
-            if (event.nativeEvent.isComposing || event.keyCode === 229) return
-            if (event.key === 'Enter') {
+            if (isPlainEnter(event)) {
               event.preventDefault()
               void save()
             }
@@ -266,8 +266,7 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
                 setGroupError(null)
               }}
               onKeyDown={(event) => {
-                if (event.nativeEvent.isComposing || event.keyCode === 229) return
-                if (event.key === 'Enter') {
+                if (isPlainEnter(event)) {
                   event.preventDefault()
                   void createGroup()
                 }
