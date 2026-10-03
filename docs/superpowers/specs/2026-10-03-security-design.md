@@ -236,3 +236,16 @@ This is a UI gate, not encryption. It stops someone holding the unlocked phone. 
 ## Out of scope
 
 Encrypting the database, multiple users, sign-out and password change UI (rotate the secrets in Cloudflare instead), a custom domain, and Cloudflare Access.
+
+## Decisions made while planning
+
+Recorded in [the security plan](../plans/2026-10-03-security.md):
+
+- **The gate fails closed.** A missing `SITE_PASSWORD`, a missing or shorter-than-32-character `SESSION_SECRET`, or a missing `LOGIN_ATTEMPTS` binding makes every request answer `500` "Friend Tracker isn't set up yet."
+- **Extra gate answers.** Other methods on `/__login` and `/__verify-password` get `405`. A `/__verify-password` body that isn't `{ "password": string }` gets `400` and isn't counted. Submissions over 1,024 characters are wrong. `next` also rejects control characters.
+- **Sign-in page.** Sent with `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`. It has a visible "Password" label and a visually hidden `username` field ("Friend Tracker") so Keychain files the password under a name.
+- **Lockout.** `firstAt` is a ms timestamp; the window starts at the first failure. If KV errors, the lockout check is skipped (the password is still required) and a failed write isn't counted.
+- **Forgot PIN.** Only `204` counts as correct. Any other status (a captive portal's `200`, a `405`, a `500`) shows "Couldn't check your password. Please try again." When the sign-in expired (`403`), the sheet's main button becomes **Sign in**.
+- **App lock.** `ft:lastActiveAt` is written whether or not the lock is on; the lock counts as on only when a PIN is stored. Wrong PINs in Change PIN and Turn off app lock count toward the same backoff. Turning the lock on saves it right after the PIN is confirmed, before the Face ID question. Resetting a forgotten PIN keeps Face ID.
+- **Settings.** The "App lock" group sits between Backup and About your data. Without Face ID on the device, the Face ID row is hidden and the footer reads "Locks the app after 15 minutes away. Unlock with your PIN."
+- **Lock screen.** "Enter your PIN" sits under the title and "Forgot PIN?" under the keypad. Wrong-PIN messages use calm secondary ink, not red. While PIN entry is paused, the countdown is a `role="timer"`, announced once.

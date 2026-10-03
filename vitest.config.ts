@@ -5,6 +5,6 @@ export default defineConfig({
     environment: 'node',
     env: { TZ: 'America/Los_Angeles' },
     setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'server/**/*.test.ts'],
   },
 })
