@@ -11,7 +11,8 @@ export interface AddResult {
   skipped: string[]
 }
 
-const LIST_FULL = 'This list is full.'
+export const LIST_FULL = 'This list is full.'
+export const ITEM_TOO_LONG = `Keep each one under ${MAX_ITEM_LENGTH} characters.`
 
 /**
  * Runs `change` on copies of a friend's lists, then saves them, all in one transaction.
@@ -32,7 +33,7 @@ async function changeLists<T>(friendId: string, change: (lists: Lists) => T): Pr
 export async function addPreferences(friendId: string, kind: PreferenceKind, text: string): Promise<AddResult> {
   const items = splitItems(text)
   if (items.some((item) => item.length > MAX_ITEM_LENGTH)) {
-    throw new ValidationError(`Keep each one under ${MAX_ITEM_LENGTH} characters.`)
+    throw new ValidationError(ITEM_TOO_LONG)
   }
   return changeLists(friendId, (lists) => {
     const list = lists[kind]

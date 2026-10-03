@@ -123,3 +123,41 @@ test('keeps likes and dislikes through a backup', async ({ page }) => {
   await expect(section(page, 'Likes').locator('.chip--wrap')).toHaveText(['Sushi'])
   await expect(section(page, 'Dislikes').locator('.chip--wrap')).toHaveText(['Cilantro'])
 })
+
+test('keeps text that cannot be saved when the field loses focus', async ({ page }) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await openFriend(page, 'Alex')
+  const likes = section(page, 'Likes')
+
+  await likes.getByRole('button', { name: 'Add a like', exact: true }).click()
+  const field = likes.getByRole('textbox', { name: 'New like', exact: true })
+  const tooLong = 'x'.repeat(61)
+  await field.fill(`Ramen, ${tooLong}`)
+  await page.getByRole('heading', { level: 1, name: 'Alex' }).click()
+
+  await expect(field).toBeVisible()
+  await expect(field).toHaveValue(`Ramen, ${tooLong}`)
+  await expect(likes.getByRole('alert')).toHaveText('Keep each one under 60 characters.')
+  await expect(likes.locator('.chip--wrap')).toHaveCount(0)
+})
+
+test('moves focus to a neighbour when an item is removed', async ({ page }) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await openFriend(page, 'Alex')
+  const likes = section(page, 'Likes')
+  await addToList(page, 'Likes', 'Sushi, Hiking, Jazz')
+
+  async function remove(name: string) {
+    await likes.getByRole('button', { name, exact: true }).click()
+    await page.getByRole('alertdialog', { name }).getByRole('button', { name: 'Remove' }).click()
+  }
+
+  await remove('Hiking')
+  await expect(likes.getByRole('button', { name: 'Jazz', exact: true })).toBeFocused()
+  await remove('Jazz')
+  await expect(likes.getByRole('button', { name: 'Sushi', exact: true })).toBeFocused()
+  await remove('Sushi')
+  await expect(likes.getByRole('button', { name: 'Add a like', exact: true })).toBeFocused()
+})

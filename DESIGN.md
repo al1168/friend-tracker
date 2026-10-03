@@ -303,6 +303,7 @@ The thumb-reachable primary action on Friends and friend detail. Peach fill, On-
 - **Field:** Paper White on Warm Paper (inside sheets), 12px corners, 44px minimum height, `0.6rem 0.9rem` padding, no border. Labels are Footnote 600 Warm Ink Secondary above the field. Placeholders are Warm Ink Tertiary.
 - **Search:** Linen, 12px corners, 44px tall, an 18px magnifier in Warm Ink Tertiary. Focus draws the 2px Terracotta Ink outline around the whole field.
 - **Error:** Footnote Danger Red text under the field, announced with `role="alert"`.
+- **Hint (`.field-hint`):** a neutral note under a field for things that aren't errors, such as "Already in Likes.". Footnote Warm Ink Secondary, announced with `role="alert"`, never red.
 
 ### Bottom sheets
 Used for adding or editing a friend, logging a meetup, and editing groups and types. Warm Paper with 22px top corners and the Float shadow, rising over 340ms with ease-out-expo, draggable to dismiss from its header. Header: a 36×5px Soft Rule grabber, then a three-column bar with Cancel (text button), a centered Body 600 title, and an optional trailing action. Body: 16px side padding, sections 1.5rem apart. Footer: a hairline-topped bar holding the block primary button above the safe area. Cancelling with unsaved changes asks first through an action sheet.

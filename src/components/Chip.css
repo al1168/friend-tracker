@@ -38,6 +38,8 @@
 .chip--wrap {
   flex: 0 1 auto;
   max-width: 100%;
+  min-width: var(--tap);
+  justify-content: center;
   padding: 6px 14px;
   border-radius: 1.2em;
   white-space: normal;
