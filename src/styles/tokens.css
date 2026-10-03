@@ -1,0 +1,102 @@
+:root {
+  color-scheme: light dark;
+
+  --font-rounded: ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', sans-serif;
+  --font-text: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  /* Type scale. 1rem follows the iPhone text-size setting (see base.css). */
+  --text-large-title: 2rem;
+  --text-title: 1.5rem;
+  --text-title-3: 1.18rem;
+  --text-body: 1rem;
+  --text-subhead: 0.88rem;
+  --text-footnote: 0.77rem;
+  --text-caption: 0.7rem;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+
+  --radius-field: 12px;
+  --radius-group: 14px;
+  --radius-sheet: 22px;
+  --radius-pill: 999px;
+
+  --tap: 44px;
+  --navbar-height: 44px;
+  --tabbar-height: 50px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --keyboard-inset: 0px;
+
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 160ms;
+  --dur: 220ms;
+  --dur-sheet: 340ms;
+
+  /* Light: warm paper neutrals + one peach accent */
+  --bg: oklch(96.4% 0.009 60);
+  --surface: oklch(99.4% 0.004 60);
+  --surface-2: oklch(93.6% 0.011 60);
+  --surface-pressed: oklch(91% 0.012 60);
+  --separator: oklch(89.5% 0.009 60);
+  --ink: oklch(25% 0.014 50);
+  --ink-2: oklch(47% 0.014 50);
+  --ink-3: oklch(56% 0.012 50);
+  --accent: oklch(81% 0.095 50);
+  --accent-pressed: oklch(77% 0.105 48);
+  --on-accent: oklch(29% 0.06 40);
+  --accent-ink: oklch(53% 0.15 38);
+  --accent-soft: oklch(94.5% 0.03 55);
+  --bar-current: oklch(66% 0.13 42);
+  --bar-previous: oklch(80% 0.012 60);
+  --danger: oklch(55% 0.19 27);
+  --scrim: oklch(22% 0.02 45 / 0.32);
+  --shadow-float: 0 10px 30px oklch(35% 0.04 45 / 0.16), 0 2px 6px oklch(35% 0.04 45 / 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: oklch(18.5% 0.008 55);
+    --surface: oklch(23.5% 0.009 55);
+    --surface-2: oklch(29% 0.011 55);
+    --surface-pressed: oklch(33% 0.012 55);
+    --separator: oklch(32% 0.01 55);
+    --ink: oklch(95% 0.008 70);
+    --ink-2: oklch(76% 0.012 60);
+    --ink-3: oklch(64% 0.012 60);
+    --accent: oklch(80% 0.1 50);
+    --accent-pressed: oklch(75% 0.11 48);
+    --on-accent: oklch(26% 0.05 40);
+    --accent-ink: oklch(81% 0.1 52);
+    --accent-soft: oklch(31% 0.04 50);
+    --bar-current: oklch(78% 0.11 48);
+    --bar-previous: oklch(42% 0.012 55);
+    --danger: oklch(70% 0.17 25);
+    --scrim: oklch(8% 0.01 45 / 0.55);
+    --shadow-float: 0 10px 30px oklch(5% 0 0 / 0.5), 0 2px 6px oklch(5% 0 0 / 0.4);
+  }
+}
+
+/* Avatar tints: soft pastels chosen per friend (see lib/tint.ts). */
+.tint-0 { --tint-bg: oklch(91% 0.045 50); --tint-fg: oklch(42% 0.08 50); }
+.tint-1 { --tint-bg: oklch(91% 0.045 85); --tint-fg: oklch(42% 0.08 85); }
+.tint-2 { --tint-bg: oklch(91% 0.045 145); --tint-fg: oklch(42% 0.08 145); }
+.tint-3 { --tint-bg: oklch(91% 0.045 215); --tint-fg: oklch(42% 0.08 215); }
+.tint-4 { --tint-bg: oklch(91% 0.045 285); --tint-fg: oklch(42% 0.08 285); }
+.tint-5 { --tint-bg: oklch(91% 0.045 350); --tint-fg: oklch(42% 0.08 350); }
+
+@media (prefers-color-scheme: dark) {
+  .tint-0 { --tint-bg: oklch(36% 0.05 50); --tint-fg: oklch(90% 0.05 50); }
+  .tint-1 { --tint-bg: oklch(36% 0.05 85); --tint-fg: oklch(90% 0.05 85); }
+  .tint-2 { --tint-bg: oklch(36% 0.05 145); --tint-fg: oklch(90% 0.05 145); }
+  .tint-3 { --tint-bg: oklch(36% 0.05 215); --tint-fg: oklch(90% 0.05 215); }
+  .tint-4 { --tint-bg: oklch(36% 0.05 285); --tint-fg: oklch(90% 0.05 285); }
+  .tint-5 { --tint-bg: oklch(36% 0.05 350); --tint-fg: oklch(90% 0.05 350); }
+}

@@ -1,0 +1,289 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* On iPhone, 1rem follows the user's text-size setting (Dynamic Type). */
+@supports (font: -apple-system-body) {
+  html {
+    font: -apple-system-body;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: var(--text-body);
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.scroll-locked,
+.scroll-locked body {
+  overflow: hidden;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+/* 16px minimum stops iOS from zooming into focused fields. */
+input,
+textarea {
+  font-size: max(16px, 1rem);
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.numeric {
+  font-family: var(--font-rounded);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The phone layout, centered on wider screens. Bottom padding clears the tab bar and Log button. */
+.app {
+  max-width: 600px;
+  margin: 0 auto;
+  padding-bottom: calc(var(--tabbar-height) + var(--safe-bottom) + 96px);
+}
+
+/* Buttons */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  transition:
+    transform var(--dur-fast) var(--ease-out-quart),
+    background-color var(--dur-fast) var(--ease-out-quart),
+    opacity var(--dur-fast) var(--ease-out-quart);
+}
+.button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.button--primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.button--primary:active:not(:disabled) {
+  background: var(--accent-pressed);
+}
+.button--secondary {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.button--block {
+  display: flex;
+  width: 100%;
+  min-height: 52px;
+  font-size: 1.06rem;
+}
+
+.text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 0 var(--space-2);
+  color: var(--accent-ink);
+  transition: opacity var(--dur-fast);
+}
+.text-button:active {
+  opacity: 0.5;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border-radius: 50%;
+  color: var(--accent-ink);
+  transition: background-color var(--dur-fast);
+}
+.icon-button:active:not(:disabled) {
+  background: var(--surface-2);
+}
+.icon-button:disabled {
+  color: var(--ink-3);
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Forms */
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.form-section__label,
+.field-label {
+  margin: 0 var(--space-1);
+  font-size: var(--text-footnote);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.field {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0.6rem 0.9rem;
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--surface);
+  color: var(--ink);
+}
+.field::placeholder {
+  color: var(--ink-3);
+}
+textarea.field {
+  min-height: 5.5rem;
+  line-height: 1.4;
+  resize: none;
+}
+.field-error {
+  margin: 0 var(--space-1);
+  font-size: var(--text-footnote);
+  color: var(--danger);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-field);
+  background: var(--surface-2);
+  color: var(--ink-3);
+}
+.search:focus-within {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 1px;
+}
+.search__input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+}
+.search__input::placeholder {
+  color: var(--ink-3);
+}
+
+/* Chip layouts */
+.chip-row {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0 calc(-1 * var(--space-4));
+  padding: var(--space-1) var(--space-4);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.chip-row::-webkit-scrollbar {
+  display: none;
+}
+.chip-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.list-message {
+  margin: var(--space-2) var(--space-4);
+  color: var(--ink-2);
+  text-align: center;
+}
+
+.emoji-badge {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes rise-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes pop-in {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button:active:not(:disabled) {
+    transform: none;
+  }
+}
