@@ -8,7 +8,7 @@ let friendId: string
 
 beforeEach(async () => {
   await resetDatabase()
-  friendId = (await addFriend({ name: 'Alex', groupId: null, photo: null, notes: '' })).id
+  friendId = (await addFriend({ name: 'Alex', groupId: null, photo: null, notes: '', birthday: null })).id
 })
 
 async function lists() {

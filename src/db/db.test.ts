@@ -2,6 +2,7 @@ import Dexie from 'dexie'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db, resetDatabase } from './db'
 import { DEFAULT_MEETUP_TYPES } from './defaults'
+import { updateFriend } from './friends'
 import { addPreferences } from './preferences'
 import { getSetting, setSetting } from './settings'
 import type { Friend } from '../types'
@@ -39,8 +40,9 @@ describe('upgrade from version 1', () => {
 
     await db.open()
 
-    expect(await db.friends.get('f1')).toEqual({ ...v1Friend, likes: [], dislikes: [] })
-    expect(await db.friends.get('f2')).toEqual({ ...nullListsFriend, likes: [], dislikes: [] })
+    // (The reading hook adds `birthday: null`, which the upgrade doesn't store.)
+    expect(await db.friends.get('f1')).toEqual({ ...v1Friend, likes: [], dislikes: [], birthday: null })
+    expect(await db.friends.get('f2')).toEqual({ ...nullListsFriend, likes: [], dislikes: [], birthday: null })
     // Dexie stores the version times 10. Read it from the native database to prove the upgrade ran.
     expect(db.backendDB().version).toBe(20)
   })
@@ -60,6 +62,23 @@ describe('friends read from the database', () => {
     expect((await db.friends.toArray())[0]).toMatchObject({ likes: [], dislikes: [] })
     expect(await addPreferences('old', 'likes', 'Sushi')).toEqual({ added: ['Sushi'], skipped: [] })
     expect(await db.friends.get('old')).toMatchObject({ likes: ['Sushi'], dislikes: [] })
+  })
+
+  it('get no birthday when the stored record has none, and can be given one', async () => {
+    await db.friends.put({
+      id: 'old',
+      name: 'Old',
+      groupId: null,
+      photo: null,
+      notes: '',
+      likes: [],
+      dislikes: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    } as unknown as Friend)
+    expect(await db.friends.get('old')).toMatchObject({ birthday: null })
+    expect((await db.friends.toArray())[0]).toMatchObject({ birthday: null })
+    await updateFriend('old', { name: 'Old', groupId: null, photo: null, notes: '', birthday: { month: 3, day: 14, year: null } })
+    expect((await db.friends.get('old'))?.birthday).toEqual({ month: 3, day: 14, year: null })
   })
 })
 

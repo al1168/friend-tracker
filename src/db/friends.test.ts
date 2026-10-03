@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import type { Birthday } from '../types'
 import { db, resetDatabase } from './db'
 import { ValidationError } from './errors'
 import { addFriend, deleteFriend, updateFriend, type FriendInput } from './friends'
@@ -9,8 +10,17 @@ const input = (overrides: Partial<FriendInput> = {}): FriendInput => ({
   groupId: null,
   photo: null,
   notes: '',
+  birthday: null,
   ...overrides,
 })
+
+/** Birthdays the data layer refuses: no Feb 30, no Feb 29 in 2023, nothing before 1900 or after today. */
+const INVALID_BIRTHDAYS: Birthday[] = [
+  { month: 2, day: 30, year: null },
+  { month: 2, day: 29, year: 2023 },
+  { month: 12, day: 31, year: 1899 },
+  { month: 1, day: 1, year: 2999 },
+]
 
 beforeEach(resetDatabase)
 
@@ -30,6 +40,30 @@ describe('addFriend', () => {
     const friend = await addFriend(input())
     expect(friend).toMatchObject({ likes: [], dislikes: [] })
   })
+
+  it('saves a birthday, or none', async () => {
+    const alex = await addFriend(input({ birthday: { month: 3, day: 14, year: 1996 } }))
+    const sam = await addFriend(input({ name: 'Sam', birthday: { month: 2, day: 29, year: null } }))
+    const kim = await addFriend(input({ name: 'Kim' }))
+    expect((await db.friends.get(alex.id))?.birthday).toEqual({ month: 3, day: 14, year: 1996 })
+    expect((await db.friends.get(sam.id))?.birthday).toEqual({ month: 2, day: 29, year: null })
+    expect((await db.friends.get(kim.id))?.birthday).toBeNull()
+  })
+
+  it('stores only the birthday fields', async () => {
+    const birthday = { month: 3, day: 14, year: null, sign: 'Pisces' }
+    const friend = await addFriend(input({ birthday }))
+    expect((await db.friends.get(friend.id))?.birthday).toEqual({ month: 3, day: 14, year: null })
+  })
+
+  it('rejects an invalid birthday and saves nothing', async () => {
+    for (const birthday of INVALID_BIRTHDAYS) {
+      const attempt = addFriend(input({ birthday }))
+      await expect(attempt).rejects.toThrow(ValidationError)
+      await expect(attempt).rejects.toThrow('Pick a valid birthday.')
+    }
+    expect(await db.friends.count()).toBe(0)
+  })
 })
 
 describe('updateFriend', () => {
@@ -44,6 +78,25 @@ describe('updateFriend', () => {
     await db.friends.update(friend.id, { likes: ['Sushi'], dislikes: ['Cilantro'] })
     await updateFriend(friend.id, input({ name: 'Alexandra' }))
     expect(await db.friends.get(friend.id)).toMatchObject({ likes: ['Sushi'], dislikes: ['Cilantro'] })
+  })
+
+  it('sets, changes and clears the birthday', async () => {
+    const friend = await addFriend(input())
+    const stored = async () => (await db.friends.get(friend.id))?.birthday
+    await updateFriend(friend.id, input({ birthday: { month: 3, day: 14, year: 1996 } }))
+    expect(await stored()).toEqual({ month: 3, day: 14, year: 1996 })
+    await updateFriend(friend.id, input({ birthday: { month: 2, day: 29, year: null } }))
+    expect(await stored()).toEqual({ month: 2, day: 29, year: null })
+    await updateFriend(friend.id, input({ birthday: null }))
+    expect(await stored()).toBeNull()
+  })
+
+  it('rejects an invalid birthday and keeps the old one', async () => {
+    const friend = await addFriend(input({ birthday: { month: 3, day: 14, year: 1996 } }))
+    for (const birthday of INVALID_BIRTHDAYS) {
+      await expect(updateFriend(friend.id, input({ name: 'Alexandra', birthday }))).rejects.toThrow('Pick a valid birthday.')
+    }
+    expect(await db.friends.get(friend.id)).toMatchObject({ name: 'Alex', birthday: { month: 3, day: 14, year: 1996 } })
   })
 })
 

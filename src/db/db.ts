@@ -46,11 +46,14 @@ db.version(2)
 
 // The upgrade above runs once, but older code that is still running (a second tab, or a
 // rollback) can write friends without lists later. Fill them in on every read.
+// Birthdays came without a version bump (no index changed), so friends saved before them
+// get "no birthday" here too.
 // (Dexie also calls this with undefined when `get` finds nothing, so guard for that.)
 db.friends.hook('reading', (friend) => {
   if (friend) {
     friend.likes ??= []
     friend.dislikes ??= []
+    friend.birthday ??= null
   }
   return friend
 })

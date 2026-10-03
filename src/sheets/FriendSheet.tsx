@@ -86,7 +86,8 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
           return
         }
       }
-      const input = { name, groupId: finalGroupId, photo, notes }
+      // The sheet doesn't edit birthdays yet, so an edited friend keeps theirs.
+      const input = { name, groupId: finalGroupId, photo, notes, birthday: editing?.birthday ?? null }
       if (editing) {
         await updateFriend(editing.id, input)
         toast({ message: 'Saved' })

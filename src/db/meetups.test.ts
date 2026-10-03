@@ -39,7 +39,7 @@ describe('updateMeetup on a missing meetup', () => {
   })
 })
 
-const friendInput = (name: string) => ({ name, groupId: null, photo: null, notes: '' })
+const friendInput = (name: string) => ({ name, groupId: null, photo: null, notes: '', birthday: null })
 
 describe('deleteMeetup and restoreMeetup', () => {
   it('deletes a meetup and restores it exactly', async () => {

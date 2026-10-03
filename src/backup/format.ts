@@ -126,6 +126,8 @@ function readBackup(raw: unknown): BackupData {
       notes: text(r, 'notes', where),
       // Version 1 backups were made before likes and dislikes existed.
       ...(version === 1 ? { likes: [], dislikes: [] } : preferenceLists(r, where)),
+      // Backups don't carry birthdays yet.
+      birthday: null,
       createdAt: text(r, 'createdAt', where),
     }
   })

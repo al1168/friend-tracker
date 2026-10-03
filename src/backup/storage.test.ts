@@ -25,8 +25,14 @@ function sortById(data: BackupData): BackupData {
 describe('backup storage', () => {
   it('round-trips everything through a backup file', async () => {
     const college = await addGroup('College')
-    const alex = await addFriend({ name: 'Alex', groupId: college.id, photo: 'data:image/jpeg;base64,AAAA', notes: 'Hi' })
-    const sam = await addFriend({ name: 'Sam', groupId: null, photo: null, notes: '' })
+    const alex = await addFriend({
+      name: 'Alex',
+      groupId: college.id,
+      photo: 'data:image/jpeg;base64,AAAA',
+      notes: 'Hi',
+      birthday: null,
+    })
+    const sam = await addFriend({ name: 'Sam', groupId: null, photo: null, notes: '', birthday: null })
     await addPreferences(alex.id, 'likes', 'Sushi, Board games')
     await addPreferences(alex.id, 'dislikes', 'Early mornings')
     await addMeetup({ date: '2026-09-01', typeId: 'type-meal', friendIds: [alex.id, sam.id], note: 'Tacos' })
@@ -34,7 +40,7 @@ describe('backup storage', () => {
     const text = JSON.stringify(createBackup(before, new Date()))
 
     await resetDatabase()
-    await addFriend({ name: 'Someone else', groupId: null, photo: null, notes: '' })
+    await addFriend({ name: 'Someone else', groupId: null, photo: null, notes: '', birthday: null })
     const parsed = await parseBackupFile(new Blob([text], { type: 'application/json' }))
     if (!parsed.ok) throw new Error(parsed.error)
     await replaceAllData(parsed.data)
@@ -67,7 +73,7 @@ describe('backup storage', () => {
   })
 
   it('leaves existing data untouched if writing fails', async () => {
-    const alex = await addFriend({ name: 'Alex', groupId: null, photo: null, notes: '' })
+    const alex = await addFriend({ name: 'Alex', groupId: null, photo: null, notes: '', birthday: null })
     const bad: BackupData = {
       friends: [friend('x', 'X'), friend('x', 'X again')],
       groups: [],

@@ -40,7 +40,7 @@ describe('renameGroup', () => {
 describe('deleteGroup', () => {
   it('ungroups its friends', async () => {
     const group = await addGroup('Work')
-    const kim = await addFriend({ name: 'Kim', groupId: group.id, photo: null, notes: '' })
+    const kim = await addFriend({ name: 'Kim', groupId: group.id, photo: null, notes: '', birthday: null })
     await deleteGroup(group.id)
     expect(await db.groups.get(group.id)).toBeUndefined()
     expect((await db.friends.get(kim.id))?.groupId).toBeNull()

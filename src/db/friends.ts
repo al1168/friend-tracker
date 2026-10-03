@@ -1,5 +1,7 @@
+import { isValidBirthday } from '../lib/birthdays'
+import { todayISO } from '../lib/dates'
 import { newId } from '../lib/ids'
-import type { Friend } from '../types'
+import type { Birthday, Friend } from '../types'
 import { db } from './db'
 import { ValidationError } from './errors'
 
@@ -8,12 +10,22 @@ export interface FriendInput {
   groupId: string | null
   photo: string | null
   notes: string
+  birthday: Birthday | null
 }
 
 function clean(input: FriendInput): FriendInput {
   const name = input.name.trim()
   if (!name) throw new ValidationError('Please enter a name.')
-  return { name, groupId: input.groupId, photo: input.photo, notes: input.notes.trim() }
+  const { birthday } = input
+  if (birthday !== null && !isValidBirthday(birthday, todayISO())) throw new ValidationError('Pick a valid birthday.')
+  return {
+    name,
+    groupId: input.groupId,
+    photo: input.photo,
+    notes: input.notes.trim(),
+    // Only the three fields are stored.
+    birthday: birthday && { month: birthday.month, day: birthday.day, year: birthday.year },
+  }
 }
 
 export async function addFriend(input: FriendInput): Promise<Friend> {
@@ -24,10 +36,10 @@ export async function addFriend(input: FriendInput): Promise<Friend> {
 
 /** Updates the fields the friend sheet edits. Likes and dislikes are left alone. */
 export async function updateFriend(id: string, input: FriendInput): Promise<void> {
-  const { name, groupId, photo, notes } = clean(input)
+  const { name, groupId, photo, notes, birthday } = clean(input)
   await db.transaction('rw', db.friends, async () => {
     if (!(await db.friends.get(id))) throw new ValidationError('This friend no longer exists.')
-    await db.friends.update(id, { name, groupId, photo, notes })
+    await db.friends.update(id, { name, groupId, photo, notes, birthday })
   })
 }
 
