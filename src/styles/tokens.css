@@ -54,7 +54,7 @@
   --on-accent: oklch(29% 0.06 40);
   --accent-ink: oklch(53% 0.15 38);
   --accent-soft: oklch(94.5% 0.03 55);
-  --bar-current: oklch(57% 0.13 42);
+  --bar-current: oklch(60% 0.13 42);
   --bar-previous: oklch(64% 0.012 60);
   --danger: oklch(55% 0.19 27);
   --scrim: oklch(22% 0.02 45 / 0.32);

@@ -8,19 +8,23 @@ export interface HBarItem {
 }
 
 /** Horizontal bars: the selected year (peach) over the previous year (gray), with numbers. */
-export function HBarList({ items, previousYear }: { items: HBarItem[]; previousYear: number }) {
+export function HBarList({ items, year, previousYear }: { items: HBarItem[]; year: number; previousYear: number }) {
   const max = Math.max(1, ...items.flatMap((item) => [item.count, item.previousCount]))
   return (
-    <ul className="hbars">
+    <ul className="hbars" role="list">
       {items.map((item) => (
         <li key={item.key} className="hbars__item">
           <div className="hbars__head">
             <span className="hbars__label">{item.label}</span>
             <span className="hbars__values">
-              <span className="numeric hbars__count">{item.count}</span>
+              <span className="numeric hbars__count">
+                <span className="visually-hidden">{year}: </span>
+                {item.count}
+              </span>
               <span>
                 {' '}
-                · {previousYear}: {item.previousCount}
+                <span aria-hidden="true">· </span>
+                {previousYear}: {item.previousCount}
               </span>
             </span>
           </div>

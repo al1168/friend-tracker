@@ -23,21 +23,27 @@ test('summarizes the year', async ({ page }) => {
 })
 
 test('switches to last year', async ({ page }) => {
-  const lastYear = new Date().getFullYear() - 1
+  const currentYear = new Date().getFullYear()
+  const lastYear = currentYear - 1
   await page.goto('/')
   await addFriend(page, 'Alex')
   await logMeetup(page, ['Alex'], { date: `${lastYear}-06-01` })
   await goToTab(page, 'Stats')
-  await expect(page.getByText('0 meetups with 0 friends.', { exact: true })).toBeVisible()
+  await expect(page.getByText(`No meetups in ${currentYear} yet.`, { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: `Show ${currentYear + 1}` })).toBeDisabled()
   await page.getByRole('button', { name: `Show ${lastYear}` }).click()
   await expect(page.getByText('1 meetup with 1 friend.', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: `Show ${lastYear - 1}` })).toBeDisabled()
 })
 
 test('opening a friend from Stats goes back to Stats', async ({ page }) => {
+  const lastYear = new Date().getFullYear() - 1
   await page.goto('/')
   await addFriend(page, 'Alex')
+  await logMeetup(page, ['Alex'], { date: `${lastYear}-06-01` })
   await logMeetup(page, ['Alex'])
   await goToTab(page, 'Stats')
+  await page.getByRole('button', { name: `Show ${lastYear}` }).click()
   await page.getByRole('region', { name: 'Top friends' }).getByRole('link', { name: /Alex/ }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Alex' })).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Stats' })).toHaveAttribute(
@@ -46,4 +52,6 @@ test('opening a friend from Stats goes back to Stats', async ({ page }) => {
   )
   await page.getByRole('button', { name: 'Stats' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Stats' })).toBeVisible()
+  await expect(page.getByText('1 meetup with 1 friend.', { exact: true })).toBeVisible()
+  await expect(page.getByText(String(lastYear), { exact: true })).toBeVisible()
 })

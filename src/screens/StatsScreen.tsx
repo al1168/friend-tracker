@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { useMemo } from 'react'
+import { Link, useSearchParams } from 'react-router'
 import { Avatar } from '../components/Avatar'
 import { EmptyState } from '../components/EmptyState'
 import { HBarList } from '../components/HBarList'
@@ -23,12 +23,15 @@ export function StatsScreen() {
   const types = useMeetupTypes()
   const today = useToday()
   const currentYear = yearOf(today)
-  const [year, setYear] = useState(currentYear)
-
   const firstYear = useMemo(
     () => Math.min(currentYear, ...(meetups ?? []).map((meetup) => yearOf(meetup.date))),
     [meetups, currentYear],
   )
+
+  const [params, setParams] = useSearchParams()
+  const asked = Number(params.get('year'))
+  const year = Number.isInteger(asked) && asked >= firstYear && asked < currentYear ? asked : currentYear
+  const showYear = (y: number) => setParams(y === currentYear ? {} : { year: String(y) }, { replace: true })
 
   const stats = useMemo(() => {
     if (!friends || !groups || !meetups || !types) return null
@@ -47,11 +50,11 @@ export function StatsScreen() {
 
   return (
     <Page title="Stats">
-      <div className="year-switcher">
+      <div className="year-switcher" role="group" aria-label="Year">
         <button
           type="button"
           className="icon-button"
-          onClick={() => setYear(year - 1)}
+          onClick={() => showYear(year - 1)}
           disabled={year <= firstYear}
           aria-label={`Show ${year - 1}`}
         >
@@ -63,7 +66,7 @@ export function StatsScreen() {
         <button
           type="button"
           className="icon-button"
-          onClick={() => setYear(year + 1)}
+          onClick={() => showYear(year + 1)}
           disabled={year >= currentYear}
           aria-label={`Show ${year + 1}`}
         >
@@ -77,7 +80,11 @@ export function StatsScreen() {
         <>
           <div className="stats-lead">
             <p className="stats-lead__main">
-              {plural(stats.totals.meetups, 'meetup')} with {plural(stats.totals.friends, 'friend')}.
+              {stats.totals.meetups === 0
+                ? year === currentYear
+                  ? `No meetups in ${year} yet.`
+                  : `No meetups in ${year}.`
+                : `${plural(stats.totals.meetups, 'meetup')} with ${plural(stats.totals.friends, 'friend')}.`}
             </p>
             <p className="stats-lead__previous">
               {year - 1}: {plural(stats.previous.meetups, 'meetup')} with {plural(stats.previous.friends, 'friend')}.
@@ -95,7 +102,10 @@ export function StatsScreen() {
                   title={friend.name}
                   trailing={
                     <span className="top-count">
-                      <span className="numeric top-count__value">{count}</span>
+                      <span className="numeric top-count__value">
+                        <span className="visually-hidden">{year}: </span>
+                        {count}
+                      </span>
                       <span className="top-count__previous">
                         {year - 1}: {previousCount}
                       </span>
@@ -109,6 +119,7 @@ export function StatsScreen() {
           {stats.byType.length > 0 && (
             <Section title="By type">
               <HBarList
+                year={year}
                 previousYear={year - 1}
                 items={stats.byType.map((row) => ({ ...row, label: `${row.emoji ?? ''} ${row.label}`.trim() }))}
               />
@@ -117,7 +128,7 @@ export function StatsScreen() {
 
           {groups.length > 0 && stats.byGroup.length > 0 && (
             <Section title="By group">
-              <HBarList previousYear={year - 1} items={stats.byGroup} />
+              <HBarList year={year} previousYear={year - 1} items={stats.byGroup} />
             </Section>
           )}
 
