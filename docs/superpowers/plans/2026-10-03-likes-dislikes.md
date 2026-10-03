@@ -1379,11 +1379,14 @@ import { useToast } from '../components/Toast'
 import { ValidationError } from '../db/errors'
 import { addPreferences, movePreference, removePreference, restorePreference } from '../db/preferences'
 import { isPlainEnter } from '../lib/keys'
-import { MAX_ITEM_LENGTH, otherKind, type PreferenceKind } from '../lib/preferences'
+import { otherKind, type PreferenceKind } from '../lib/preferences'
 import type { Friend } from '../types'
 import './FriendPreferences.css'
 
 const KINDS: PreferenceKind[] = ['likes', 'dislikes']
+
+/** Room to type several comma-separated items at once; each item is still held to 60 characters when saved. */
+const FIELD_MAX_LENGTH = 300
 
 const COPY: Record<PreferenceKind, { title: string; addLabel: string; fieldLabel: string; placeholder: string }> = {
   likes: { title: 'Likes', addLabel: 'Add a like', fieldLabel: 'New like', placeholder: 'Sushi, hiking…' },
@@ -1539,7 +1542,7 @@ export function FriendPreferences({ friend }: { friend: Friend }) {
                       autoFocus
                       autoCapitalize="sentences"
                       enterKeyHint="done"
-                      maxLength={MAX_ITEM_LENGTH}
+                      maxLength={FIELD_MAX_LENGTH}
                       onChange={(event) => setDraft({ kind, text: event.target.value, message: null })}
                       onKeyDown={(event) => {
                         if (isPlainEnter(event)) {
@@ -1968,7 +1971,7 @@ with:
   // The last toast has an Undo action, so it stays up for 8 seconds.
 ```
 
-(The long item is 51 characters and goes in its own entry: the field's `maxLength` of 60 counts the whole typed text. `captureAll` already shoots Alex Rivera's page as `*-04-friend.png` and `*-05-friend-full.png` in light, dark and large text, so no new captures are needed.)
+(The long item is 51 characters and goes in its own entry so the page shows a long chip wrapping. `captureAll` already shoots Alex Rivera's page as `*-04-friend.png` and `*-05-friend-full.png` in light, dark and large text, so no new captures are needed.)
 
 - [ ] **Step 2: Regenerate the screenshots and look at them**
 

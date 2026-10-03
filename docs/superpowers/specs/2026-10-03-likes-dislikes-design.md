@@ -25,7 +25,7 @@ dislikes: string[]
 
 **Item rules,** in one pure module (`src/lib/preferences.ts`) shared by the data layer and the backup parser:
 - An item is trimmed, and runs of whitespace (including newlines) become one space. Empty items are dropped.
-- At most **60 characters** after cleaning. The input has `maxLength={60}`; the data layer rejects anything longer with a `ValidationError`.
+- At most **60 characters** after cleaning. The input allows 300 characters so several items can be typed at once; each item over 60 is refused with a `ValidationError`.
 - A list never holds the same item twice, comparing case-insensitively (`toLocaleLowerCase`). The first spelling wins.
 - At most **50 items** per list.
 - Typed text is split on commas and newlines, so "sushi, hiking" adds two items.
@@ -68,7 +68,7 @@ DISLIKES
   - **Remove:** the item disappears and a toast says `Removed “Sushi”` with **Undo**, which restores it in place.
   - **Move:** the chip appears in the other list. No toast.
 - **"+ Add" chip** (plus icon, accessible name "Add a like" / "Add a dislike"). Tapping it replaces the chip, in place, with a row holding a field and a secondary **Add** button (the same pattern as "New group" in the friend sheet).
-  - The field takes focus and has `enterKeyHint="done"`, `autoCapitalize="sentences"` and `maxLength={60}`. Placeholders: Likes "Sushi, hiking…", Dislikes "Cilantro, early mornings…". Accessible names: "New like" / "New dislike".
+  - The field takes focus and has `enterKeyHint="done"`, `autoCapitalize="sentences"` and `maxLength={300}`. Placeholders: Likes "Sushi, hiking…", Dislikes "Cilantro, early mornings…". Accessible names: "New like" / "New dislike".
   - **Enter or Add** saves the text, clears the field and keeps focus, so several can be added in a row.
   - **Blur:** text left in the field is saved, then the field closes. An empty field just closes.
   - **Escape** closes the field without saving.
@@ -76,7 +76,7 @@ DISLIKES
 - **Messages** appear under the field as a Footnote with `role="alert"`, in Warm Ink Secondary (never red, since these aren't errors):
   - every typed item was already in the list: "Already in Likes."
   - the list is full: "This list is full."
-  - an item is too long: "Keep each one under 60 characters." (only reachable by paste, since the field caps typing)
+  - an item is too long: "Keep each one under 60 characters."
 
   A save failure uses the existing plain toast: "Couldn't save. Please try again."
 - **Empty lists** show only the "+ Add" chip. No extra copy.
