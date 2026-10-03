@@ -11,6 +11,7 @@ import { Page } from '../components/Page'
 import { useFriends, useGroups, useMeetups, useSetting } from '../data/hooks'
 import { setSetting } from '../db/settings'
 import { useToday } from '../hooks/useToday'
+import { describeNextBirthday, upcomingBirthdays } from '../lib/birthdays'
 import { daysBetween, yearOf } from '../lib/dates'
 import { matchFriend, matchSubtitle } from '../lib/friendSearch'
 import { isPlainEnter } from '../lib/keys'
@@ -24,6 +25,8 @@ import './FriendsScreen.css'
 
 const SORT_KEY = 'friend-tracker:sort'
 const SORTS = Object.keys(FRIEND_SORT_LABELS) as FriendSort[]
+/** The most rows Birthdays soon shows. Its footer counts the rest. */
+const MAX_BIRTHDAYS_SOON = 5
 
 function readStoredSort(): FriendSort {
   try {
@@ -71,6 +74,8 @@ export function FriendsScreen() {
       })
   }, [friends, meetups, today, sort, activeGroup, query])
 
+  const birthdaysSoon = useMemo(() => upcomingBirthdays(friends ?? [], today), [friends, today])
+
   async function chooseSort() {
     const choice = await showActionSheet<FriendSort>({
       title: 'Sort friends by',
@@ -83,6 +88,10 @@ export function FriendsScreen() {
   }
 
   if (!friends || !groups || !meetups || hintDismissed === undefined) return null
+
+  // Hidden while searching or filtering, so the list below stays a plain filtered list.
+  const showBirthdaysSoon = birthdaysSoon.length > 0 && query.trim() === '' && activeGroup === null
+  const moreBirthdays = birthdaysSoon.length - MAX_BIRTHDAYS_SOON
 
   return (
     <Page
@@ -119,6 +128,23 @@ export function FriendsScreen() {
         />
       ) : (
         <>
+          {showBirthdaysSoon && (
+            <InsetGroup
+              title="Birthdays soon"
+              footer={moreBirthdays > 0 ? `And ${moreBirthdays} more in the next two weeks.` : undefined}
+            >
+              {birthdaysSoon.slice(0, MAX_BIRTHDAYS_SOON).map(({ friend, birthday }) => (
+                <Row
+                  key={friend.id}
+                  to={`/friends/${friend.id}`}
+                  leading={<Avatar name={friend.name} photo={friend.photo} seed={friend.id} />}
+                  title={friend.name}
+                  subtitle={describeNextBirthday(birthday, today)}
+                />
+              ))}
+            </InsetGroup>
+          )}
+
           <div className="friends-filters">
             <label className="search">
               <IconSearch size={18} />

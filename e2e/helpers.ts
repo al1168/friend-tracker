@@ -9,7 +9,7 @@ export async function goToTab(page: Page, name: 'Friends' | 'Stats' | 'Settings'
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
 }
 
-export async function addFriend(page: Page, name: string, group?: string) {
+export async function addFriend(page: Page, name: string, group?: string, birthday?: BirthdayChoice) {
   await page.getByRole('button', { name: 'Add friend' }).first().click()
   const sheet = page.getByRole('dialog', { name: 'New friend' })
   await sheet.getByLabel('Name', { exact: true }).fill(name)
@@ -24,6 +24,7 @@ export async function addFriend(page: Page, name: string, group?: string) {
       await expect(sheet.getByRole('button', { name: group, exact: true })).toHaveAttribute('aria-pressed', 'true')
     }
   }
+  if (birthday) await setBirthday(sheet, birthday)
   await sheet.getByRole('button', { name: 'Save' }).click()
   await expect(sheet).toBeHidden()
 }
@@ -60,6 +61,16 @@ export async function setBirthday(sheet: Locator, { month, day, year }: Birthday
   await sheet
     .getByRole('combobox', { name: 'Birthday year' })
     .selectOption(year === undefined ? { label: 'No year' } : String(year))
+}
+
+/**
+ * The local date `days` from today (negative for the past). Tests build birthdays from it, so the
+ * same countdown ("In 5 days") shows whatever day they run.
+ */
+export function dayFromToday(days: number): { year: number; month: number; day: number } {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  return { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() }
 }
 
 /** On a friend's page: adds `text` to their Likes or Dislikes with Enter, then closes the field. */

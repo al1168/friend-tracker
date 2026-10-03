@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import { Navigate, useParams } from 'react-router'
 import { Avatar } from '../components/Avatar'
+import { Chip } from '../components/Chip'
+import { IconPlus } from '../components/icons'
 import { InsetGroup, Row, Section } from '../components/InsetGroup'
 import { LogButton } from '../components/LogButton'
 import { MonthBars } from '../components/MonthBars'
@@ -8,6 +10,7 @@ import { Page } from '../components/Page'
 import { StatRow } from '../components/StatRow'
 import { useFriend, useFriends, useGroups, useMeetups, useMeetupTypes } from '../data/hooks'
 import { useToday } from '../hooks/useToday'
+import { describeNextBirthday, formatBirthday } from '../lib/birthdays'
 import { daysBetween, formatDate, formatMonthYear, yearOf } from '../lib/dates'
 import { formatNameList, formatSince } from '../lib/text'
 import { useSheets } from '../sheets/sheetsContext'
@@ -79,6 +82,31 @@ export function FriendDetailScreen() {
       }
     >
       {friend.notes && <p className="friend-notes">{friend.notes}</p>}
+
+      <Section title="Birthday">
+        {friend.birthday ? (
+          <InsetGroup>
+            <Row
+              onClick={() => openFriendSheet({ friend })}
+              leading={
+                <span className="emoji-badge" aria-hidden="true">
+                  🎂
+                </span>
+              }
+              title={formatBirthday(friend.birthday)}
+              subtitle={describeNextBirthday(friend.birthday, today)}
+              chevron
+            />
+          </InsetGroup>
+        ) : (
+          <div className="chip-wrap">
+            <Chip onClick={() => openFriendSheet({ friend })}>
+              <IconPlus size={16} strokeWidth={2.4} />
+              Add birthday
+            </Chip>
+          </div>
+        )}
+      </Section>
 
       <FriendPreferences key={friend.id} friend={friend} />
 
