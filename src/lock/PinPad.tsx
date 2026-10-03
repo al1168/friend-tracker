@@ -82,11 +82,20 @@ export function PinPad({ value, onChange, onComplete, label, disabled = false, b
  * (the countdown itself is a timer, not announced every second); a real `message` (such as a failed
  * Face ID) stays visible during the wait too.
  */
-export function PinMessage({ message, waitMs = 0 }: { message: string; waitMs?: number }) {
+export function PinMessage({
+  message,
+  waitMs = 0,
+  announceKey,
+}: {
+  message: string
+  waitMs?: number
+  /** Changes with every new message, so an identical message is announced again. */
+  announceKey?: number
+}) {
   const waiting = waitMs > 0
   return (
     <div className="pin-message">
-      <p role="alert" className={waiting && !message ? 'visually-hidden' : undefined}>
+      <p key={announceKey} role="alert" className={waiting && !message ? 'visually-hidden' : undefined}>
         {message || (waiting ? 'Too many wrong PINs. Wait, then try again.' : '')}
       </p>
       {waiting && <p role="timer">Try again in {formatWait(waitMs)}</p>}

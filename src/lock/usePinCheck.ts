@@ -24,8 +24,15 @@ export function usePinCheck(onSuccess: () => void) {
   const failures = useLiveQuery(() => getSetting('appLockFailures'))
   const waitMs = useWaitRemaining(failures?.lockedUntil ?? null)
   const [pin, setPin] = useState('')
-  const [message, setMessage] = useState('')
+  const [message, setMessageText] = useState('')
+  const [messageKey, setMessageKey] = useState(0)
   const [shake, setShake] = useState(0)
+
+  /** Shows a message; the key changes each time, so an identical message is announced again. */
+  function setMessage(text: string) {
+    setMessageText(text)
+    setMessageKey((key) => key + 1)
+  }
   const [checking, setChecking] = useState(false)
 
   // A stored wait longer than the failure count allows (a damaged setting, or a clock that moved) is cut back
@@ -66,7 +73,7 @@ export function usePinCheck(onSuccess: () => void) {
 
   function change(value: string) {
     setPin(value)
-    if (value.length > 0) setMessage('')
+    if (value.length > 0) setMessageText('')
   }
 
   return {
@@ -79,6 +86,7 @@ export function usePinCheck(onSuccess: () => void) {
       shake,
     },
     message,
+    messageKey,
     setMessage,
     waitMs,
   }

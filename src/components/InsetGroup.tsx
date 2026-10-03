@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react'
+import { useId, type ReactNode, type Ref } from 'react'
 import { Link } from 'react-router'
 import { IconChevronRight } from './icons'
 import type { NavState } from './Page'
@@ -9,16 +9,18 @@ interface InsetGroupProps {
   /** Heading level for the title (3 when nested inside a Section). */
   level?: 2 | 3
   footer?: ReactNode
+  /** Makes the title focusable from code (not by tab), for moving focus here after a control is replaced. */
+  titleRef?: Ref<HTMLHeadingElement>
   children: ReactNode
 }
 
-export function InsetGroup({ title, level = 2, footer, children }: InsetGroupProps) {
+export function InsetGroup({ title, level = 2, footer, titleRef, children }: InsetGroupProps) {
   const titleId = useId()
   const Heading = level === 3 ? 'h3' : 'h2'
   return (
     <section className="inset-group" aria-labelledby={title && level !== 3 ? titleId : undefined}>
       {title && (
-        <Heading id={titleId} className="group-title">
+        <Heading id={titleId} className="group-title" ref={titleRef} tabIndex={titleRef ? -1 : undefined}>
           {title}
         </Heading>
       )}
@@ -49,12 +51,26 @@ interface RowProps {
   /** Router location state for `to` (e.g. back label and origin tab). */
   state?: NavState
   onClick?: () => void
+  /** Makes the row an on/off switch (a button with role "switch") showing a switch on the right. */
+  switchOn?: boolean
   chevron?: boolean
   accent?: boolean
   destructive?: boolean
 }
 
-export function Row({ title, subtitle, leading, trailing, to, state, onClick, chevron, accent, destructive }: RowProps) {
+export function Row({
+  title,
+  subtitle,
+  leading,
+  trailing,
+  to,
+  state,
+  onClick,
+  switchOn,
+  chevron,
+  accent,
+  destructive,
+}: RowProps) {
   const className = [
     'row',
     (to || onClick) && 'row--interactive',
@@ -72,6 +88,7 @@ export function Row({ title, subtitle, leading, trailing, to, state, onClick, ch
         {subtitle && <span className="row__subtitle">{subtitle}</span>}
       </span>
       {trailing !== undefined && <span className="row__trailing">{trailing}</span>}
+      {switchOn !== undefined && <span className="switch" data-on={switchOn} aria-hidden="true" />}
       {chevron && (
         <span className="row__chevron">
           <IconChevronRight size={18} strokeWidth={2.4} />
@@ -89,7 +106,13 @@ export function Row({ title, subtitle, leading, trailing, to, state, onClick, ch
   }
   if (onClick) {
     return (
-      <button type="button" className={className} onClick={onClick}>
+      <button
+        type="button"
+        className={className}
+        onClick={onClick}
+        role={switchOn === undefined ? undefined : 'switch'}
+        aria-checked={switchOn}
+      >
         {content}
       </button>
     )

@@ -1,12 +1,14 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { InsetGroup, Row } from '../components/InsetGroup'
 import { useToast } from '../components/Toast'
-import { ChangePinSheet, TurnOffLockSheet, TurnOnLockSheet } from './LockSheets'
+import { ChangePinSheet, TurnOffLockSheet, TurnOnFaceIdSheet, TurnOnLockSheet } from './LockSheets'
 import { setPasskey } from './lockStore'
-import { registerPasskey } from './passkey'
 import type { AppLock } from './types'
 
-type LockSheet = 'on' | 'change' | 'off'
+type LockSheet = 'on' | 'faceId' | 'change' | 'off'
+
+/** Longer than the sheet's exit animation. */
+const EXIT_MS = 400
 
 interface AppLockSectionProps {
   lock: AppLock
@@ -17,37 +19,44 @@ interface AppLockSectionProps {
 /** The "App lock" group on the Settings screen. */
 export function AppLockSection({ lock, passkeyAvailable }: AppLockSectionProps) {
   const toast = useToast()
-  const [sheet, setSheet] = useState<LockSheet | null>(null)
-  const [sheetKey, setSheetKey] = useState(0)
-  const faceIdBusy = useRef(false)
+  // One sheet at a time. It stays mounted while it slides away, and a new key gives the next one a clean start.
+  const [shown, setShown] = useState<{ kind: LockSheet; key: number; open: boolean } | null>(null)
+  const [headingFocus, setHeadingFocus] = useState(0)
+  const titleRef = useRef<HTMLHeadingElement>(null)
+  // Same rule as LockGate: the lock is on only when a PIN is stored.
+  const lockOn = lock.enabled && lock.pin !== null
 
-  const open = (next: LockSheet) => {
-    setSheetKey((key) => key + 1)
-    setSheet(next)
+  const open = (kind: LockSheet) => setShown((previous) => ({ kind, key: (previous?.key ?? 0) + 1, open: true }))
+  const close = () => setShown((previous) => previous && { ...previous, open: false })
+  // For a sheet that replaced the control that opened it: focus has nowhere to return to, so it goes to the heading.
+  const done = () => {
+    close()
+    setHeadingFocus((count) => count + 1)
   }
-  const close = () => setSheet(null)
 
-  // Registering a passkey has to start from this tap, so it can't wait behind a sheet.
+  const exiting = shown !== null && !shown.open
+  useEffect(() => {
+    if (!exiting) return
+    const timer = window.setTimeout(() => setShown((current) => (current && !current.open ? null : current)), EXIT_MS)
+    return () => window.clearTimeout(timer)
+  }, [exiting])
+
+  // Runs after the sheet has given focus back, so the heading wins.
+  useEffect(() => {
+    if (headingFocus > 0) titleRef.current?.focus({ preventScroll: true })
+  }, [headingFocus])
+
+  // Turning Face ID off is one tap. Turning it on asks for the PIN first (in a sheet).
   async function toggleFaceId() {
-    if (faceIdBusy.current) return
-    faceIdBusy.current = true
+    if (!lock.passkeyId) {
+      open('faceId')
+      return
+    }
     try {
-      if (lock.passkeyId) {
-        await setPasskey(null)
-        toast({ message: 'Face ID is off', tone: 'plain' })
-        return
-      }
-      const passkeyId = await registerPasskey()
-      if (!passkeyId) {
-        toast({ message: "Face ID wasn't turned on.", tone: 'plain' })
-        return
-      }
-      await setPasskey(passkeyId)
-      toast({ message: 'Face ID is on' })
+      await setPasskey(null)
+      toast({ message: 'Face ID is off', tone: 'plain' })
     } catch {
       toast({ message: "Couldn't save. Please try again.", tone: 'plain' })
-    } finally {
-      faceIdBusy.current = false
     }
   }
 
@@ -55,13 +64,15 @@ export function AppLockSection({ lock, passkeyAvailable }: AppLockSectionProps) 
     ? 'Locks the app after 15 minutes away. Unlock with your PIN, Face ID or your iPhone passcode.'
     : 'Locks the app after 15 minutes away. Unlock with your PIN.'
 
+  const sheetKey = shown ? `${shown.kind}-${shown.key}` : undefined
+
   return (
     <>
-      <InsetGroup title="App lock" footer={footer}>
-        {lock.enabled ? (
+      <InsetGroup title="App lock" footer={footer} titleRef={titleRef}>
+        {lockOn ? (
           <>
             {(passkeyAvailable || lock.passkeyId) && (
-              <Row title="Face ID" trailing={lock.passkeyId ? 'On' : 'Off'} onClick={toggleFaceId} />
+              <Row title="Face ID" switchOn={lock.passkeyId !== null} onClick={toggleFaceId} />
             )}
             <Row title="Change PIN" accent onClick={() => open('change')} />
             <Row title="Turn off app lock" destructive onClick={() => open('off')} />
@@ -70,14 +81,20 @@ export function AppLockSection({ lock, passkeyAvailable }: AppLockSectionProps) 
           <Row title="Turn on app lock" accent onClick={() => open('on')} />
         )}
       </InsetGroup>
-      <TurnOnLockSheet
-        key={`on-${sheetKey}`}
-        open={sheet === 'on'}
-        onClose={close}
-        passkeyAvailable={passkeyAvailable}
-      />
-      <ChangePinSheet key={`change-${sheetKey}`} open={sheet === 'change'} onClose={close} />
-      <TurnOffLockSheet key={`off-${sheetKey}`} open={sheet === 'off'} onClose={close} passkeyId={lock.passkeyId} />
+      {shown?.kind === 'on' && (
+        <TurnOnLockSheet
+          key={sheetKey}
+          open={shown.open}
+          onClose={close}
+          onDone={done}
+          passkeyAvailable={passkeyAvailable}
+        />
+      )}
+      {shown?.kind === 'faceId' && <TurnOnFaceIdSheet key={sheetKey} open={shown.open} onClose={close} />}
+      {shown?.kind === 'change' && <ChangePinSheet key={sheetKey} open={shown.open} onClose={close} />}
+      {shown?.kind === 'off' && (
+        <TurnOffLockSheet key={sheetKey} open={shown.open} onClose={close} onDone={done} passkeyId={lock.passkeyId} />
+      )}
     </>
   )
 }

@@ -100,6 +100,89 @@ export async function reopenAfterAWhile(page: Page) {
   await page.reload()
 }
 
+/** Writes one row of the `settings` table straight into IndexedDB (the open page notices on its next reload). */
+export async function putSetting(page: Page, key: string, value: unknown) {
+  await page.evaluate(
+    async ({ key, value }) => {
+      await new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open('friend-tracker')
+        request.onerror = () => reject(request.error)
+        request.onsuccess = () => {
+          const database = request.result
+          const transaction = database.transaction('settings', 'readwrite')
+          transaction.objectStore('settings').put({ key, value })
+          transaction.oncomplete = () => {
+            database.close()
+            resolve()
+          }
+          transaction.onerror = () => reject(transaction.error)
+        }
+      })
+    },
+    { key, value },
+  )
+}
+
+/** Reads one row of the `settings` table straight from IndexedDB (null when missing). */
+export async function readSetting(page: Page, key: string): Promise<unknown> {
+  return page.evaluate(
+    (key) =>
+      new Promise((resolve, reject) => {
+        const request = indexedDB.open('friend-tracker')
+        request.onerror = () => reject(request.error)
+        request.onsuccess = () => {
+          const database = request.result
+          const get = database.transaction('settings').objectStore('settings').get(key)
+          get.onsuccess = () => {
+            database.close()
+            resolve(get.result?.value ?? null)
+          }
+        }
+      }),
+    key,
+  )
+}
+
+/** The passkey id that `fakePasskey` hands out (the bytes 1 to 8, as base64url). */
+export const FAKE_PASSKEY_ID = 'AQIDBAUGBwg'
+
+/**
+ * Fakes a Face ID that always succeeds: creating and asserting a passkey both return the same
+ * credential, with the user-verified flag set. Face ID also looks available.
+ */
+export async function fakePasskey(page: Page) {
+  await page.addInitScript(() => {
+    function FakeCredential() {}
+    FakeCredential.isUserVerifyingPlatformAuthenticatorAvailable = async () => true
+    function FakeAssertion() {}
+    Object.defineProperty(window, 'PublicKeyCredential', { configurable: true, writable: true, value: FakeCredential })
+    Object.defineProperty(window, 'AuthenticatorAssertionResponse', {
+      configurable: true,
+      writable: true,
+      value: FakeAssertion,
+    })
+    const rawId = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]).buffer
+    const credential = () => {
+      const result = Object.create(FakeCredential.prototype)
+      Object.defineProperty(result, 'rawId', { value: rawId })
+      return result
+    }
+    const credentials = {
+      create: async () => credential(),
+      get: async () => {
+        const result = credential()
+        const response = Object.create(FakeAssertion.prototype)
+        const authenticatorData = new Uint8Array(37)
+        authenticatorData[32] = 0x05 // user present + user verified
+        Object.defineProperty(response, 'authenticatorData', { value: authenticatorData.buffer })
+        Object.defineProperty(result, 'response', { value: response })
+        return result
+      },
+    }
+    Object.defineProperty(navigator, 'credentials', { configurable: true, value: credentials })
+  })
+}
+
 /** Makes Face ID look available (or not) on every later page load, whatever machine runs the tests. */
 export async function stubFaceId(page: Page, available: boolean) {
   await page.addInitScript((available) => {

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { addFriend, enterPin, lockHeading, reopenAfterAWhile, seedAppLock } from './helpers.ts'
+import { addFriend, enterPin, lockHeading, putSetting, reopenAfterAWhile, seedAppLock } from './helpers.ts'
 // PIN hashing and many taps make these tests slower than most.
 test.describe.configure({ timeout: 60_000 })
 
@@ -111,6 +111,8 @@ test('relocking with a sheet open closes it, and the app works after unlocking',
 
 test('a cancelled Face ID says so and stays locked', async ({ page }) => {
   await seedAppLock(page, PIN, 'AAAAAAAAAAAAAAAAAAAAAA')
+  // Three wrong PINs already: a fourth is still free, a fifth would start a wait.
+  await putSetting(page, 'appLockFailures', { count: 3, lockedUntil: null })
   await page.addInitScript(() => {
     // The user cancels the Face ID prompt.
     const credentials = { get: () => Promise.reject(new DOMException('Cancelled', 'NotAllowedError')) }
@@ -120,7 +122,7 @@ test('a cancelled Face ID says so and stays locked', async ({ page }) => {
   await expect(lockHeading(page)).toBeFocused()
   await page.getByRole('button', { name: 'Unlock with Face ID' }).click()
   await expect(page.getByRole('alert')).toHaveText("Face ID didn't work. Use your PIN.")
-  // A failed Face ID is not a wrong PIN: the first wrong PIN afterwards is a plain one, with no wait.
+  // A failed Face ID is not a wrong PIN: if it had counted, this would be the fifth failure and start a wait.
   await enterPin(page, '000000')
   await expect(page.getByRole('alert')).toHaveText('Wrong PIN. Try again.')
   await expect(page.getByRole('timer')).toHaveCount(0)

@@ -115,7 +115,10 @@ export function Sheet({ open, title, onRequestClose, footer, children }: SheetPr
             <h2 id={titleId} className="sheet__title">
               {title}
             </h2>
-            <span aria-hidden="true" />
+            {/* As wide as Cancel, so the title stays centered and can wrap at large text sizes. */}
+            <span className="text-button sheet__spacer" aria-hidden="true">
+              Cancel
+            </span>
           </div>
         </div>
         <div className="sheet__body">{children}</div>

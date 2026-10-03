@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { addFriend, goToTab, lockHeading, logMeetup, reopenAfterAWhile, seedAppLock } from './helpers.ts'
+import { addFriend, goToTab, lockHeading, logMeetup, reopenAfterAWhile, seedAppLock, stubFaceId } from './helpers.ts'
 
 const DIR = 'e2e/screenshots'
 // Roughly the iPhone's largest standard text size.
@@ -102,4 +102,28 @@ test('large text lock screen', async ({ page }) => {
 
 test('large text lock screen with Face ID', async ({ page }) => {
   await captureLock(page, 'large-text-face-id', true, true)
+})
+
+/** Settings with the lock on, then one lock sheet open, at the given text size. */
+async function captureLockSheet(page: Page, prefix: string, sheetOpener: string, dialog: string, largeText = false) {
+  await stubFaceId(page, true)
+  await page.goto('/#/settings')
+  await seedAppLock(page, '135790', 'AAAAAAAAAAAAAAAAAAAAAA')
+  await page.reload()
+  if (largeText) await page.addStyleTag({ content: LARGE_TEXT })
+  await page.getByRole('heading', { level: 2, name: 'App lock' }).scrollIntoViewIfNeeded()
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: `${DIR}/${prefix}-09-app-lock-on.png` })
+  await page.getByRole(sheetOpener === 'Face ID' ? 'switch' : 'button', { name: sheetOpener }).click()
+  await expect(page.getByRole('dialog', { name: dialog })).toBeVisible()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-10-lock-sheet.png` })
+}
+
+test('lock sheet', async ({ page }) => {
+  await captureLockSheet(page, 'light', 'Turn off app lock', 'Turn off app lock')
+})
+
+test('large text lock sheet', async ({ page }) => {
+  await captureLockSheet(page, 'large-text', 'Turn off app lock', 'Turn off app lock', true)
 })

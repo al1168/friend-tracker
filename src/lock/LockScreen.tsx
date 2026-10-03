@@ -54,7 +54,7 @@ export function LockScreen({ lock, onUnlock }: { lock: AppLock; onUnlock: () => 
       <PinPad
         label={PROMPT}
         {...entry.pinPad}
-        status={<PinMessage message={entry.message} waitMs={entry.waitMs} />}
+        status={<PinMessage message={entry.message} waitMs={entry.waitMs} announceKey={entry.messageKey} />}
       />
     </div>
   )
