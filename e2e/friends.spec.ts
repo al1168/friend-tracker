@@ -107,4 +107,5 @@ test('empty name is announced', async ({ page }) => {
   const input = sheet.getByLabel('Name', { exact: true })
   await expect(input).toHaveAttribute('aria-invalid', 'true')
   await expect(input).toHaveAccessibleDescription(/Please enter a name/)
+  await expect(input).toBeFocused()
 })

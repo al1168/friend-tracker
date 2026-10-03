@@ -1,4 +1,5 @@
 import { useId, useRef, useState, type ChangeEvent } from 'react'
+import { flushSync } from 'react-dom'
 import { useNavigate } from 'react-router'
 import { useConfirm, useConfirmDiscard } from '../components/ActionSheet'
 import { Avatar } from '../components/Avatar'
@@ -36,6 +37,7 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
   const groupErrorId = useId()
   const photoErrorId = useId()
   const nameInput = useRef<HTMLInputElement>(null)
+  const savingRef = useRef(false)
 
   const [name, setName] = useState(editing?.name ?? '')
   const [groupId, setGroupId] = useState<string | null>(editing?.groupId ?? null)
@@ -60,11 +62,13 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
   }
 
   async function save() {
+    if (savingRef.current || processingPhoto) return
     if (!name.trim()) {
-      setNameError('Please enter a name.')
+      flushSync(() => setNameError('Please enter a name.'))
       nameInput.current?.focus()
       return
     }
+    savingRef.current = true
     setSaving(true)
     try {
       let finalGroupId = groupId
@@ -93,6 +97,7 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
       if (error instanceof ValidationError) setNameError(error.message)
       else toast({ message: "Couldn't save. Please try again.", tone: 'plain' })
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -206,6 +211,7 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
           aria-invalid={nameError !== null}
           aria-describedby={nameError ? nameErrorId : undefined}
           onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing || event.keyCode === 229) return
             if (event.key === 'Enter') {
               event.preventDefault()
               void save()
@@ -260,6 +266,7 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
                 setGroupError(null)
               }}
               onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing || event.keyCode === 229) return
                 if (event.key === 'Enter') {
                   event.preventDefault()
                   void createGroup()
