@@ -7,8 +7,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      // New versions install quietly and are used the next time the app opens.
+      // New versions install in the background and take over right away; the app shows them the next time it's opened or reloaded.
       registerType: 'autoUpdate',
+      workbox: { skipWaiting: true, clientsClaim: true },
       injectRegister: 'script',
       includeAssets: ['favicon.ico', 'logo.svg', 'apple-touch-icon-180x180.png'],
       manifest: {
