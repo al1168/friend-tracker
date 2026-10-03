@@ -44,6 +44,17 @@ db.version(2)
       }),
   )
 
+// The upgrade above runs once, but older code that is still running (a second tab, or a
+// rollback) can write friends without lists later. Fill them in on every read.
+// (Dexie also calls this with undefined when `get` finds nothing, so guard for that.)
+db.friends.hook('reading', (friend) => {
+  if (friend) {
+    friend.likes ??= []
+    friend.dislikes ??= []
+  }
+  return friend
+})
+
 // Runs once, when the database is first created on this device.
 db.on('populate', (tx) => {
   return tx.table('meetupTypes').bulkAdd(DEFAULT_MEETUP_TYPES)

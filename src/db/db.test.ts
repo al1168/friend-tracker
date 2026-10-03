@@ -2,7 +2,9 @@ import Dexie from 'dexie'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db, resetDatabase } from './db'
 import { DEFAULT_MEETUP_TYPES } from './defaults'
+import { addPreferences } from './preferences'
 import { getSetting, setSetting } from './settings'
+import type { Friend } from '../types'
 
 beforeEach(resetDatabase)
 
@@ -16,6 +18,7 @@ describe('upgrade from version 1', () => {
       notes: 'Moved to Austin',
       createdAt: '2026-01-01T00:00:00.000Z',
     }
+    const nullListsFriend = { ...v1Friend, id: 'f2', name: 'Sam', likes: null }
     // Build the database as version 1 of the app left it, under the app's own name.
     // (The next test's resetDatabase deletes it and reopens the app database fresh.)
     db.close()
@@ -29,7 +32,7 @@ describe('upgrade from version 1', () => {
       settings: 'key',
     })
     try {
-      await v1.table('friends').add(v1Friend)
+      await v1.table('friends').bulkAdd([v1Friend, nullListsFriend])
     } finally {
       v1.close()
     }
@@ -37,7 +40,26 @@ describe('upgrade from version 1', () => {
     await db.open()
 
     expect(await db.friends.get('f1')).toEqual({ ...v1Friend, likes: [], dislikes: [] })
-    expect(db.verno).toBe(2)
+    expect(await db.friends.get('f2')).toEqual({ ...nullListsFriend, likes: [], dislikes: [] })
+    // Dexie stores the version times 10. Read it from the native database to prove the upgrade ran.
+    expect(db.backendDB().version).toBe(20)
+  })
+})
+
+describe('friends read from the database', () => {
+  it('get empty lists when the stored record has none, and can be added to', async () => {
+    await db.friends.put({
+      id: 'old',
+      name: 'Old',
+      groupId: null,
+      photo: null,
+      notes: '',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    } as unknown as Friend)
+    expect(await db.friends.get('old')).toMatchObject({ likes: [], dislikes: [] })
+    expect((await db.friends.toArray())[0]).toMatchObject({ likes: [], dislikes: [] })
+    expect(await addPreferences('old', 'likes', 'Sushi')).toEqual({ added: ['Sushi'], skipped: [] })
+    expect(await db.friends.get('old')).toMatchObject({ likes: ['Sushi'], dislikes: [] })
   })
 })
 

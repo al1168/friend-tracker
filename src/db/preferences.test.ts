@@ -126,6 +126,12 @@ describe('restorePreference', () => {
     expect(await lists()).toEqual({ likes: ['Sushi', 'Jazz'], dislikes: [] })
   })
 
+  it('does nothing for an empty item', async () => {
+    await addPreferences(friendId, 'likes', 'Sushi')
+    await restorePreference(friendId, 'likes', '   ', 0)
+    expect((await lists()).likes).toEqual(['Sushi'])
+  })
+
   it('refuses when the list is full', async () => {
     await addPreferences(friendId, 'likes', manyItems(50))
     await expect(restorePreference(friendId, 'likes', 'Sushi', 0)).rejects.toThrow('This list is full.')
@@ -144,6 +150,12 @@ describe('movePreference', () => {
     expect(await lists()).toEqual({ likes: ['Hiking'], dislikes: ['Cilantro', 'Sushi'] })
     await movePreference(friendId, 'dislikes', 'Cilantro')
     expect(await lists()).toEqual({ likes: ['Hiking', 'Cilantro'], dislikes: ['Sushi'] })
+  })
+
+  it('only removes the item when the other list already has it', async () => {
+    await db.friends.update(friendId, { likes: ['Sushi'], dislikes: ['sushi'] })
+    await movePreference(friendId, 'likes', 'Sushi')
+    expect(await lists()).toEqual({ likes: [], dislikes: ['sushi'] })
   })
 
   it('refuses when the other list is full and changes nothing', async () => {

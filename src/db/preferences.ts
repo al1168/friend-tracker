@@ -32,7 +32,7 @@ async function changeLists<T>(friendId: string, change: (lists: Lists) => T): Pr
 export async function addPreferences(friendId: string, kind: PreferenceKind, text: string): Promise<AddResult> {
   const items = splitItems(text)
   if (items.some((item) => item.length > MAX_ITEM_LENGTH)) {
-    throw new ValidationError('Keep each one under 60 characters.')
+    throw new ValidationError(`Keep each one under ${MAX_ITEM_LENGTH} characters.`)
   }
   return changeLists(friendId, (lists) => {
     const list = lists[kind]
@@ -73,6 +73,7 @@ export async function restorePreference(
   index: number,
 ): Promise<void> {
   const cleaned = cleanItem(item)
+  if (cleaned === '') return
   await changeLists(friendId, (lists) => {
     const list = lists[kind]
     if (indexOfItem(list, cleaned) !== -1) return
