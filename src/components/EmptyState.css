@@ -30,4 +30,5 @@
   max-width: 32ch;
   margin: 0 0 var(--space-3);
   color: var(--ink-2);
+  text-wrap: balance;
 }

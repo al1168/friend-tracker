@@ -40,12 +40,18 @@
   color: var(--on-accent);
   animation: pop-in var(--dur) var(--ease-out-quart);
 }
+/* Up to two lines, so first and last names both show at large text sizes. */
 .recent-friend__name {
+  display: -webkit-box;
   max-width: 100%;
   overflow: hidden;
   font-size: var(--text-footnote);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .date-chip {

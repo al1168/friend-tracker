@@ -1,12 +1,17 @@
+/* Centered with auto margins (not left: 50%) so the label gets the full width and stays on one line at large text sizes. */
 .log-button {
   position: fixed;
-  left: 50%;
+  left: 0;
+  right: 0;
   bottom: calc(var(--tabbar-height) + var(--safe-bottom) + var(--space-4));
   z-index: 15;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--space-2);
+  width: max-content;
+  max-width: calc(100% - 2 * var(--space-4));
   min-height: 52px;
+  margin: 0 auto;
   padding: 0 var(--space-6) 0 var(--space-5);
   border-radius: var(--radius-pill);
   background: var(--accent);
@@ -15,18 +20,23 @@
   font-size: 1.06rem;
   font-weight: 600;
   box-shadow: var(--shadow-float);
-  transform: translateX(-50%);
   transition:
     transform var(--dur-fast) var(--ease-out-quart),
     background-color var(--dur-fast) var(--ease-out-quart);
 }
+/* The plus grows with the label. */
+.log-button svg {
+  flex: none;
+  width: 1.15em;
+  height: 1.15em;
+}
 .log-button:active {
   background: var(--accent-pressed);
-  transform: translateX(-50%) scale(0.96);
+  transform: scale(0.96);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .log-button:active {
-    transform: translateX(-50%);
+    transform: none;
   }
 }

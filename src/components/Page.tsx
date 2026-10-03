@@ -55,7 +55,7 @@ export function Page({ title, back, actions, hero, pushed = false, children }: P
           {back && (
             <button type="button" className="text-button navbar__back" onClick={goBack}>
               <IconChevronLeft size={26} strokeWidth={2.4} />
-              {(location.state as NavState | null)?.backLabel ?? back.label}
+              <span className="navbar__back-label">{(location.state as NavState | null)?.backLabel ?? back.label}</span>
             </button>
           )}
         </div>

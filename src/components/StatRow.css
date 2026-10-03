@@ -7,8 +7,9 @@
   border-radius: var(--radius-group);
   background: var(--surface);
 }
+/* Three across up to the largest standard text sizes; one per line at accessibility sizes. */
 .stat-row__item {
-  flex: 1 1 calc((15rem - 100%) * 999);
+  flex: 1 1 calc((12rem - 100%) * 999);
   display: flex;
   flex-direction: column-reverse;
   align-items: center;

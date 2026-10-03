@@ -65,9 +65,14 @@ export function FriendDetailScreen() {
           <h1 className="friend-hero__name">{friend.name}</h1>
           {groupName && <p className="friend-hero__group">{groupName}</p>}
           <p className="friend-hero__seen">
-            {data.lastSeen
-              ? `Last seen ${formatDate(data.lastSeen, today)} · ${formatSince(daysBetween(data.lastSeen, today))}`
-              : 'Not seen yet'}
+            {data.lastSeen ? (
+              <>
+                <span className="friend-hero__seen-part">Last seen {formatDate(data.lastSeen, today)} ·</span>{' '}
+                <span className="friend-hero__seen-part">{formatSince(daysBetween(data.lastSeen, today))}</span>
+              </>
+            ) : (
+              'Not seen yet'
+            )}
           </p>
         </div>
       }

@@ -38,9 +38,10 @@
   flex-direction: column;
   gap: 3px;
 }
+/* A zero shows as a small round dot rather than a sliver. */
 .hbars__bar {
   display: block;
-  min-width: 3px;
+  min-width: 6px;
   height: 6px;
   border-radius: 3px;
 }

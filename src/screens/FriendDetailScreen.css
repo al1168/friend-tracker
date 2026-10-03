@@ -17,13 +17,18 @@
   margin: 0;
   color: var(--ink-2);
 }
+/* A pill on one line; a soft rounded box if large text wraps it. */
 .friend-hero__seen {
   margin: var(--space-3) 0 0;
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-pill);
+  border-radius: 1em;
   background: var(--surface);
   font-size: var(--text-subhead);
   color: var(--ink-2);
+}
+/* Wraps between the date and the "time since", never inside either. */
+.friend-hero__seen-part {
+  display: inline-block;
 }
 
 .friend-notes {

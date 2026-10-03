@@ -11,6 +11,10 @@
   display: flex;
   padding-right: var(--space-2);
 }
+/* Sixteen peach arrows would outshout the list; reorder controls stay neutral, like iOS. */
+.type-row__order .icon-button:not(:disabled) {
+  color: var(--ink-2);
+}
 
 .type-form {
   display: grid;
