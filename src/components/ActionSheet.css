@@ -1,0 +1,97 @@
+.action-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+.action-layer--closing {
+  pointer-events: none;
+}
+.action-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  animation: fade-in var(--dur) var(--ease-out-quart);
+}
+.action-layer--closing .action-scrim {
+  animation: fade-out 200ms var(--ease-out-quart) forwards;
+}
+
+.action-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-2) calc(var(--space-2) + var(--safe-bottom));
+  animation: rise-in var(--dur-sheet) var(--ease-out-expo);
+}
+.action-layer--closing .action-sheet {
+  animation: action-out 200ms var(--ease-out-quart) forwards;
+}
+@keyframes action-out {
+  to {
+    transform: translateY(100%);
+  }
+}
+
+.action-sheet__group {
+  overflow: hidden;
+  border-radius: var(--radius-group);
+  background: var(--surface);
+}
+.action-sheet__header {
+  padding: var(--space-4) var(--space-5) var(--space-3);
+  text-align: center;
+}
+.action-sheet__title {
+  margin: 0;
+  font-size: var(--text-footnote);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.action-sheet__message {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-footnote);
+  color: var(--ink-2);
+}
+.action-sheet__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 56px;
+  padding: 0 var(--space-4);
+  border-top: 0.5px solid var(--separator);
+  background: var(--surface);
+  color: var(--accent-ink);
+  font-size: 1.1rem;
+  transition: background-color var(--dur-fast);
+}
+.action-sheet__group > .action-sheet__button:first-child {
+  border-top: 0;
+}
+.action-sheet__button:active {
+  background: var(--surface-pressed);
+}
+.action-sheet__button--destructive {
+  color: var(--danger);
+}
+.action-sheet__cancel {
+  border-top: 0;
+  border-radius: var(--radius-group);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-sheet {
+    animation-name: fade-in;
+  }
+  .action-layer--closing .action-sheet {
+    animation-name: fade-out;
+  }
+}

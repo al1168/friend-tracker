@@ -1,0 +1,86 @@
+.toast-region {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--tabbar-height) + var(--safe-bottom) + 84px);
+  z-index: 70;
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--space-4);
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 100%;
+  min-height: 52px;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: var(--shadow-float);
+  pointer-events: auto;
+  animation: toast-in var(--dur-sheet) var(--ease-out-expo);
+}
+@keyframes toast-in {
+  from {
+    transform: translateY(16px) scale(0.96);
+    opacity: 0;
+  }
+}
+
+.toast__check {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.toast__check svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.toast__check path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-check 420ms var(--ease-out-quart) 120ms forwards;
+}
+@keyframes draw-check {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.toast__message {
+  padding: var(--space-2) var(--space-2) var(--space-2) 0;
+  font-weight: 500;
+}
+.toast__action {
+  flex: none;
+  min-height: var(--tap);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--bg) 18%, transparent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation-name: fade-in;
+  }
+  .toast__check path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}

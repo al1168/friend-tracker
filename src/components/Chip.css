@@ -1,0 +1,42 @@
+.chip {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: var(--text-subhead);
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-out-quart),
+    color var(--dur-fast) var(--ease-out-quart),
+    transform var(--dur-fast) var(--ease-out-quart);
+}
+/* Grows the tap target to 44px without changing the look. */
+.chip::after {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
+.chip:active {
+  transform: scale(0.96);
+}
+.chip[aria-pressed='true'],
+.chip[data-selected='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.chip .avatar {
+  margin-left: -8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip:active {
+    transform: none;
+  }
+}

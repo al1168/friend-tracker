@@ -1,0 +1,17 @@
+.avatar {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-2);
+  object-fit: cover;
+}
+.avatar--initials {
+  background: var(--tint-bg);
+  color: var(--tint-fg);
+  font-family: var(--font-rounded);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  user-select: none;
+}
