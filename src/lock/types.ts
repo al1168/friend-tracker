@@ -20,6 +20,7 @@ export interface LockFailures {
   lockedUntil: number | null
 }
 
-export const LOCK_OFF: AppLock = { enabled: false, pin: null, passkeyId: null }
+// Frozen: these are shared defaults, so nothing may change them in place (copy with a spread instead).
+export const LOCK_OFF: AppLock = Object.freeze({ enabled: false, pin: null, passkeyId: null })
 
-export const NO_FAILURES: LockFailures = { count: 0, lockedUntil: null }
+export const NO_FAILURES: LockFailures = Object.freeze({ count: 0, lockedUntil: null })

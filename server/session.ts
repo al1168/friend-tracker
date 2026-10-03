@@ -65,6 +65,11 @@ export async function verifySessionValue(key: CryptoKey, value: string, nowMs: n
   return crypto.subtle.verify('HMAC', key, signature, encoder.encode(`v1.${match[1]}`))
 }
 
+/** When a session value expires, in ms. Only call it on a value that verified. */
+export function sessionExpiresAt(value: string): number {
+  return Number(value.split('.')[1]) * 1000
+}
+
 export function sessionCookie(value: string): string {
   return `${SESSION_COOKIE}=${value}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${SESSION_MAX_AGE}`
 }

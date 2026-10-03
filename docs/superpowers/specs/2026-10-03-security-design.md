@@ -38,7 +38,7 @@ Three protections:
 - Delete `.github/workflows/deploy.yml`.
 - Cloudflare Pages project, Git-connected to the private repo:
   - Production branch: `main`
-  - Build command: `npm run build`
+  - Build command: `npm test && npm run build` (a failing unit test stops the deploy)
   - Output directory: `dist`
   - Environment variable: `NODE_VERSION=24`. Also add `.node-version` containing `24`.
 - Functions live in `/functions` and are deployed automatically with the site.
@@ -89,6 +89,7 @@ Three protections:
   - `sig` is base64url HMAC-SHA256(session key, `"v1.<expiresAt>"`), where session key = HMAC-SHA256(`SESSION_SECRET`, `"ft-session\0" + SITE_PASSWORD`).
 - **Attributes:** `HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=31536000`
 - **Valid when:** any cookie with that name verifies (a stray duplicate can't lock the owner out), the format parses, `expiresAt > now`, and the signature verifies via `crypto.subtle.verify`, which compares in constant time.
+- **Renewal:** a request with a valid session that expires in less than 30 days is served as usual and the response also carries a fresh one-year `__Host-ft_session` cookie, so regular use never signs the owner out. Sessions with 30 days or more left aren't touched.
 - **Rotation:** changing `SESSION_SECRET` or `SITE_PASSWORD` signs everyone out, because the session key depends on both. The old name `ft_session` is not accepted.
 
 ### Password check
@@ -150,7 +151,7 @@ Using a separate password-check key = HMAC-SHA256(`SESSION_SECRET`, `"ft-passwor
 - **Availability:** `PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()`. If unavailable, the app is PIN-only and the Face ID option is hidden.
 - **Register:** `navigator.credentials.create`, always called from a tap, with:
   - `rp: { name: 'Friend Tracker', id: location.hostname }`
-  - a random 16-byte user id
+  - a fixed user id (`friend-tracker-owner`), so iOS replaces the existing Friend Tracker passkey instead of adding another
   - `user.name` / `displayName` set to "Friend Tracker"
   - `pubKeyCredParams` ES256 (-7) and RS256 (-257)
   - `authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' }`
@@ -181,8 +182,8 @@ Using a separate password-check key = HMAC-SHA256(`SESSION_SECRET`, `"ft-passwor
 ### Settings screen additions (an "App lock" section)
 
 - **Lock off:**
-  - Row "Turn on app lock" (accent). It opens a sheet: "Choose a 6-digit PIN", then "Enter it again", then, if available, "Use Face ID to unlock?" with **Use Face ID** and **Not now**.
-  - Footer: "Locks the app after 15 minutes away. Unlock with Face ID or your PIN."
+  - Row "Turn on app lock" (accent). It opens a sheet: "Choose a 6-digit PIN", then "Enter it again", then, if available, "Use Face ID or your iPhone passcode to unlock?" with **Use Face ID** and **Not now**.
+  - Footer: "Locks the app after 15 minutes away. Unlock with your PIN, Face ID or your iPhone passcode."
 - **Lock on:**
   - Row "Face ID", trailing "On" or "Off". Tapping it toggles: turning on registers a passkey, turning off clears `passkeyId`.
   - Row "Change PIN": current PIN, then new PIN twice.
@@ -192,6 +193,8 @@ Using a separate password-check key = HMAC-SHA256(`SESSION_SECRET`, `"ft-passwor
 ### Honest limit
 
 This is a UI gate, not encryption. It stops someone holding the unlocked phone. It doesn't stop someone with developer tools attached to the unlocked phone. The PIN hash could also be brute-forced offline by such a person, since there are only 10⁶ PINs. Encrypting the database is out of scope.
+
+Face ID unlock also accepts your iPhone passcode (`userVerification: 'required'`: if Face ID fails, iOS offers the passcode), so anyone who knows your iPhone passcode can unlock the app that way. The PIN adds nothing against such a person. Two clock-related limits remain: setting the phone's clock back to within 15 minutes after the last use still opens the app, and moving the clock forward can skip a wrong-PIN wait. (The app does lock when the clock is behind the last recorded use.)
 
 ## Rollout
 
@@ -254,3 +257,7 @@ Recorded in [the security plan](../plans/2026-10-03-security.md):
 - **App lock.** `ft:lastActiveAt` is written whether or not the lock is on; the lock counts as on only when a PIN is stored. Wrong PINs in Change PIN and Turn off app lock count toward the same backoff. Turning the lock on saves it right after the PIN is confirmed, before the Face ID question. Resetting a forgotten PIN keeps Face ID.
 - **Settings.** The "App lock" group sits between Backup and About your data. Without Face ID on the device, the Face ID row is hidden and the footer reads "Locks the app after 15 minutes away. Unlock with your PIN."
 - **Lock screen.** "Enter your PIN" sits under the title and "Forgot PIN?" under the keypad. Wrong-PIN messages use calm secondary ink, not red. While PIN entry is paused, the countdown is a `role="timer"`, announced once.
+- **Hardening of the lock core (added after review).** The passkey user handle is the fixed text `friend-tracker-owner` instead of a random id (the spec said random), so iOS replaces the existing passkey instead of listing a new one each time Face ID is turned on. The app locks when the clock is behind the last recorded use. A stored wait longer than the failure count allows is cut back, and a stored PIN hash with an iteration count outside 100,000 to 5,000,000 never verifies. A PIN hash that cannot be read makes the check fail without counting a wrong PIN. Lock settings are written in one transaction.
+- **Sessions renew.** A valid session with less than 30 days left gets a fresh one-year cookie on its next request.
+- **Build runs the unit tests.** The Cloudflare build command is `npm test && npm run build`.
+- **Face ID copy.** Because Face ID unlock also accepts the iPhone passcode, the copy says "Face ID or your iPhone passcode" where it describes Face ID unlocking.

@@ -46,7 +46,7 @@ function postJson(path: string, body: string, headers: Record<string, string> = 
 
 async function run(request: Request, env: GateEnv): Promise<Response> {
   const result = await handleRequest(request, env, NOW)
-  if (result === 'next') throw new Error('expected the gate to answer')
+  if (result === 'next' || !(result instanceof Response)) throw new Error('expected the gate to answer')
   return result
 }
 
@@ -305,6 +305,23 @@ describe('everything else', () => {
   it('passes through with a valid session', async () => {
     const { env } = setup()
     expect(await handleRequest(get('/assets/index.js', { Cookie: await signedInCookie() }), env, NOW)).toBe('next')
+  })
+
+  it('renews a session with less than 30 days left', async () => {
+    const { env } = setup()
+    const tenDaysLeft = `__Host-ft_session=${await createSessionValue(await sessionKey(), NOW - 355 * 24 * 3600 * 1000)}`
+    const result = await handleRequest(get('/assets/index.js', { Cookie: tenDaysLeft }), env, NOW)
+    expect(result).toMatchObject({ kind: 'next' })
+    const setCookie = (result as { setCookie: string }).setCookie
+    expect(setCookie).toMatch(/^__Host-ft_session=v1\.\d+\.[\w-]{43}; HttpOnly; Secure; SameSite=Lax; Path=\/; Max-Age=31536000$/)
+    const value = setCookie.slice('__Host-ft_session='.length, setCookie.indexOf(';'))
+    expect(await verifySessionValue(await sessionKey(), value, NOW + 364 * 24 * 3600 * 1000)).toBe(true)
+  })
+
+  it('does not renew a session with 200 days left', async () => {
+    const { env } = setup()
+    const cookie = `__Host-ft_session=${await createSessionValue(await sessionKey(), NOW - 165 * 24 * 3600 * 1000)}`
+    expect(await handleRequest(get('/assets/index.js', { Cookie: cookie }), env, NOW)).toBe('next')
   })
 
   it('redirects a signed-out navigation to the sign-in page', async () => {

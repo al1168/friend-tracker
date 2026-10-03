@@ -29,6 +29,13 @@ describe('PIN', () => {
     expect(await verifyPin('12345', stored)).toBe(false)
   })
 
+  it('refuses a stored iteration count outside 100,000 to 5,000,000', async () => {
+    const stored = await hashPin('123456')
+    for (const iterations of [1.5, 0, 99_999, 5_000_001, 10_000_000, Number.NaN]) {
+      expect(await verifyPin('123456', { ...stored, iterations })).toBe(false)
+    }
+  })
+
   it('refuses to hash an invalid PIN', async () => {
     await expect(hashPin('1234')).rejects.toThrow('A PIN is exactly 6 digits.')
   })

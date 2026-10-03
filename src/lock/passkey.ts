@@ -5,6 +5,7 @@ import { base64urlToBytes, bytesToBase64url } from '../lib/base64'
 import { isExpectedAssertion } from './webauthn'
 
 const TIMEOUT_MS = 60_000
+const USER_HANDLE = new TextEncoder().encode('friend-tracker-owner')
 
 function randomBytes(length: number): Uint8Array<ArrayBuffer> {
   return crypto.getRandomValues(new Uint8Array(length))
@@ -26,7 +27,8 @@ export async function registerPasskey(): Promise<string | null> {
     const credential = await navigator.credentials.create({
       publicKey: {
         rp: { name: 'Friend Tracker', id: location.hostname },
-        user: { id: randomBytes(16), name: 'Friend Tracker', displayName: 'Friend Tracker' },
+        // A fixed user handle: iOS then replaces the existing Friend Tracker passkey instead of adding another.
+        user: { id: USER_HANDLE, name: 'Friend Tracker', displayName: 'Friend Tracker' },
         challenge: randomBytes(32),
         pubKeyCredParams: [
           { type: 'public-key', alg: -7 },

@@ -96,10 +96,9 @@ if (!password) {
     // Read the raw header: WebKit on Windows reports every cookie's SameSite as "None".
     const response = await anonymous.post('/__login', { form: { password, next: '/' } })
     assert.equal(response.status(), 303)
-    assert.match(
-      response.headers()['set-cookie'] ?? '',
-      /^__Host-ft_session=v1\.\d+\.[\w-]{43}; HttpOnly; Secure; SameSite=Lax; Path=\/; Max-Age=31536000$/,
-    )
+    // assert.ok, not assert.match: a failed match would print the cookie value.
+    const attributes = /^__Host-ft_session=v1\.\d+\.[\w-]{43}; HttpOnly; Secure; SameSite=Lax; Path=\/; Max-Age=31536000$/
+    assert.ok(attributes.test(response.headers()['set-cookie'] ?? ''), 'Set-Cookie attributes differ')
     const cookie = (await context.cookies(base)).find((c) => c.name === '__Host-ft_session')
     assert.ok(cookie, 'Safari did not keep the __Host-ft_session cookie')
     const days = (cookie.expires * 1000 - Date.now()) / 86_400_000
@@ -123,6 +122,10 @@ if (!password) {
   })
 
   await check('the sign-in page is never answered from the offline cache', async () => {
+    // Only meaningful once the service worker controls the page, so wait for that first.
+    await page.evaluate(() => navigator.serviceWorker.ready)
+    await page.reload()
+    assert.ok(await page.evaluate(() => navigator.serviceWorker.controller !== null), 'the service worker is not in control')
     await page.goto(new URL('/__login', base).href)
     await page.getByRole('heading', { level: 1, name: 'Friends' }).waitFor()
     assert.equal(page.url(), base)

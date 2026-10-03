@@ -31,7 +31,7 @@ test.beforeAll(async () => {
       body: hasBody ? Buffer.concat(chunks) : undefined,
     })
     const result = await handleRequest(request, env, Date.now())
-    if (result === 'next') {
+    if (!(result instanceof Response)) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
       res.end('<!doctype html><title>App</title><h1>App</h1>')
       return

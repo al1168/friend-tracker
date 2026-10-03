@@ -9,5 +9,11 @@ interface Env {
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   const result = await handleRequest(context.request, context.env, Date.now())
-  return result === 'next' ? context.next() : result
+  if (result === 'next') return context.next()
+  if (result instanceof Response) return result
+  // A session close to expiring is renewed: serve the file and send a fresh cookie with it.
+  const served = await context.next()
+  const response = new Response(served.body, served)
+  response.headers.append('Set-Cookie', result.setCookie)
+  return response
 }

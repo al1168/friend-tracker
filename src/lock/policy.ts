@@ -19,7 +19,8 @@ export function shouldLock({
   now: number
 }): boolean {
   if (!enabled) return false
-  return lastActiveAt === null || now - lastActiveAt >= RELOCK_AFTER_MS
+  // A clock that went backwards (now < lastActiveAt) also locks.
+  return lastActiveAt === null || now < lastActiveAt || now - lastActiveAt >= RELOCK_AFTER_MS
 }
 
 /** The pause after this many wrong PINs in a row: none for 1 to 4, then 30 s, doubling up to 15 minutes. */

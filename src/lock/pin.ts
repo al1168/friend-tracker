@@ -29,8 +29,21 @@ export async function hashPin(pin: string): Promise<PinHash> {
   return { hash: bytesToBase64(hash), salt: bytesToBase64(salt), iterations: PIN_ITERATIONS }
 }
 
+// 210k is deliberate (fast enough for a phone); with only 10^6 possible PINs the iteration count isn't the real
+// protection, the wrong-PIN backoff is.
+const MIN_STORED_ITERATIONS = 100_000
+const MAX_STORED_ITERATIONS = 5_000_000
+
 export async function verifyPin(pin: string, stored: PinHash): Promise<boolean> {
   if (!isValidPin(pin)) return false
+  // A damaged stored hash must not make this hang (huge count) or run unchecked (tiny count).
+  if (
+    !Number.isInteger(stored.iterations) ||
+    stored.iterations < MIN_STORED_ITERATIONS ||
+    stored.iterations > MAX_STORED_ITERATIONS
+  ) {
+    return false
+  }
   const actual = await derive(pin, base64ToBytes(stored.salt), stored.iterations)
   return constantTimeEqual(actual, base64ToBytes(stored.hash))
 }

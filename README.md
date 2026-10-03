@@ -7,14 +7,14 @@ A private iPhone app for remembering when you last saw your friends and how ofte
 1. Open the app's link (`https://<project>.pages.dev/`) in **Safari** and sign in with the website password. Let Safari save it to your passwords.
 2. Tap **Share** → **Add to Home Screen** → **Add**.
 3. Open it from the new **Friends** icon, and sign in again if asked (the icon keeps its own sign-in). Always use the icon: data entered in a Safari tab is stored separately.
-4. Optional: **Settings → App lock** locks the app after 15 minutes away. Unlock with Face ID or a 6-digit PIN; **Forgot PIN?** takes the website password. The lock stops someone holding your unlocked phone; it doesn't encrypt your data.
+4. Optional: **Settings → App lock** locks the app after 15 minutes away. Unlock with Face ID or a 6-digit PIN; **Forgot PIN?** takes the website password. The lock stops someone holding your unlocked phone; it doesn't encrypt your data. Face ID unlock also accepts your iPhone passcode (if Face ID fails, iOS offers the passcode), so anyone who knows your iPhone passcode can unlock the app that way. Also, setting the clock to within 15 minutes after your last use still opens the app, and moving the clock forward can skip a wrong-PIN wait.
 5. Back up now and then: **Settings → Export backup** → Save to Files (iCloud Drive).
 
 ## Hosting
 
 Cloudflare Pages (free plan) builds the private GitHub repo and publishes it on every push to `main`.
 
-- Build command `npm run build`, output directory `dist`, Node 24 (`NODE_VERSION=24` and `.node-version`).
+- Build command `npm test && npm run build` (a failing unit test stops the deploy), output directory `dist`, Node 24 (`NODE_VERSION=24` and `.node-version`).
 - `functions/_middleware.ts` runs in front of every request, static files included, and asks for the website password. The logic lives in `server/` and is unit tested. The local dev and preview servers don't run it.
 - Project settings, for both Production and Preview:
   - Secret `SITE_PASSWORD`: the website password, at least 16 characters (4 or more random words). Changing it signs everyone out.

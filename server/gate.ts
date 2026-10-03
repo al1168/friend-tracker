@@ -10,6 +10,7 @@ import {
   deriveSessionKey,
   readCookies,
   sessionCookie,
+  sessionExpiresAt,
   verifySessionValue,
 } from './session.ts'
 
@@ -63,12 +64,18 @@ function clientIp(request: Request): string {
   return request.headers.get('CF-Connecting-IP') ?? 'unknown'
 }
 
-/** Signed in when any cookie with the session name verifies (a stray duplicate can't lock the owner out). */
-async function hasSession(request: Request, key: CryptoKey, now: number): Promise<boolean> {
+/** A session with less than this left is renewed on its next request, so regular use never signs the owner out. */
+const RENEW_WITHIN_MS = 30 * 24 * 3600 * 1000
+
+/**
+ * Signed in when any cookie with the session name verifies (a stray duplicate can't lock the owner out).
+ * Returns when the first valid session expires (ms), or null when there isn't one.
+ */
+async function sessionExpiry(request: Request, key: CryptoKey, now: number): Promise<number | null> {
   for (const value of readCookies(request.headers.get('Cookie'), SESSION_COOKIE).slice(0, MAX_SESSION_COOKIES)) {
-    if (await verifySessionValue(key, value, now)) return true
+    if (await verifySessionValue(key, value, now)) return sessionExpiresAt(value)
   }
-  return false
+  return null
 }
 
 /**
@@ -114,8 +121,13 @@ async function readJsonPassword(request: Request): Promise<string | null> {
   return null
 }
 
-/** Returns the response to send, or 'next' to serve the requested file as usual. */
-export async function handleRequest(request: Request, env: GateEnv, now: number): Promise<Response | 'next'> {
+/**
+ * What the gate decides: a response to send, `'next'` to serve the requested file as usual, or
+ * `{ kind: 'next', setCookie }` to serve it and also send a fresh session cookie (renewal).
+ */
+export type GateResult = Response | 'next' | { kind: 'next'; setCookie: string }
+
+export async function handleRequest(request: Request, env: GateEnv, now: number): Promise<GateResult> {
   const password = env.SITE_PASSWORD
   const secret = env.SESSION_SECRET
   const attempts = env.LOGIN_ATTEMPTS
@@ -127,7 +139,8 @@ export async function handleRequest(request: Request, env: GateEnv, now: number)
   const url = new URL(request.url)
   const sessionKey = await deriveSessionKey(secret, password)
   const passwordKey = await derivePasswordKey(secret)
-  const signedIn = await hasSession(request, sessionKey, now)
+  const expiresAt = await sessionExpiry(request, sessionKey, now)
+  const signedIn = expiresAt !== null
 
   if (url.pathname === LOGIN_PATH) {
     if (request.method === 'GET') {
@@ -167,7 +180,10 @@ export async function handleRequest(request: Request, env: GateEnv, now: number)
     return respond(401)
   }
 
-  if (signedIn) return 'next'
+  if (signedIn) {
+    if (expiresAt - now >= RENEW_WITHIN_MS) return 'next'
+    return { kind: 'next', setCookie: sessionCookie(await createSessionValue(sessionKey, now)) }
+  }
   if (isNavigation(request)) {
     return respond(302, null, { Location: `${LOGIN_PATH}?next=${encodeURIComponent(url.pathname + url.search)}` })
   }

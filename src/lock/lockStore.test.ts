@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { readAllData, replaceAllData } from '../backup/storage'
 import { resetDatabase } from '../db/db'
-import { getSetting } from '../db/settings'
+import { getSetting, setSetting } from '../db/settings'
 import { changePin, checkPin, resetFailures, setPasskey, turnOffLock, turnOnLock } from './lockStore'
 import { LOCK_OFF, NO_FAILURES } from './types'
 
@@ -68,6 +68,31 @@ describe('lock store', () => {
     await turnOffLock()
     expect(await getSetting('appLock')).toEqual(LOCK_OFF)
     expect(await getSetting('appLockFailures')).toEqual(NO_FAILURES)
+  })
+
+  it('cuts back a wait that is longer than the failure count allows', async () => {
+    await turnOnLock('123456')
+    await setSetting('appLockFailures', { count: 5, lockedUntil: NOW + 10 * 60_000 })
+    const result = await checkPin('123456', NOW)
+    expect(result).toEqual({ result: 'wait', failures: { count: 5, lockedUntil: NOW + 30_000 } })
+    expect(await getSetting('appLockFailures')).toEqual({ count: 5, lockedUntil: NOW + 30_000 })
+    expect(await checkPin('123456', NOW + 30_000)).toEqual({ result: 'ok' })
+  })
+
+  it('rejects without counting a failure when the stored hash is damaged', async () => {
+    await setSetting('appLock', { enabled: true, pin: { hash: '!!!', salt: '!!!', iterations: 210_000 }, passkeyId: null })
+    await expect(checkPin('123456', NOW)).rejects.toThrow()
+    expect(await getSetting('appLockFailures')).toEqual(NO_FAILURES)
+  })
+
+  it('never passes when no PIN is stored', async () => {
+    await setSetting('appLock', { enabled: true, pin: null, passkeyId: null })
+    expect((await checkPin('123456', NOW)).result).toBe('wrong')
+  })
+
+  it('keeps the shared defaults frozen', () => {
+    expect(Object.isFrozen(LOCK_OFF)).toBe(true)
+    expect(Object.isFrozen(NO_FAILURES)).toBe(true)
   })
 
   it('is never part of a backup and survives a restore', async () => {
