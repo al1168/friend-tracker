@@ -34,6 +34,16 @@
 .chip .avatar {
   margin-left: -8px;
 }
+/* User-entered items: long text wraps inside the chip. A pill on one line, a soft rounded box when it wraps. */
+.chip--wrap {
+  flex: 0 1 auto;
+  max-width: 100%;
+  padding: 6px 14px;
+  border-radius: 1.2em;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .chip:active {

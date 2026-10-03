@@ -288,9 +288,10 @@ Flat by default, with depth from tonal layering, as in iOS Settings: Paper White
 The thumb-reachable primary action on Friends and friend detail. Peach fill, On-Peach rounded 600 text at 1.06rem, a plus icon at 1.15em, 52px tall, Float shadow, fixed 16px above the tab bar. It's centered with auto margins and `width: max-content` (never `left: 50%` plus a translate, which halves its available width and wraps the label at large text). Pressed: Peach Pressed and a 0.96 scale.
 
 ### Chips
-- **Style:** Linen pill, 36px tall with an invisible extension to a 44px hit area, `0 14px` padding, Subhead 500 text, no wrapping inside a chip.
+- **Style:** Linen pill, 36px tall with an invisible extension to a 44px hit area, `0 14px` padding, Subhead 500 text, no wrapping inside a chip (except the wrapping variant below).
 - **Selected:** Peach fill with On-Peach text, announced with `aria-pressed`. Selected-friend tokens in the log sheet use the same look with a 24px avatar and a close glyph.
-- **Layouts:** a horizontally scrolling row that bleeds to the screen edges for filters and meetup types; a wrapping cluster for group pickers and dates.
+- **Wrapping (`.chip--wrap`):** for user-entered items, such as a friend's likes and dislikes. Long text wraps inside the chip instead of overflowing. It keeps the 36px minimum height with `6px 14px` padding, is capped at the full width, and has `1.2em` corners: a pill on one line, a soft rounded box when the text wraps.
+- **Layouts:** a horizontally scrolling row that bleeds to the screen edges for filters and meetup types; a wrapping cluster for group pickers, dates, and a friend's likes and dislikes.
 
 ### Inset groups and rows
 - **Container:** Paper White, 14px corners, no shadow, no border. A Footnote section label sits above (inset 16px from the group edge, aligned with row text) and an optional footer below.
@@ -320,7 +321,8 @@ The one happy moment. An inverted pill (Warm Ink background, Warm Paper text, Fl
 Circles. Initials in the rounded face (600, 40% of the size) on a per-friend pastel tint, or a cropped photo. Sizes: 44px in rows, 52px in the recent-friends grid, 96px in the detail hero, 24 to 28px inside chips.
 
 ### Friend detail column
-Reads as one calm column, not a grid of cards: centered 96px avatar, Title name, group in Warm Ink Secondary, then a Paper White "Last seen" pill (Subhead, 1em corners so it becomes a soft box if large text wraps it between the date and the time since). Below: the stat row, "Month by month", and the history grouped by month.
+Reads as one calm column, not a grid of cards: centered 96px avatar, Title name, group in Warm Ink Secondary, then a Paper White "Last seen" pill (Subhead, 1em corners so it becomes a soft box if large text wraps it between the date and the time since). Below: the notes, then **Likes** and **Dislikes** (people before numbers), then the stat row, "Month by month", and the history grouped by month.
+- **Likes and Dislikes:** each a section with a Footnote label over a wrapping cluster of item chips (the wrapping variant) on the page background, with no container. The cluster ends with a "+ Add" chip; tapping it puts a Paper White field and a secondary **Add** button in its place (one field open at a time). Notes under the field ("Already in Likes.", "This list is full.") are Footnote Warm Ink Secondary with `role="alert"`, never red. Tapping an item opens an action sheet titled with it: **Move to Dislikes** (or **Move to Likes**) and a destructive **Remove**, which an Undo toast reverses. An empty list shows only the "+ Add" chip.
 
 ### Stat row
 One Paper White group (not three cards) with three centered items: a 1.6rem rounded numeral over a Footnote Warm Ink Secondary label. Wraps to one item per line only at accessibility text sizes.

@@ -14,6 +14,7 @@ import { useSheets } from '../sheets/sheetsContext'
 import { allTimeCountsByFriend, countsByFriendForYear, monthlyCounts } from '../stats/counts'
 import { groupByMonth } from '../stats/history'
 import { lastSeenByFriend } from '../stats/lastSeen'
+import { FriendPreferences } from './FriendPreferences'
 import './FriendDetailScreen.css'
 
 export function FriendDetailScreen() {
@@ -78,6 +79,8 @@ export function FriendDetailScreen() {
       }
     >
       {friend.notes && <p className="friend-notes">{friend.notes}</p>}
+
+      <FriendPreferences key={friend.id} friend={friend} />
 
       <StatRow
         items={[

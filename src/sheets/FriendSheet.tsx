@@ -298,7 +298,7 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
           className="field"
           rows={3}
           value={notes}
-          placeholder="Birthday, partner's name, favorite things"
+          placeholder="Birthday, partner's name"
           onChange={(event) => setNotes(event.target.value)}
         />
       </div>

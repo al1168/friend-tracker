@@ -197,6 +197,12 @@ textarea.field {
   font-size: var(--text-footnote);
   color: var(--danger);
 }
+/* A neutral note under a field (not an error, so never red). */
+.field-hint {
+  margin: 0 var(--space-1);
+  font-size: var(--text-footnote);
+  color: var(--ink-2);
+}
 
 .search {
   display: flex;

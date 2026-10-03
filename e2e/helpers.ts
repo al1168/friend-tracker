@@ -46,6 +46,19 @@ export async function logMeetup(
   await expect(sheet).toBeHidden()
 }
 
+/** On a friend's page: adds `text` to their Likes or Dislikes with Enter, then closes the field. */
+export async function addToList(page: Page, list: 'Likes' | 'Dislikes', text: string) {
+  const kind = list === 'Likes' ? 'like' : 'dislike'
+  const section = page.getByRole('region', { name: list, exact: true })
+  await section.getByRole('button', { name: `Add a ${kind}`, exact: true }).click()
+  const field = section.getByRole('textbox', { name: `New ${kind}`, exact: true })
+  await field.fill(text)
+  await field.press('Enter')
+  await expect(field).toHaveValue('')
+  await field.press('Escape')
+  await expect(field).toBeHidden()
+}
+
 /** The lock screen's heading. */
 export function lockHeading(page: Page): Locator {
   return page.getByRole('heading', { level: 1, name: 'Friend Tracker is locked' })
