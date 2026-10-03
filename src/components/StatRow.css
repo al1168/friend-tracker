@@ -1,0 +1,26 @@
+.stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) 0;
+  margin: 0;
+  padding: var(--space-4) var(--space-2);
+  border-radius: var(--radius-group);
+  background: var(--surface);
+}
+.stat-row__item {
+  flex: 1 1 6.5rem;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 2px;
+}
+.stat-row__label {
+  font-size: var(--text-footnote);
+  color: var(--ink-2);
+}
+.stat-row__value {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.1;
+}

@@ -1,0 +1,47 @@
+.friend-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  text-align: center;
+}
+.friend-hero__name {
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-rounded);
+  font-size: var(--text-title);
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.friend-hero__group {
+  margin: 0;
+  color: var(--ink-2);
+}
+.friend-hero__seen {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: var(--text-subhead);
+  color: var(--ink-2);
+}
+
+.friend-notes {
+  max-width: 65ch;
+  margin: 0 var(--space-1);
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.upcoming-badge {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  vertical-align: 2px;
+}
