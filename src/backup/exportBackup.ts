@@ -12,7 +12,7 @@ function download(file: File) {
   document.body.append(link)
   link.click()
   link.remove()
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
 async function markBackedUp() {
@@ -25,13 +25,19 @@ export async function exportBackup(data: BackupData): Promise<ExportOutcome> {
   const file = new File([JSON.stringify(backup)], backupFileName(todayISO()), { type: 'application/json' })
 
   if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+    let shared = false
     try {
       await navigator.share({ files: [file] })
-      await markBackedUp()
-      return 'shared'
+      shared = true
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return 'cancelled'
-      // Sharing not allowed for this file: fall back to a download.
+      // Sharing not allowed for this file: fall back to a download. Anything else is a real error.
+      const notAllowed = error instanceof DOMException && error.name === 'NotAllowedError'
+      if (!notAllowed && !(error instanceof TypeError)) throw error
+    }
+    if (shared) {
+      await markBackedUp()
+      return 'shared'
     }
   }
 

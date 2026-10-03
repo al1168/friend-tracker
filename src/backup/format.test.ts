@@ -45,6 +45,15 @@ describe('createBackup and parseBackup', () => {
   })
 })
 
+describe('parseBackup cleanup', () => {
+  it('dedupes repeated friend ids within a meetup', () => {
+    const file = broken((f) => (list(f, 'meetups')[0].friendIds = ['f1', 'f1', 'f2']))
+    const result = parseBackup(file)
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.data.meetups[0].friendIds).toEqual(['f1', 'f2'])
+  })
+})
+
 describe('parseBackup rejects bad files', () => {
   it('rejects things that are not backups', () => {
     expectError('hello', "This isn't a Friend Tracker backup file.")

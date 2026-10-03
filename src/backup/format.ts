@@ -120,7 +120,7 @@ function readBackup(raw: unknown): BackupData {
       id: text(r, 'id', where, true),
       date,
       typeId: text(r, 'typeId', where, true),
-      friendIds: friendIds as string[],
+      friendIds: [...new Set(friendIds as string[])],
       note: text(r, 'note', where),
       createdAt: text(r, 'createdAt', where),
     }

@@ -2,13 +2,15 @@ import { db } from '../db/db'
 import { parseBackup, type BackupData, type ParseResult } from './format'
 
 export async function readAllData(): Promise<BackupData> {
-  const [friends, groups, meetupTypes, meetups] = await Promise.all([
-    db.friends.toArray(),
-    db.groups.toArray(),
-    db.meetupTypes.orderBy('order').toArray(),
-    db.meetups.toArray(),
-  ])
-  return { friends, groups, meetupTypes, meetups }
+  return db.transaction('r', [db.friends, db.groups, db.meetupTypes, db.meetups], async () => {
+    const [friends, groups, meetupTypes, meetups] = await Promise.all([
+      db.friends.toArray(),
+      db.groups.toArray(),
+      db.meetupTypes.orderBy('order').toArray(),
+      db.meetups.toArray(),
+    ])
+    return { friends, groups, meetupTypes, meetups }
+  })
 }
 
 /** Replaces everything in one transaction. If anything fails, nothing changes. */
