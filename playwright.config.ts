@@ -9,7 +9,10 @@ export default defineConfig({
     serviceWorkers: 'block',
     trace: 'retain-on-failure',
   },
-  projects: [{ name: 'iphone', use: { ...devices['iPhone 13'] }, testIgnore: /screenshots\.spec\.ts/ }],
+  projects: [
+    { name: 'iphone', use: { ...devices['iPhone 13'] }, testIgnore: /screenshots\.spec\.ts/ },
+    { name: 'screenshots', use: { ...devices['iPhone 13'] }, testMatch: /screenshots\.spec\.ts/ },
+  ],
   webServer: {
     command: 'npm run build && npx vite preview --port 4174 --strictPort',
     url: 'http://localhost:4174',

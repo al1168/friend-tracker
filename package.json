@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test --project=iphone",
+    "screenshots": "playwright test --project=screenshots",
     "icons": "pwa-assets-generator"
   },
   "dependencies": {
