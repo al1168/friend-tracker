@@ -38,10 +38,6 @@ export function ActionSheetProvider({ children }: { children: ReactNode }) {
   const messageId = useId()
   useScrollLock(pending !== null)
 
-  useEffect(() => {
-    pendingRef.current = pending
-  }, [pending])
-
   const pendingId = pending?.id
   useEffect(() => {
     if (pendingId === undefined) return
@@ -58,12 +54,14 @@ export function ActionSheetProvider({ children }: { children: ReactNode }) {
           returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
         }
         nextId.current += 1
-        setPending({
+        const next: Pending = {
           id: nextId.current,
           options: options as ActionSheetOptions<unknown>,
           resolve: resolve as (value: unknown) => void,
           closing: false,
-        })
+        }
+        pendingRef.current = next
+        setPending(next)
       }),
     [],
   )
@@ -74,8 +72,13 @@ export function ActionSheetProvider({ children }: { children: ReactNode }) {
     returnFocus.current?.focus({ preventScroll: true })
     returnFocus.current = null
     pending.resolve(value)
-    setPending({ ...pending, closing: true })
-    window.setTimeout(() => setPending((current) => (current?.id === id ? null : current)), EXIT_MS)
+    const closing = { ...pending, closing: true }
+    pendingRef.current = closing
+    setPending(closing)
+    window.setTimeout(() => {
+      if (pendingRef.current?.id === id) pendingRef.current = null
+      setPending((current) => (current?.id === id ? null : current))
+    }, EXIT_MS)
   }
 
   const options = pending?.options

@@ -40,7 +40,11 @@ export function Sheet({ open, title, onRequestClose, footer, children }: SheetPr
     if (!open) return
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
     panelRef.current?.focus({ preventScroll: true })
-    return () => previous?.focus({ preventScroll: true })
+    return () => {
+      const active = document.activeElement
+      if (active instanceof HTMLElement && panelRef.current?.contains(active)) active.blur()
+      previous?.focus({ preventScroll: true })
+    }
   }, [open])
 
   function onPointerDown(event: PointerEvent<HTMLDivElement>) {
