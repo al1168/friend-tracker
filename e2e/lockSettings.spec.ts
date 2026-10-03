@@ -149,6 +149,20 @@ test('turning Face ID off is one tap', async ({ page }) => {
   expect(await readSetting(page, 'appLock')).toMatchObject({ enabled: true, passkeyId: null })
 })
 
+test('a double tap on the Face ID switch only turns it off', async ({ page }) => {
+  await stubFaceId(page, true)
+  await page.goto('/#/settings')
+  await seedAppLock(page, '111111', FAKE_PASSKEY_ID)
+  await page.reload()
+  const faceId = page.getByRole('switch', { name: 'Face ID' })
+  await expect(faceId).toHaveAttribute('aria-checked', 'true')
+  await faceId.dblclick()
+  await expect(faceId).toHaveAttribute('aria-checked', 'false')
+  await page.waitForTimeout(600)
+  await expect(page.locator('[role=dialog]')).toHaveCount(0)
+  await expect(faceId).toHaveAttribute('aria-checked', 'false')
+})
+
 test('changes the PIN', async ({ page }) => {
   await stubFaceId(page, false)
   await page.goto('/#/settings')

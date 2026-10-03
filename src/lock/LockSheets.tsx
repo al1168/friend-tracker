@@ -35,7 +35,7 @@ export function PinStep({ prompt, pinPad, message, waitMs, messageKey }: PinStep
   const promptRef = useStepFocus<HTMLParagraphElement>(prompt)
   return (
     <div className="lock-sheet">
-      <p ref={promptRef} tabIndex={-1} className="lock-sheet__prompt" aria-live="polite">
+      <p ref={promptRef} tabIndex={-1} className="lock-sheet__prompt">
         {prompt}
       </p>
       <PinPad
@@ -52,7 +52,7 @@ function FaceIdQuestion({ error }: { error: { text: string; n: number } | null }
   const promptRef = useStepFocus<HTMLParagraphElement>(FACE_ID_QUESTION)
   return (
     <div className="lock-sheet">
-      <p ref={promptRef} tabIndex={-1} className="lock-sheet__prompt" aria-live="polite">
+      <p ref={promptRef} tabIndex={-1} className="lock-sheet__prompt">
         {FACE_ID_QUESTION}
       </p>
       <p className="lock-sheet__note">Your PIN still works any time.</p>

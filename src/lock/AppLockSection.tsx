@@ -10,6 +10,9 @@ type LockSheet = 'on' | 'faceId' | 'change' | 'off'
 /** Longer than the sheet's exit animation. */
 const EXIT_MS = 400
 
+/** How long after turning Face ID off that further taps on the switch are ignored. */
+const FACE_ID_TAP_GUARD_MS = 300
+
 interface AppLockSectionProps {
   lock: AppLock
   /** Whether this device can use Face ID here. */
@@ -23,6 +26,7 @@ export function AppLockSection({ lock, passkeyAvailable }: AppLockSectionProps) 
   const [shown, setShown] = useState<{ kind: LockSheet; key: number; open: boolean } | null>(null)
   const [headingFocus, setHeadingFocus] = useState(0)
   const titleRef = useRef<HTMLHeadingElement>(null)
+  const faceIdBusy = useRef(false)
   // Same rule as LockGate: the lock is on only when a PIN is stored.
   const lockOn = lock.enabled && lock.pin !== null
 
@@ -48,15 +52,23 @@ export function AppLockSection({ lock, passkeyAvailable }: AppLockSectionProps) 
 
   // Turning Face ID off is one tap. Turning it on asks for the PIN first (in a sheet).
   async function toggleFaceId() {
+    // A double tap on "On" must not turn it off and then open "Turn on Face ID".
+    if (faceIdBusy.current) return
     if (!lock.passkeyId) {
       open('faceId')
       return
     }
+    faceIdBusy.current = true
     try {
       await setPasskey(null)
       toast({ message: 'Face ID is off', tone: 'plain' })
     } catch {
       toast({ message: "Couldn't save. Please try again.", tone: 'plain' })
+    } finally {
+      // Taps are ignored until the write is done, plus a moment for a second tap of a double tap.
+      window.setTimeout(() => {
+        faceIdBusy.current = false
+      }, FACE_ID_TAP_GUARD_MS)
     }
   }
 
