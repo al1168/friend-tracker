@@ -9,8 +9,15 @@ export default defineConfig({
     VitePWA({
       // New versions install in the background and take over right away; the app shows them the next time it's opened or reloaded.
       registerType: 'autoUpdate',
-      workbox: { skipWaiting: true, clientsClaim: true },
+      workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        // The website's sign-in page and password check (/__login, /__verify-password) always go to the network.
+        navigateFallbackDenylist: [/^\/__/],
+      },
       injectRegister: 'script',
+      // Send the sign-in cookie with the manifest request, or the website gate redirects it and installing breaks.
+      useCredentials: true,
       includeAssets: ['favicon.ico', 'logo.svg', 'apple-touch-icon-180x180.png'],
       manifest: {
         name: 'Friend Tracker',
