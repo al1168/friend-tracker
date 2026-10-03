@@ -14,8 +14,9 @@ describe('shouldLock', () => {
     expect(shouldLock({ enabled: true, lastActiveAt: null, now: NOW })).toBe(true)
   })
 
-  it('locks when the clock went backwards', () => {
-    expect(shouldLock({ enabled: true, lastActiveAt: NOW + 1, now: NOW })).toBe(true)
+  it('locks when the clock went back by more than a minute', () => {
+    expect(shouldLock({ enabled: true, lastActiveAt: NOW + 60_000, now: NOW })).toBe(false)
+    expect(shouldLock({ enabled: true, lastActiveAt: NOW + 60_001, now: NOW })).toBe(true)
   })
 
   it('locks after 15 minutes away, not before', () => {

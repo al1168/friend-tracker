@@ -8,6 +8,8 @@ export const ACTIVE_PING_MS = 30_000
 const FREE_ATTEMPTS = 4
 const FIRST_WAIT_MS = 30_000
 const LONGEST_WAIT_MS = 15 * 60_000
+/** A clock step back of up to this much (an NTP or carrier correction) does not lock the app. */
+const CLOCK_STEP_TOLERANCE_MS = 60_000
 
 export function shouldLock({
   enabled,
@@ -19,8 +21,8 @@ export function shouldLock({
   now: number
 }): boolean {
   if (!enabled) return false
-  // A clock that went backwards (now < lastActiveAt) also locks.
-  return lastActiveAt === null || now < lastActiveAt || now - lastActiveAt >= RELOCK_AFTER_MS
+  // A clock that went back by more than a minute also locks (a small NTP or carrier correction does not).
+  return lastActiveAt === null || now < lastActiveAt - CLOCK_STEP_TOLERANCE_MS || now - lastActiveAt >= RELOCK_AFTER_MS
 }
 
 /** The pause after this many wrong PINs in a row: none for 1 to 4, then 30 s, doubling up to 15 minutes. */

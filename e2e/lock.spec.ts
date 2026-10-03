@@ -120,6 +120,10 @@ test('a cancelled Face ID says so and stays locked', async ({ page }) => {
   await expect(lockHeading(page)).toBeFocused()
   await page.getByRole('button', { name: 'Unlock with Face ID' }).click()
   await expect(page.getByRole('alert')).toHaveText("Face ID didn't work. Use your PIN.")
+  // A failed Face ID is not a wrong PIN: the first wrong PIN afterwards is a plain one, with no wait.
+  await enterPin(page, '000000')
+  await expect(page.getByRole('alert')).toHaveText('Wrong PIN. Try again.')
+  await expect(page.getByRole('timer')).toHaveCount(0)
   await expect(lockHeading(page)).toBeVisible()
 })
 

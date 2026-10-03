@@ -29,7 +29,8 @@ export function LockScreen({ lock, onUnlock }: { lock: AppLock; onUnlock: () => 
         onUnlock()
         return
       }
-      entry.setMessage("Face ID didn't work. Use your PIN.")
+      // The keypad is disabled during a wait, so don't tell them to use it.
+      entry.setMessage(entry.waitMs > 0 ? "Face ID didn't work." : "Face ID didn't work. Use your PIN.")
     } finally {
       faceIdBusy.current = false
     }
