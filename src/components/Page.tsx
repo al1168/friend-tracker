@@ -3,6 +3,12 @@ import { useLocation, useNavigate } from 'react-router'
 import { IconChevronLeft } from './icons'
 import './Page.css'
 
+/** Router location state used for back labels and the origin tab. */
+export interface NavState {
+  backLabel?: string
+  tab?: string
+}
+
 interface PageProps {
   title: string
   /** Back button label and where to go if there's no history (e.g. opened from a link). */
@@ -49,7 +55,7 @@ export function Page({ title, back, actions, hero, pushed = false, children }: P
           {back && (
             <button type="button" className="text-button navbar__back" onClick={goBack}>
               <IconChevronLeft size={26} strokeWidth={2.4} />
-              {(location.state as { backLabel?: string } | null)?.backLabel ?? back.label}
+              {(location.state as NavState | null)?.backLabel ?? back.label}
             </button>
           )}
         </div>

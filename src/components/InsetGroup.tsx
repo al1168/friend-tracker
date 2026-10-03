@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { IconChevronRight } from './icons'
+import type { NavState } from './Page'
 import './InsetGroup.css'
 
 interface InsetGroupProps {
@@ -46,7 +47,7 @@ interface RowProps {
   trailing?: ReactNode
   to?: string
   /** Router location state for `to` (e.g. back label and origin tab). */
-  state?: unknown
+  state?: NavState
   onClick?: () => void
   chevron?: boolean
   accent?: boolean

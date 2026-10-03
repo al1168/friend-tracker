@@ -31,3 +31,6 @@
 .tabbar__item[aria-current='page'] {
   color: var(--accent-ink);
 }
+.tabbar__item[aria-current='page'] span {
+  font-weight: 600;
+}
