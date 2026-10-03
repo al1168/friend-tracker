@@ -34,7 +34,9 @@ export const MESSAGES = {
 const SECURITY_HEADERS: Record<string, string> = {
   'Cache-Control': 'no-store',
   'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'no-referrer',
+  // Not 'no-referrer': with it a browser sends "Origin: null" on a form POST from the sign-in page,
+  // which would make the cross-site check reject the owner's own sign-in.
+  'Referrer-Policy': 'same-origin',
   'X-Frame-Options': 'DENY',
 }
 
@@ -63,18 +65,26 @@ function clientIp(request: Request): string {
 
 /** Signed in when any cookie with the session name verifies (a stray duplicate can't lock the owner out). */
 async function hasSession(request: Request, key: CryptoKey, now: number): Promise<boolean> {
-  for (const value of readCookies(request.headers.get('Cookie'), SESSION_COOKIE)) {
+  for (const value of readCookies(request.headers.get('Cookie'), SESSION_COOKIE).slice(0, MAX_SESSION_COOKIES)) {
     if (await verifySessionValue(key, value, now)) return true
   }
   return false
 }
 
-/** True for a POST that a browser says came from another site (checked before anything is counted). */
+/**
+ * True for a POST that a browser says came from another site (checked before anything is counted).
+ * Sec-Fetch-Site decides when present: only "same-origin" and "none" pass. Without it (older browsers,
+ * scripts), a request with an Origin header must match the site; "null" is cross-site. No Origin passes.
+ */
 function isCrossSite(request: Request, url: URL): boolean {
-  if (request.headers.get('Sec-Fetch-Site') === 'cross-site') return true
+  const site = request.headers.get('Sec-Fetch-Site')
+  if (site !== null) return site !== 'same-origin' && site !== 'none'
   const origin = request.headers.get('Origin')
   return origin !== null && origin !== url.origin
 }
+
+/** A browser sends at most a few cookies of one name; checking more only costs time. */
+const MAX_SESSION_COOKIES = 4
 
 function isNavigation(request: Request): boolean {
   if (request.headers.get('Sec-Fetch-Mode') === 'navigate') return true

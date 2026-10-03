@@ -79,8 +79,3 @@ export function readCookies(header: string | null, name: string): string[] {
   }
   return values
 }
-
-/** The value of the first cookie with this name, or null. */
-export function readCookie(header: string | null, name: string): string | null {
-  return readCookies(header, name)[0] ?? null
-}

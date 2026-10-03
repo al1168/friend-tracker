@@ -142,16 +142,35 @@ describe('cross-site POSTs', () => {
   it('rejects a cross-site lockout attempt even while locked out', async () => {
     const { env, kv } = setup()
     await lockOut(kv)
-    const response = await run(postForm('/__login', { password: PASSWORD }, { Origin: 'null' }), env)
+    const response = await run(postForm('/__login', { password: PASSWORD }, { 'Sec-Fetch-Site': 'cross-site' }), env)
     expect(response.status).toBe(403)
   })
 
-  it('accepts same-origin and same-site requests', async () => {
+  it('accepts a same-origin form POST whose Origin is "null" (Referrer-Policy hides it)', async () => {
+    const { env } = setup()
+    const response = await run(postForm('/__login', { password: PASSWORD }, { Origin: 'null', 'Sec-Fetch-Site': 'same-origin' }), env)
+    expect(response.status).toBe(303)
+  })
+
+  it('lets Sec-Fetch-Site decide when it is present', async () => {
     const { env } = setup()
     const same = await run(postForm('/__login', { password: PASSWORD }, { Origin: ORIGIN, 'Sec-Fetch-Site': 'same-origin' }), env)
     expect(same.status).toBe(303)
     const none = await run(postForm('/__login', { password: PASSWORD }, { 'Sec-Fetch-Site': 'none' }), env)
     expect(none.status).toBe(303)
+    for (const site of ['same-site', 'cross-site', 'bogus']) {
+      const response = await run(postForm('/__login', { password: PASSWORD }, { Origin: ORIGIN, 'Sec-Fetch-Site': site }), env)
+      expect(response.status).toBe(403)
+    }
+  })
+
+  it('falls back to Origin when Sec-Fetch-Site is absent', async () => {
+    const { env, kv } = setup()
+    expect((await run(postForm('/__login', { password: PASSWORD }, { Origin: 'null' }), env)).status).toBe(403)
+    expect((await run(postForm('/__login', { password: PASSWORD }, { Origin: 'https://evil.example' }), env)).status).toBe(403)
+    expect((await run(postForm('/__login', { password: PASSWORD }, { Origin: ORIGIN }), env)).status).toBe(303)
+    expect((await run(postForm('/__login', { password: PASSWORD }), env)).status).toBe(303)
+    expect(failureCount(kv)).toBe(0)
   })
 
   it('rejects a cross-site /__verify-password before counting', async () => {
@@ -329,7 +348,7 @@ describe('everything else', () => {
     for (const response of responses) {
       expect(response.headers.get('Cache-Control')).toBe('no-store')
       expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
-      expect(response.headers.get('Referrer-Policy')).toBe('no-referrer')
+      expect(response.headers.get('Referrer-Policy')).toBe('same-origin')
       expect(response.headers.get('X-Frame-Options')).toBe('DENY')
     }
   })
@@ -340,6 +359,14 @@ describe('everything else', () => {
     expect(await handleRequest(get('/a.js', { Cookie: `__Host-ft_session=garbage; ${good}` }), env, NOW)).toBe('next')
     expect(await handleRequest(get('/a.js', { Cookie: `${good}; __Host-ft_session=garbage` }), env, NOW)).toBe('next')
     expect((await run(get('/a.js', { Cookie: '__Host-ft_session=garbage; __Host-ft_session=junk' }), env)).status).toBe(401)
+  })
+
+  it('only checks the first four session cookies', async () => {
+    const { env } = setup()
+    const good = await signedInCookie()
+    const junk = '__Host-ft_session=junk; '.repeat(4)
+    expect((await run(get('/a.js', { Cookie: junk + good }), env)).status).toBe(401)
+    expect(await handleRequest(get('/a.js', { Cookie: '__Host-ft_session=junk; ' + good }), env, NOW)).toBe('next')
   })
 
   it('does not accept the old cookie name', async () => {

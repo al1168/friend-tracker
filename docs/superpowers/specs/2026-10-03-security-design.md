@@ -68,16 +68,17 @@ Three protections:
 | Request | Behavior |
 |---|---|
 | `GET /__login` | Signed in: `303` to `/`. Otherwise `200` with the sign-in page. |
-| `POST /__login` (form: `password`, `next`) | Cross-site (`Sec-Fetch-Site: cross-site`, or an `Origin` header that isn't the site's own origin): `403`, before the lockout check and without counting. Locked out: `429` page, "Too many attempts. Try again in 15 minutes." Correct password: clear attempts, set session cookie, `303` to the sanitized `next` (default `/`). Wrong: record attempt, `401` page, "That password didn't work." |
-| `POST /__verify-password` (JSON `{ "password": string }`) | Cross-site (same rule as above) or no valid session: `403`, nothing counted. Content type other than `application/json`: `415`, nothing counted. Locked out: `429`. Correct: `204` and clear attempts. Wrong: record attempt, `401`. Used by the app's "Forgot PIN?". |
+| `POST /__login` (form: `password`, `next`) | Cross-site: `403`, before the lockout check and without counting. Locked out: `429` page, "Too many attempts. Try again in 15 minutes." Correct password: clear attempts, set session cookie, `303` to the sanitized `next` (default `/`). Wrong: record attempt, `401` page, "That password didn't work." |
+| `POST /__verify-password` (JSON `{ "password": string }`) | Cross-site (same rule) or no valid session: `403`, nothing counted. Content type other than `application/json`: `415`, nothing counted. Locked out: `429`. Correct: `204` and clear attempts. Wrong: record attempt, `401`. Used by the app's "Forgot PIN?". |
 | Any other request with a valid session | Passed through to the static asset (`next()`). |
 | Any other request without a valid session | Navigations (`Sec-Fetch-Mode: navigate` or `Accept` includes `text/html`): `302` to `/__login?next=<path+query>`. Everything else: `401` with an empty body. |
 
+- **Cross-site rule (both POST routes):** when `Sec-Fetch-Site` is present it decides: `same-origin` and `none` pass, anything else (`cross-site`, `same-site`) is `403`. Only when it is absent, an `Origin` header must equal the site's origin (`null` is cross-site); no `Origin` passes. This runs before the lockout check and counts nothing.
 - **`next` sanitization:** accept only paths matching `^/[\x21-\x7e]*$` (one leading `/`, then printable ASCII with no spaces), that don't start with `//` and contain no backslash. Anything else becomes `/`. Percent-encoded text is never decoded.
 - **Headers on every response the gate itself produces:**
   - `Cache-Control: no-store`
   - `X-Content-Type-Options: nosniff`
-  - `Referrer-Policy: no-referrer`
+  - `Referrer-Policy: same-origin` (not `no-referrer`: with it a browser sends `Origin: null` on a form POST from the sign-in page, and the cross-site check would reject the owner)
   - `X-Frame-Options: DENY`
 
 ### Session cookie
@@ -248,7 +249,7 @@ Recorded in [the security plan](../plans/2026-10-03-security.md):
 - **Extra gate answers.** Other methods on `/__login` and `/__verify-password` get `405`. A `/__verify-password` body that isn't `{ "password": string }` gets `400` and isn't counted. Submissions over 1,024 characters are wrong. `next` also rejects control characters.
 - **Sign-in page.** Sent with `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`. It has a visible "Password" label and a visually hidden `username` field ("Friend Tracker") so Keychain files the password under a name.
 - **Lockout.** `firstAt` is a ms timestamp; the window starts at the first failure. If KV errors, the lockout check is skipped (the password is still required) and a failed write isn't counted. IPv6 addresses are counted per /64 prefix.
-- **Hardening.** `SITE_PASSWORD` shorter than 16 characters fails closed like a missing secret. The cookie is `__Host-ft_session`, signed with a key derived from `SESSION_SECRET` and `SITE_PASSWORD` (rotating the password signs everyone out); the password check uses a separate derived key. `next` allows printable ASCII only. A cross-site POST (`Sec-Fetch-Site: cross-site`, or an `Origin` that isn't the site) gets `403` before anything is counted, and `/__verify-password` needs a JSON content type (`415` otherwise).
+- **Hardening.** `SITE_PASSWORD` shorter than 16 characters fails closed like a missing secret. The cookie is `__Host-ft_session`, signed with a key derived from `SESSION_SECRET` and `SITE_PASSWORD` (rotating the password signs everyone out); the password check uses a separate derived key. `next` allows printable ASCII only. `Referrer-Policy` is `same-origin` so sign-in form POSTs don't carry `Origin: null`. A cross-site POST (`Sec-Fetch-Site` other than `same-origin`/`none`, or with no `Sec-Fetch-Site`, an `Origin` that isn't the site) gets `403` before anything is counted, and `/__verify-password` needs a JSON content type (`415` otherwise).
 - **Forgot PIN.** Only `204` counts as correct. Any other status (a captive portal's `200`, a `405`, a `500`) shows "Couldn't check your password. Please try again." When the sign-in expired (`403`), the sheet's main button becomes **Sign in**.
 - **App lock.** `ft:lastActiveAt` is written whether or not the lock is on; the lock counts as on only when a PIN is stored. Wrong PINs in Change PIN and Turn off app lock count toward the same backoff. Turning the lock on saves it right after the PIN is confirmed, before the Face ID question. Resetting a forgotten PIN keeps Face ID.
 - **Settings.** The "App lock" group sits between Backup and About your data. Without Face ID on the device, the Face ID row is hidden and the footer reads "Locks the app after 15 minutes away. Unlock with your PIN."

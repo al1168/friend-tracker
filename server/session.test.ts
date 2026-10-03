@@ -3,7 +3,6 @@ import {
   SESSION_MAX_AGE,
   createSessionValue,
   deriveSessionKey,
-  readCookie,
   readCookies,
   sessionCookie,
   verifySessionValue,
@@ -76,13 +75,6 @@ describe('session cookie', () => {
     expect(sessionCookie('v1.1.abc')).toBe(
       '__Host-ft_session=v1.1.abc; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=31536000',
     )
-  })
-
-  it('reads one cookie from a Cookie header', () => {
-    expect(readCookie('a=1; ft_session=v1.2.xyz; b=3', 'ft_session')).toBe('v1.2.xyz')
-    expect(readCookie('ft_session_old=1', 'ft_session')).toBeNull()
-    expect(readCookie('', 'ft_session')).toBeNull()
-    expect(readCookie(null, 'ft_session')).toBeNull()
   })
 
   it('reads every cookie with the same name', () => {
