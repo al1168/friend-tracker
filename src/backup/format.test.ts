@@ -139,10 +139,16 @@ describe('parseBackup rejects bad files', () => {
     expectError(broken((f) => delete list(f, 'friends')[0].birthday), 'Friend 1 has an invalid birthday.')
   })
 
-  it('rejects a birthday after the day it is read', () => {
-    const file = broken((f) => (list(f, 'friends')[1].birthday = { month: 10, day: 3, year: 2026 }))
-    expect(parseBackup(file, '2026-10-02')).toEqual({ ok: false, error: 'Friend 2 has an invalid birthday.' })
-    expect(parseBackup(file, '2026-10-03').ok).toBe(true)
+  it('allows a birthday up to 2 days after the day it is read, and refuses later ones', () => {
+    const on = (day: number) => broken((f) => (list(f, 'friends')[1].birthday = { month: 10, day, year: 2026 }))
+    expect(parseBackup(on(4), '2026-10-02').ok).toBe(true)
+    expect(parseBackup(on(5), '2026-10-02')).toEqual({ ok: false, error: 'Friend 2 has an invalid birthday.' })
+  })
+
+  it('keeps a birthday without a year', () => {
+    const file = broken((f) => (list(f, 'friends')[1].birthday = { month: 2, day: 29, year: null }))
+    const result = parseBackup(file, '2026-10-02')
+    expect(result.ok && result.data.friends[1].birthday).toEqual({ month: 2, day: 29, year: null })
   })
 
   it('rejects a missing or malformed list', () => {

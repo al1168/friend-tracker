@@ -138,6 +138,13 @@ describe('nextBirthday', () => {
     expect(nextBirthday(bday(2, 29), '2026-02-28')).toBe('2026-02-28')
     expect(nextBirthday(bday(2, 29), '2026-03-01')).toBe('2027-02-28')
     expect(nextBirthday(bday(2, 29), '2027-03-01')).toBe('2028-02-29')
+    expect(nextBirthday(bday(2, 29), '2028-02-29')).toBe('2028-02-29')
+  })
+
+  it('never lands before the first birthday of someone born today', () => {
+    expect(nextBirthday(bday(10, 2, 2026), TODAY)).toBe('2027-10-02')
+    expect(describeNextBirthday(bday(10, 2, 2026), TODAY)).toBe('In 365 days · turns 1')
+    expect(describeNextBirthday(bday(3, 1, 2027), '2027-03-01')).toBe('In 366 days · turns 1')
   })
 })
 
@@ -174,6 +181,7 @@ describe('describeNextBirthday', () => {
     expect(describeNextBirthday(bday(10, 2), TODAY)).toBe('Today')
     expect(describeNextBirthday(bday(10, 3), TODAY)).toBe('Tomorrow')
     expect(describeNextBirthday(bday(10, 4), TODAY)).toBe('In 2 days')
+    expect(describeNextBirthday(bday(2, 29), '2028-02-28')).toBe('Tomorrow')
     expect(describeNextBirthday(bday(10, 14), TODAY)).toBe('In 12 days')
   })
 

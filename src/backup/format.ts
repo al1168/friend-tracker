@@ -1,5 +1,5 @@
 import { isValidBirthday } from '../lib/birthdays'
-import { isISODate, todayISO, type ISODate } from '../lib/dates'
+import { addDays, isISODate, todayISO, type ISODate } from '../lib/dates'
 import { cleanItems, indexOfItem, MAX_ITEM_LENGTH, MAX_ITEMS, type PreferenceKind } from '../lib/preferences'
 import type { Birthday, Friend, Group, Meetup, MeetupType } from '../types'
 
@@ -28,7 +28,7 @@ export function backupFileName(today: ISODate): string {
 
 /**
  * Validates an untrusted, already-JSON-parsed value. Never throws for bad input.
- * `today` is the phone's date, for refusing a birthday in the future.
+ * `today` is the phone's date. A birthday more than 2 days after it is refused (a small margin is allowed, see birthdayOf).
  */
 export function parseBackup(raw: unknown, today: ISODate = todayISO()): ParseResult {
   try {
@@ -94,7 +94,9 @@ function preferenceLists(record: Obj, where: string): Pick<Friend, PreferenceKin
 function birthdayOf(record: Obj, where: string, today: ISODate): Birthday | null {
   const value = record.birthday
   if (value === null) return null
-  if (!isValidBirthday(value, today)) throw new BackupError(`${where} has an invalid birthday.`)
+  // A backup holds birthdays some phone already accepted, so a day or two "early" from time zones or
+  // clock changes is not corruption.
+  if (!isValidBirthday(value, addDays(today, 2))) throw new BackupError(`${where} has an invalid birthday.`)
   return { month: value.month, day: value.day, year: value.year }
 }
 

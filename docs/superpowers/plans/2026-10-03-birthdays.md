@@ -42,7 +42,7 @@ The spec leaves these open. Task 5 records them at the end of the spec.
 5. **Accessible names** come from `aria-label` on each select ("Birthday month", "Birthday day", "Birthday year"), and the visible "Birthday" label names the row group. Visible labels over each select would crowd a row that must fit three fields; the empty options ("Month", "Day", "No year") already say which is which.
 6. **The empty choice looks like a placeholder** (Warm Ink Tertiary), like the other fields' placeholders.
 7. **Validation messages** stay under the row until a select changes. The selects get `aria-invalid` and `aria-describedby` like the name field. No `role="alert"`, again like the name field: focus moving to the described row announces it.
-8. **Backups.** `parseBackup(raw, today = todayISO())` takes `today`, so a birthday after the day the file is read is refused, and tests can pass a fixed date. A version 3 friend without a `birthday` key is refused, like a version 2 friend without lists. Extra keys inside a birthday are dropped. A `birthday` in a version 1 or 2 file is ignored.
+8. **Backups.** `parseBackup(raw, today = todayISO())` takes `today`, so a birthday more than 2 days after the day the file is read is refused (a backup holds birthdays some phone already accepted, so a day or two "early" from time zones or clock changes is not corruption; the data layer and the sheet stay strict), and tests can pass a fixed date. A version 3 friend without a `birthday` key is refused, like a version 2 friend without lists. Extra keys inside a birthday are dropped. A `birthday` in a version 1 or 2 file is ignored.
 9. **Stored shape.** The data layer stores a copy with only `month`, `day` and `year`.
 10. **"While searching"** means a query that isn't blank after trimming, the same test the search itself uses (spaces alone still list everyone).
 11. **The footer** reads "And 1 more in the next two weeks." for one, which is already correct English, so it needs no `plural`.
@@ -2564,7 +2564,7 @@ Recorded in [the plan](../plans/2026-10-03-birthdays.md):
 - **Accessible names.** Each select has an `aria-label` ("Birthday month", "Birthday day", "Birthday year") and the visible "Birthday" label names the row. Visible labels per select would crowd the row; the empty options say which is which.
 - **Placeholder look.** The empty choice ("Month", "Day", "No year") is Warm Ink Tertiary, like other placeholders.
 - **Errors** stay under the row until a select changes, wired with `aria-invalid` and `aria-describedby` like the name field.
-- **Backups.** The parser takes today's date, so a birthday after the day the file is read is refused. A version 3 friend without a `birthday` key is refused, extra keys inside a birthday are dropped, and a `birthday` in a version 1 or 2 file is ignored.
+- **Backups.** The parser takes today's date, so a birthday more than 2 days after the day the file is read is refused (the data layer and the sheet stay strict about future dates). A version 3 friend without a `birthday` key is refused, extra keys inside a birthday are dropped, and a `birthday` in a version 1 or 2 file is ignored.
 - **Stored shape.** Only `month`, `day` and `year` are stored.
 - **"While searching"** means a query that isn't blank after trimming, the same test the search uses.
 - **Footer.** "And 1 more in the next two weeks." needs no plural form.

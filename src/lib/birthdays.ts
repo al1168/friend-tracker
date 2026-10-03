@@ -8,10 +8,10 @@ import { compareNames } from './text'
 /** The earliest birth year the app accepts. */
 export const MIN_BIRTH_YEAR = 1900
 
-/** What the Edit friend sheet says when it can't save a birthday. */
-export const PICK_MONTH_AND_DAY = 'Pick a month and a day.'
-export const NOT_A_DATE = "That date doesn't exist."
-export const IN_THE_FUTURE = 'That date is in the future.'
+// What the Edit friend sheet says when it can't save a birthday.
+const PICK_MONTH_AND_DAY = 'Pick a month and a day.'
+const NOT_A_DATE = "That date doesn't exist."
+const IN_THE_FUTURE = 'That date is in the future.'
 
 /** Days in each month of a leap year: a birthday without a year can be Feb 29. */
 const MONTH_LENGTHS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -83,10 +83,11 @@ function birthdayIn(birthday: Birthday, year: number): ISODate {
   return isoDate(year, birthday.month, leapDayMoves ? 28 : birthday.day)
 }
 
-/** The next date the birthday falls on, today included. */
+/** The next date the birthday falls on, today included. With a known year, never before the first birthday. */
 export function nextBirthday(birthday: Birthday, today: ISODate): ISODate {
-  const thisYear = birthdayIn(birthday, yearOf(today))
-  return thisYear >= today ? thisYear : birthdayIn(birthday, yearOf(today) + 1)
+  const first = birthday.year === null ? yearOf(today) : Math.max(yearOf(today), birthday.year + 1)
+  const thisYear = birthdayIn(birthday, first)
+  return thisYear >= today ? thisYear : birthdayIn(birthday, first + 1)
 }
 
 /** Days until the next birthday. 0 means today. */
