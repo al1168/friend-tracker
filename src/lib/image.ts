@@ -22,6 +22,7 @@ export async function resizeImageToDataUrl(file: Blob, maxSide = 400, quality = 
     if (!context) throw new Error('Canvas is not available')
     context.fillStyle = 'white' // JPEG has no transparency
     context.fillRect(0, 0, width, height)
+    context.imageSmoothingQuality = 'high'
     context.drawImage(image, 0, 0, width, height)
     return canvas.toDataURL('image/jpeg', quality)
   } finally {

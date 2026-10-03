@@ -125,6 +125,9 @@ export function FriendsScreen() {
                 enterKeyHint="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') event.currentTarget.blur()
+                }}
               />
             </label>
             {groups.length > 0 && (

@@ -32,6 +32,10 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
   const nameId = useId()
   const notesId = useId()
   const groupLabelId = useId()
+  const nameErrorId = useId()
+  const groupErrorId = useId()
+  const photoErrorId = useId()
+  const nameInput = useRef<HTMLInputElement>(null)
 
   const [name, setName] = useState(editing?.name ?? '')
   const [groupId, setGroupId] = useState<string | null>(editing?.groupId ?? null)
@@ -42,12 +46,14 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
   const [groupError, setGroupError] = useState<string | null>(null)
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [processingPhoto, setProcessingPhoto] = useState(false)
 
   const dirty =
     name !== (editing?.name ?? '') ||
     groupId !== (editing?.groupId ?? null) ||
     photo !== (editing?.photo ?? null) ||
-    notes !== (editing?.notes ?? '')
+    notes !== (editing?.notes ?? '') ||
+    !!newGroupName?.trim()
 
   async function requestClose() {
     if (await confirmDiscard(dirty)) onClose()
@@ -56,11 +62,25 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
   async function save() {
     if (!name.trim()) {
       setNameError('Please enter a name.')
+      nameInput.current?.focus()
       return
     }
     setSaving(true)
     try {
-      const input = { name, groupId, photo, notes }
+      let finalGroupId = groupId
+      if (newGroupName?.trim()) {
+        try {
+          const group = await addGroup(newGroupName)
+          finalGroupId = group.id
+          setGroupId(group.id)
+          setNewGroupName(null)
+          setGroupError(null)
+        } catch (error) {
+          setGroupError(error instanceof ValidationError ? error.message : "Couldn't add the group.")
+          return
+        }
+      }
+      const input = { name, groupId: finalGroupId, photo, notes }
       if (editing) {
         await updateFriend(editing.id, input)
         toast({ message: 'Saved' })
@@ -81,11 +101,14 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
+    setProcessingPhoto(true)
     try {
       setPhoto(await resizeImageToDataUrl(file))
       setPhotoError(null)
     } catch {
       setPhotoError("That image couldn't be used. Try a different photo.")
+    } finally {
+      setProcessingPhoto(false)
     }
   }
 
@@ -109,7 +132,12 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
       destructive: true,
     })
     if (!confirmed) return
-    await deleteFriend(editing.id)
+    try {
+      await deleteFriend(editing.id)
+    } catch {
+      toast({ message: "Couldn't delete. Please try again.", tone: 'plain' })
+      return
+    }
     onClose()
     navigate('/', { replace: true })
     toast({ message: `Deleted ${editing.name}`, tone: 'plain' })
@@ -121,7 +149,7 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
       title={editing ? 'Edit friend' : 'New friend'}
       onRequestClose={requestClose}
       footer={
-        <button type="button" className="button button--primary button--block" onClick={save} disabled={saving}>
+        <button type="button" className="button button--primary button--block" onClick={save} disabled={saving || processingPhoto}>
           Save
         </button>
       }
@@ -148,11 +176,19 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
           onChange={choosePhoto}
         />
         {photo && (
-          <button type="button" className="text-button" onClick={() => setPhoto(null)}>
+          <button type="button" className="text-button" onClick={() => {
+              setPhoto(null)
+              setPhotoError(null)
+            }}
+          >
             Remove photo
           </button>
         )}
-        {photoError && <p className="field-error">{photoError}</p>}
+        {photoError && (
+          <p className="field-error" id={photoErrorId} role="alert">
+            {photoError}
+          </p>
+        )}
       </div>
 
       <div className="form-section">
@@ -161,18 +197,30 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
         </label>
         <input
           id={nameId}
+          ref={nameInput}
           className="field"
           value={name}
           autoComplete="off"
           autoCapitalize="words"
           enterKeyHint="done"
           aria-invalid={nameError !== null}
+          aria-describedby={nameError ? nameErrorId : undefined}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              void save()
+            }
+          }}
           onChange={(event) => {
             setName(event.target.value)
             setNameError(null)
           }}
         />
-        {nameError && <p className="field-error">{nameError}</p>}
+        {nameError && (
+          <p className="field-error" id={nameErrorId}>
+            {nameError}
+          </p>
+        )}
       </div>
 
       <div className="form-section">
@@ -202,6 +250,8 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
               value={newGroupName}
               placeholder="Group name"
               aria-label="New group name"
+              aria-invalid={groupError !== null}
+              aria-describedby={groupError ? groupErrorId : undefined}
               autoFocus
               autoCapitalize="words"
               enterKeyHint="done"
@@ -221,7 +271,11 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
             </button>
           </div>
         )}
-        {groupError && <p className="field-error">{groupError}</p>}
+        {groupError && (
+          <p className="field-error" id={groupErrorId}>
+            {groupError}
+          </p>
+        )}
       </div>
 
       <div className="form-section">

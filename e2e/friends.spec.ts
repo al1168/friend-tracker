@@ -62,6 +62,7 @@ test('adds a photo', async ({ page }) => {
     buffer: Buffer.from(ONE_PIXEL_PNG, 'base64'),
   })
   await expect(sheet.locator('img.avatar')).toBeVisible()
+  await expect(sheet.locator('img.avatar')).toHaveAttribute('src', /^data:image\/jpeg/)
   await expect(sheet.getByRole('button', { name: 'Remove photo' })).toBeVisible()
 })
 
@@ -74,4 +75,36 @@ test('install hint can be dismissed and stays dismissed', async ({ page }) => {
   await page.reload()
   await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
   await expect(hint).toBeHidden()
+})
+
+test('remembers the sort order', async ({ page }) => {
+  await page.goto('/')
+  await addFriend(page, 'Amy')
+  await addFriend(page, 'Zoe')
+  await page.getByRole('button', { name: /^Sort/ }).click()
+  await page.getByRole('dialog', { name: 'Sort friends by' }).getByRole('button', { name: 'Name' }).click()
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Sort: Name' })).toBeVisible()
+})
+
+test('keeps a typed new group when saving', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Add friend' }).first().click()
+  const sheet = page.getByRole('dialog', { name: 'New friend' })
+  await sheet.getByLabel('Name', { exact: true }).fill('Kim')
+  await sheet.getByRole('button', { name: 'New group' }).click()
+  await sheet.getByLabel('New group name').fill('Work')
+  await sheet.getByRole('button', { name: 'Save' }).click()
+  await expect(sheet).toBeHidden()
+  await expect(page.getByRole('link', { name: /Kim/ })).toContainText('Work')
+})
+
+test('empty name is announced', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Add friend' }).first().click()
+  const sheet = page.getByRole('dialog', { name: 'New friend' })
+  await sheet.getByRole('button', { name: 'Save' }).click()
+  const input = sheet.getByLabel('Name', { exact: true })
+  await expect(input).toHaveAttribute('aria-invalid', 'true')
+  await expect(input).toHaveAccessibleDescription(/Please enter a name/)
 })
