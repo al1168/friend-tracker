@@ -27,7 +27,10 @@ export async function addMeetup(input: MeetupInput): Promise<Meetup> {
 
 export async function updateMeetup(id: string, input: MeetupInput): Promise<void> {
   const { date, typeId, friendIds, note } = clean(input)
-  await db.meetups.update(id, { date, typeId, friendIds, note })
+  await db.transaction('rw', db.meetups, async () => {
+    if (!(await db.meetups.get(id))) throw new ValidationError('This meetup no longer exists.')
+    await db.meetups.update(id, { date, typeId, friendIds, note })
+  })
 }
 
 /** Deletes a meetup and returns it, so it can be put back with `restoreMeetup` (Undo). */
@@ -39,6 +42,13 @@ export async function deleteMeetup(id: string): Promise<Meetup | undefined> {
   })
 }
 
+/** Undo: puts a meetup back, dropping friends who were deleted since. Does nothing if it would be empty. */
 export async function restoreMeetup(meetup: Meetup): Promise<void> {
-  await db.meetups.put(meetup)
+  await db.transaction('rw', db.meetups, db.friends, db.meetupTypes, async () => {
+    const existing = await db.friends.bulkGet(meetup.friendIds)
+    const friendIds = meetup.friendIds.filter((_, i) => existing[i] !== undefined)
+    if (friendIds.length === 0) return
+    if (!(await db.meetupTypes.get(meetup.typeId))) return
+    await db.meetups.put({ ...meetup, friendIds })
+  })
 }

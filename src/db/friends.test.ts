@@ -49,3 +49,9 @@ describe('deleteFriend', () => {
     expect((await db.meetups.get(shared.id))?.friendIds).toEqual([sam.id])
   })
 })
+
+describe('updateFriend on a missing friend', () => {
+  it('rejects', async () => {
+    await expect(updateFriend('nope', input())).rejects.toThrow('This friend no longer exists.')
+  })
+})

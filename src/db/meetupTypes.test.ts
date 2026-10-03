@@ -70,3 +70,20 @@ describe('deleteMeetupType', () => {
     expect(await db.meetupTypes.get('type-trip')).toBeUndefined()
   })
 })
+
+describe('atomicity and missing records', () => {
+  it('does not create duplicate types on concurrent adds', async () => {
+    const results = await Promise.allSettled([
+      addMeetupType({ name: 'Hike', emoji: '🥾' }),
+      addMeetupType({ name: 'Hike', emoji: '🥾' }),
+    ])
+    expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1)
+    expect((await names()).filter((n) => n === 'Hike')).toHaveLength(1)
+  })
+
+  it('rejects updating a missing type', async () => {
+    await expect(updateMeetupType('nope', { name: 'X', emoji: '✨' })).rejects.toThrow(
+      'This meetup type no longer exists.',
+    )
+  })
+})

@@ -27,7 +27,7 @@ db.version(1).stores({
 
 // Runs once, when the database is first created on this device.
 db.on('populate', (tx) => {
-  tx.table('meetupTypes').bulkAdd(DEFAULT_MEETUP_TYPES)
+  return tx.table('meetupTypes').bulkAdd(DEFAULT_MEETUP_TYPES)
 })
 
 /** Test helper: delete the database and recreate it (re-running the seed). */

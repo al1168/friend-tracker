@@ -23,7 +23,11 @@ export async function addFriend(input: FriendInput): Promise<Friend> {
 }
 
 export async function updateFriend(id: string, input: FriendInput): Promise<void> {
-  await db.friends.update(id, clean(input))
+  const cleaned = clean(input)
+  await db.transaction('rw', db.friends, async () => {
+    if (!(await db.friends.get(id))) throw new ValidationError('This friend no longer exists.')
+    await db.friends.update(id, cleaned)
+  })
 }
 
 /** Deletes a friend, removes them from meetups, and deletes meetups left with nobody. */

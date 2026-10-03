@@ -4,6 +4,7 @@ import type { Group } from '../types'
 import { db } from './db'
 import { ValidationError } from './errors'
 
+/** Must be called inside a transaction on db.groups so the check and the write are atomic. */
 async function cleanName(name: string, exceptId?: string): Promise<string> {
   const trimmed = name.trim()
   if (!trimmed) throw new ValidationError('Please enter a group name.')
@@ -15,13 +16,18 @@ async function cleanName(name: string, exceptId?: string): Promise<string> {
 }
 
 export async function addGroup(name: string): Promise<Group> {
-  const group: Group = { id: newId(), name: await cleanName(name) }
-  await db.groups.add(group)
-  return group
+  return db.transaction('rw', db.groups, async () => {
+    const group: Group = { id: newId(), name: await cleanName(name) }
+    await db.groups.add(group)
+    return group
+  })
 }
 
 export async function renameGroup(id: string, name: string): Promise<void> {
-  await db.groups.update(id, { name: await cleanName(name, id) })
+  await db.transaction('rw', db.groups, async () => {
+    if (!(await db.groups.get(id))) throw new ValidationError('This group no longer exists.')
+    await db.groups.update(id, { name: await cleanName(name, id) })
+  })
 }
 
 /** Deletes a group; its friends become ungrouped. */

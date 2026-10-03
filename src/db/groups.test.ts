@@ -46,3 +46,15 @@ describe('deleteGroup', () => {
     expect((await db.friends.get(kim.id))?.groupId).toBeNull()
   })
 })
+
+describe('atomicity and missing records', () => {
+  it('does not create duplicate groups on concurrent adds', async () => {
+    const results = await Promise.allSettled([addGroup('College'), addGroup('college')])
+    expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1)
+    expect(await db.groups.count()).toBe(1)
+  })
+
+  it('rejects renaming a missing group', async () => {
+    await expect(renameGroup('nope', 'X')).rejects.toThrow('This group no longer exists.')
+  })
+})

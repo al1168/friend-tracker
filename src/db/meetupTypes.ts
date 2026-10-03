@@ -9,6 +9,7 @@ export interface MeetupTypeInput {
   emoji: string
 }
 
+/** Must be called inside a transaction on db.meetupTypes so the check and the write are atomic. */
 async function clean(input: MeetupTypeInput, exceptId?: string): Promise<MeetupTypeInput> {
   const name = input.name.trim()
   if (!name) throw new ValidationError('Please enter a name.')
@@ -22,15 +23,20 @@ async function clean(input: MeetupTypeInput, exceptId?: string): Promise<MeetupT
 }
 
 export async function addMeetupType(input: MeetupTypeInput): Promise<MeetupType> {
-  const cleaned = await clean(input)
-  const last = await db.meetupTypes.orderBy('order').last()
-  const type: MeetupType = { id: newId(), ...cleaned, order: (last?.order ?? -1) + 1 }
-  await db.meetupTypes.add(type)
-  return type
+  return db.transaction('rw', db.meetupTypes, async () => {
+    const cleaned = await clean(input)
+    const last = await db.meetupTypes.orderBy('order').last()
+    const type: MeetupType = { id: newId(), ...cleaned, order: (last?.order ?? -1) + 1 }
+    await db.meetupTypes.add(type)
+    return type
+  })
 }
 
 export async function updateMeetupType(id: string, input: MeetupTypeInput): Promise<void> {
-  await db.meetupTypes.update(id, await clean(input, id))
+  await db.transaction('rw', db.meetupTypes, async () => {
+    if (!(await db.meetupTypes.get(id))) throw new ValidationError('This meetup type no longer exists.')
+    await db.meetupTypes.update(id, await clean(input, id))
+  })
 }
 
 /** Swaps a type with its neighbor above (-1) or below (1). */

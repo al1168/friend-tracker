@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db, resetDatabase } from './db'
 import { ValidationError } from './errors'
+import { addFriend, deleteFriend } from './friends'
 import { addMeetup, deleteMeetup, restoreMeetup, updateMeetup, type MeetupInput } from './meetups'
 
 const base: MeetupInput = { date: '2026-09-01', typeId: 'type-coffee', friendIds: ['alex'], note: '' }
@@ -32,13 +33,41 @@ describe('updateMeetup', () => {
   })
 })
 
+describe('updateMeetup on a missing meetup', () => {
+  it('rejects', async () => {
+    await expect(updateMeetup('nope', base)).rejects.toThrow('This meetup no longer exists.')
+  })
+})
+
+const friendInput = (name: string) => ({ name, groupId: null, photo: null, notes: '' })
+
 describe('deleteMeetup and restoreMeetup', () => {
   it('deletes a meetup and restores it exactly', async () => {
-    const meetup = await addMeetup(base)
+    const alex = await addFriend(friendInput('Alex'))
+    const meetup = await addMeetup({ ...base, friendIds: [alex.id] })
     const deleted = await deleteMeetup(meetup.id)
     expect(await db.meetups.get(meetup.id)).toBeUndefined()
     await restoreMeetup(deleted!)
     expect(await db.meetups.get(meetup.id)).toEqual(meetup)
+  })
+
+  it('keeps only friends who still exist when restoring', async () => {
+    const alex = await addFriend(friendInput('Alex'))
+    const sam = await addFriend(friendInput('Sam'))
+    const meetup = await addMeetup({ ...base, friendIds: [alex.id, sam.id] })
+    const deleted = await deleteMeetup(meetup.id)
+    await deleteFriend(alex.id)
+    await restoreMeetup(deleted!)
+    expect((await db.meetups.get(meetup.id))?.friendIds).toEqual([sam.id])
+  })
+
+  it('restores nothing when no friends remain', async () => {
+    const alex = await addFriend(friendInput('Alex'))
+    const meetup = await addMeetup({ ...base, friendIds: [alex.id] })
+    const deleted = await deleteMeetup(meetup.id)
+    await deleteFriend(alex.id)
+    await restoreMeetup(deleted!)
+    expect(await db.meetups.get(meetup.id)).toBeUndefined()
   })
 
   it('returns undefined for a missing meetup', async () => {
