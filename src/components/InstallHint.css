@@ -1,0 +1,27 @@
+.install-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-group);
+  background: var(--accent-soft);
+}
+.install-hint__title {
+  margin: 0 0 var(--space-1);
+  font-weight: 600;
+}
+.install-hint__body {
+  margin: 0;
+  font-size: var(--text-subhead);
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.install-hint__body svg {
+  display: inline;
+  vertical-align: -3px;
+}
+.install-hint__close {
+  flex: none;
+  margin: -10px -10px 0 0;
+  color: var(--ink-2);
+}
