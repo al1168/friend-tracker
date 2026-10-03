@@ -115,3 +115,21 @@ Above the search field, an inset group titled **Birthdays soon** lists `upcoming
 - **Backup:** export and import keeps birthdays.
 
 **Screenshots:** the friend page with a birthday, and the Friends tab with Birthdays soon, in light, dark and large text.
+
+## Decisions made while planning
+
+Recorded in [the plan](../plans/2026-10-03-birthdays.md):
+
+- **Out-of-range values.** A month outside 1 to 12, a day the month never has, or a year before 1900 (only possible from code or an edited backup) counts as "That date doesn't exist.". A year after this one counts as "That date is in the future.".
+- **A year on its own** (month and day empty) is dropped on Save, so the friend has no birthday.
+- **"Remove birthday"** shows when any of the three selects has a value, so it also clears a half-picked row.
+- **Focus.** When Save finds a birthday problem, focus moves to the Birthday row (described by the error), not to a select, so iOS doesn't open a picker wheel. With a missing name too, both errors show and the name field takes focus. "Remove birthday" moves focus to the row as it disappears.
+- **Accessible names.** Each select has an `aria-label` ("Birthday month", "Birthday day", "Birthday year") and the visible "Birthday" label names the row. Visible labels per select would crowd the row; the empty options say which is which.
+- **Placeholder look.** The empty choice ("Month", "Day", "No year") is Warm Ink Tertiary, like other placeholders.
+- **Errors** stay under the row until a select changes, wired with `aria-invalid` and `aria-describedby` like the name field.
+- **Backups.** The parser takes today's date, so a birthday more than 2 days after the day the file is read is refused (the data layer and the sheet stay strict about future dates). A version 3 friend without a `birthday` key is refused, extra keys inside a birthday are dropped, and a `birthday` in a version 1 or 2 file is ignored.
+- **First birthday.** When the birth year is known, the next birthday is never earlier than a year after birth, so a baby born today is not "turning 0".
+- **Stored shape.** Only `month`, `day` and `year` are stored.
+- **"While searching"** means a query that isn't blank after trimming, the same test the search uses.
+- **Footer.** "And 1 more in the next two weeks." needs no plural form.
+- **Birthdays soon rows** open the friend like the Friends list rows, so the back button says "Friends".

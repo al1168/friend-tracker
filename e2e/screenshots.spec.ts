@@ -1,5 +1,16 @@
 import { expect, test, type Page } from '@playwright/test'
-import { addFriend, addToList, goToTab, lockHeading, logMeetup, reopenAfterAWhile, seedAppLock, stubFaceId } from './helpers.ts'
+import {
+  addFriend,
+  addToList,
+  dayFromToday,
+  goToTab,
+  lockHeading,
+  logMeetup,
+  reopenAfterAWhile,
+  seedAppLock,
+  setBirthday,
+  stubFaceId,
+} from './helpers.ts'
 
 const DIR = 'e2e/screenshots'
 // Roughly the iPhone's largest standard text size.
@@ -16,12 +27,17 @@ function daysAgo(days: number): string {
 async function seed(page: Page) {
   await page.goto('/')
   await page.getByRole('complementary', { name: 'Install the app' }).getByRole('button', { name: 'Dismiss' }).click()
+  // Birthdays soon shows Maya (today), Sam (in 3 days, with an age) and Theo (in 9 days).
+  // Ages are multiples of 4, so a birthday that lands on Feb 29 still has a leap birth year.
+  const today = dayFromToday(0)
+  const inThree = dayFromToday(3)
+  const inNine = dayFromToday(9)
   await addFriend(page, 'Alex Rivera', 'College')
-  await addFriend(page, 'Sam Chen', 'College')
+  await addFriend(page, 'Sam Chen', 'College', { ...inThree, year: inThree.year - 28 })
   await addFriend(page, 'Kim Park', 'Work')
   await addFriend(page, 'Jordan Lee', 'Work')
-  await addFriend(page, 'Maya Patel')
-  await addFriend(page, 'Theo Brooks', 'Family')
+  await addFriend(page, 'Maya Patel', undefined, { month: today.month, day: today.day })
+  await addFriend(page, 'Theo Brooks', 'Family', { month: inNine.month, day: inNine.day })
   await logMeetup(page, ['Alex Rivera', 'Sam Chen'], { type: 'Meal', note: 'Ramen night', date: daysAgo(3) })
   await logMeetup(page, ['Kim Park'], { type: 'Coffee', date: daysAgo(20) })
   await logMeetup(page, ['Alex Rivera'], { type: 'Drinks', date: daysAgo(45) })
@@ -29,6 +45,14 @@ async function seed(page: Page) {
   await logMeetup(page, ['Alex Rivera', 'Kim Park', 'Jordan Lee'], { type: 'Party', date: daysAgo(300) })
   await logMeetup(page, ['Sam Chen'], { type: 'Trip', date: daysAgo(400) })
   await page.getByRole('link', { name: /Alex Rivera/ }).click()
+  // Alex's birthday is further off, so the friend page shows it but Birthdays soon doesn't
+  // (and Alex keeps a single link on the Friends tab).
+  const inForty = dayFromToday(40)
+  await page.getByRole('region', { name: 'Birthday', exact: true }).getByRole('button', { name: 'Add birthday' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Edit friend' })
+  await setBirthday(sheet, { ...inForty, year: inForty.year - 32 })
+  await sheet.getByRole('button', { name: 'Save' }).click()
+  await expect(sheet).toBeHidden()
   await addToList(page, 'Likes', 'Ramen, Board games, Hiking')
   // Long enough to show an item wrapping inside its chip.
   await addToList(page, 'Likes', 'Live jazz in tiny basement bars on rainy weeknights')
