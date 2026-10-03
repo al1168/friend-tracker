@@ -36,13 +36,14 @@ const MAX_STORED_ITERATIONS = 5_000_000
 
 export async function verifyPin(pin: string, stored: PinHash): Promise<boolean> {
   if (!isValidPin(pin)) return false
-  // A damaged stored hash must not make this hang (huge count) or run unchecked (tiny count).
+  // A damaged stored hash must not make this hang (huge count) or run unchecked (tiny count). It throws (rather
+  // than returning false) so the caller doesn't count it as a wrong PIN.
   if (
     !Number.isInteger(stored.iterations) ||
     stored.iterations < MIN_STORED_ITERATIONS ||
     stored.iterations > MAX_STORED_ITERATIONS
   ) {
-    return false
+    throw new Error('The stored PIN hash is unreadable.')
   }
   const actual = await derive(pin, base64ToBytes(stored.salt), stored.iterations)
   return constantTimeEqual(actual, base64ToBytes(stored.hash))

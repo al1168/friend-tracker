@@ -29,10 +29,10 @@ describe('PIN', () => {
     expect(await verifyPin('12345', stored)).toBe(false)
   })
 
-  it('refuses a stored iteration count outside 100,000 to 5,000,000', async () => {
+  it('throws on a stored iteration count outside 100,000 to 5,000,000 or not a whole number', async () => {
     const stored = await hashPin('123456')
     for (const iterations of [1.5, 0, 99_999, 5_000_001, 10_000_000, Number.NaN]) {
-      expect(await verifyPin('123456', { ...stored, iterations })).toBe(false)
+      await expect(verifyPin('123456', { ...stored, iterations })).rejects.toThrow('The stored PIN hash is unreadable.')
     }
   })
 

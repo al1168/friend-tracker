@@ -318,6 +318,18 @@ describe('everything else', () => {
     expect(await verifySessionValue(await sessionKey(), value, NOW + 364 * 24 * 3600 * 1000)).toBe(true)
   })
 
+  it('does not renew a session with exactly 30 days left', async () => {
+    const { env } = setup()
+    const cookie = `__Host-ft_session=${await createSessionValue(await sessionKey(), NOW - 335 * 24 * 3600 * 1000)}`
+    expect(await handleRequest(get('/assets/index.js', { Cookie: cookie }), env, NOW)).toBe('next')
+  })
+
+  it('renews a session with 30 days minus 1 second left', async () => {
+    const { env } = setup()
+    const cookie = `__Host-ft_session=${await createSessionValue(await sessionKey(), NOW - 335 * 24 * 3600 * 1000 - 1000)}`
+    expect(await handleRequest(get('/assets/index.js', { Cookie: cookie }), env, NOW)).toMatchObject({ kind: 'next' })
+  })
+
   it('does not renew a session with 200 days left', async () => {
     const { env } = setup()
     const cookie = `__Host-ft_session=${await createSessionValue(await sessionKey(), NOW - 165 * 24 * 3600 * 1000)}`

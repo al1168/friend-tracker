@@ -123,7 +123,7 @@ if (!password) {
 
   await check('the sign-in page is never answered from the offline cache', async () => {
     // Only meaningful once the service worker controls the page, so wait for that first.
-    await page.evaluate(() => navigator.serviceWorker.ready)
+    await page.evaluate(() => navigator.serviceWorker.ready.then(() => true))
     await page.reload()
     assert.ok(await page.evaluate(() => navigator.serviceWorker.controller !== null), 'the service worker is not in control')
     await page.goto(new URL('/__login', base).href)

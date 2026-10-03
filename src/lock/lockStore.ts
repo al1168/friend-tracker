@@ -48,13 +48,18 @@ export async function resetFailures(): Promise<void> {
   await setSetting('appLockFailures', NO_FAILURES)
 }
 
-/** A wait longer than the count allows (a damaged setting, or a clock that moved) is cut back to what it should be. */
-async function readFailures(now: number): Promise<LockFailures> {
-  const failures = await getSetting('appLockFailures')
-  if (failures.lockedUntil === null || failures.lockedUntil - now <= backoffMs(failures.count)) return failures
-  const rebased = { ...failures, lockedUntil: now + backoffMs(failures.count) }
-  await setSetting('appLockFailures', rebased)
-  return rebased
+/**
+ * A wait longer than the count allows (a damaged setting, or a clock that moved) is cut back to what it should be,
+ * and saved. Call it when the lock screen opens and when the app returns to the foreground.
+ */
+export async function normalizeFailures(now = Date.now()): Promise<LockFailures> {
+  return db.transaction('rw', db.settings, async () => {
+    const failures = await getSetting('appLockFailures')
+    if (failures.lockedUntil === null || failures.lockedUntil - now <= backoffMs(failures.count)) return failures
+    const rebased = { ...failures, lockedUntil: now + backoffMs(failures.count) }
+    await setSetting('appLockFailures', rebased)
+    return rebased
+  })
 }
 
 /**
@@ -63,7 +68,7 @@ async function readFailures(now: number): Promise<LockFailures> {
  */
 export async function checkPin(pin: string, now: number): Promise<PinCheck> {
   const lock = await getSetting('appLock')
-  const failures = await readFailures(now)
+  const failures = await normalizeFailures(now)
   if (waitRemainingMs(failures, now) > 0) return { result: 'wait', failures }
   if (lock.pin !== null && (await verifyPin(pin, lock.pin))) {
     await setSetting('appLockFailures', NO_FAILURES)
