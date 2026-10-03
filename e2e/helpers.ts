@@ -99,3 +99,26 @@ export async function reopenAfterAWhile(page: Page) {
   })
   await page.reload()
 }
+
+/** Makes Face ID look available (or not) on every later page load, whatever machine runs the tests. */
+export async function stubFaceId(page: Page, available: boolean) {
+  await page.addInitScript((available) => {
+    Object.defineProperty(PublicKeyCredential, 'isUserVerifyingPlatformAuthenticatorAvailable', {
+      configurable: true,
+      value: async () => available,
+    })
+  }, available)
+}
+
+/** Turns on the app lock from Settings with this PIN (Face ID must look unavailable). */
+export async function turnOnAppLock(page: Page, pin: string) {
+  await page.goto('/#/settings')
+  await page.getByRole('button', { name: 'Turn on app lock' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Turn on app lock' })
+  await expect(sheet.getByText('Choose a 6-digit PIN')).toBeVisible()
+  await enterPin(sheet, pin)
+  await expect(sheet.getByText('Enter it again')).toBeVisible()
+  await enterPin(sheet, pin)
+  await expect(sheet).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Change PIN' })).toBeVisible()
+}

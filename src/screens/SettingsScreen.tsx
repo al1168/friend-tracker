@@ -8,6 +8,8 @@ import { useToast } from '../components/Toast'
 import { useFriends, useGroups, useMeetups, useMeetupTypes, useSetting } from '../data/hooks'
 import { useToday } from '../hooks/useToday'
 import { describeLastBackup, plural } from '../lib/text'
+import { AppLockSection } from '../lock/AppLockSection'
+import { usePasskeyAvailable } from '../lock/usePasskeyAvailable'
 import './SettingsScreen.css'
 
 export function SettingsScreen() {
@@ -16,6 +18,8 @@ export function SettingsScreen() {
   const meetupTypes = useMeetupTypes()
   const meetups = useMeetups()
   const lastBackupAt = useSetting('lastBackupAt')
+  const appLock = useSetting('appLock')
+  const passkeyAvailable = usePasskeyAvailable()
   const today = useToday()
   const toast = useToast()
   const confirm = useConfirm()
@@ -24,6 +28,7 @@ export function SettingsScreen() {
   const [importError, setImportError] = useState<{ message: string; n: number } | null>(null)
 
   if (!friends || !groups || !meetupTypes || !meetups || lastBackupAt === undefined) return null
+  if (appLock === undefined || passkeyAvailable === undefined) return null
 
   // Uses data that's already loaded, so the iOS share sheet opens straight from the tap.
   const exportData = async () => {
@@ -90,6 +95,8 @@ export function SettingsScreen() {
           {importError.message}
         </p>
       )}
+
+      <AppLockSection lock={appLock} passkeyAvailable={passkeyAvailable} />
 
       <InsetGroup title="About your data">
         <p className="about-text">
