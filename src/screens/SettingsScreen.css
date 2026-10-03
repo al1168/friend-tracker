@@ -1,0 +1,11 @@
+.about-text {
+  max-width: 65ch;
+  margin: 0;
+  padding: var(--space-4);
+  font-size: var(--text-subhead);
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.settings-error {
+  margin-top: calc(-1 * var(--space-4));
+}

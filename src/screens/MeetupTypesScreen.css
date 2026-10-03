@@ -1,0 +1,30 @@
+.type-row {
+  display: flex;
+  align-items: center;
+}
+.type-row > .row {
+  flex: 1;
+  min-width: 0;
+}
+.type-row__order {
+  flex: none;
+  display: flex;
+  padding-right: var(--space-2);
+}
+
+.type-form {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: var(--space-3);
+}
+.type-form__emoji {
+  font-size: 1.5rem;
+  text-align: center;
+}
+
+.sheet-note {
+  margin: 0 var(--space-1);
+  font-size: var(--text-subhead);
+  line-height: 1.45;
+  color: var(--ink-2);
+}
