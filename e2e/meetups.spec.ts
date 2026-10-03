@@ -35,7 +35,7 @@ test('logs a meetup on another date', async ({ page }) => {
   await page.goto('/')
   await addFriend(page, 'Alex')
   await logMeetup(page, ['Alex'], { date: '2025-03-14' })
-  await expect(page.getByRole('link', { name: /Alex/ })).toContainText('year')
+  await expect(page.getByRole('link', { name: /Alex/ }).locator('.row__subtitle')).toContainText(/years? ago/)
 })
 
 test('asks before discarding a started meetup', async ({ page }) => {

@@ -40,7 +40,7 @@ export async function logMeetup(
     await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name, exact: true }).click()
   }
   if (options.type) await sheet.getByRole('button', { name: options.type, exact: true }).click()
-  if (options.date) await sheet.getByLabel('Pick a date').fill(options.date)
+  if (options.date) await sheet.getByLabel('Pick date').fill(options.date)
   if (options.note) await sheet.getByLabel('Note').fill(options.note)
   await sheet.getByRole('button', { name: 'Save' }).click()
   await expect(sheet).toBeHidden()

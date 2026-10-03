@@ -55,6 +55,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
+  const searchRef = useRef<HTMLInputElement>(null)
 
   const effectiveTypeId = typeId ?? types?.[0]?.id ?? null
   const yesterday = addDays(today, -1)
@@ -75,14 +76,21 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
       .slice(0, 20)
   }, [friends, query])
 
+  const startTypeId = start.typeId ?? types?.[0]?.id ?? null
+  const sameFriends = [...friendIds].sort().join() === [...start.friendIds].sort().join()
   const dirty =
-    friendIds.join() !== start.friendIds.join() ||
-    typeId !== start.typeId ||
+    !sameFriends ||
+    effectiveTypeId !== startTypeId ||
     date !== start.date ||
     note !== start.note
 
   function toggleFriend(id: string) {
     setFriendIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
+    setError(null)
+  }
+
+  function addFriendId(id: string) {
+    setFriendIds((ids) => (ids.includes(id) ? ids : [...ids, id]))
     setError(null)
   }
 
@@ -119,7 +127,13 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
 
   async function remove() {
     if (!editing) return
-    const deleted = await deleteMeetup(editing.id)
+    let deleted
+    try {
+      deleted = await deleteMeetup(editing.id)
+    } catch {
+      setError("Couldn't delete. Please try again.")
+      return
+    }
     onClose()
     if (deleted) {
       toast({
@@ -163,7 +177,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
             {selected.map((friend) => (
               <Chip
                 key={friend.id}
-                selected
+                active
                 onClick={() => toggleFriend(friend.id)}
                 ariaLabel={`Remove ${friend.name}`}
               >
@@ -203,6 +217,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
         <label className="search">
           <IconSearch size={18} />
           <input
+            ref={searchRef}
             type="search"
             className="search__input"
             placeholder="Search all friends"
@@ -221,8 +236,9 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
                   <Row
                     key={friend.id}
                     onClick={() => {
-                      toggleFriend(friend.id)
+                      addFriendId(friend.id)
                       setQuery('')
+                      searchRef.current?.focus()
                     }}
                     leading={<Avatar name={friend.name} photo={friend.photo} seed={friend.id} />}
                     title={friend.name}
@@ -242,7 +258,10 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
         </h3>
         <div className="chip-row" role="group" aria-labelledby={whatId}>
           {(types ?? []).map((type) => (
-            <Chip key={type.id} selected={type.id === effectiveTypeId} onClick={() => setTypeId(type.id)}>
+            <Chip key={type.id} selected={type.id === effectiveTypeId} onClick={() => {
+                setTypeId(type.id)
+                setError(null)
+              }}>
               <span aria-hidden="true">{type.emoji}</span>
               {type.name}
             </Chip>
@@ -255,10 +274,16 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
           When
         </h3>
         <div className="chip-wrap" role="group" aria-labelledby={whenId}>
-          <Chip selected={date === today} onClick={() => setDate(today)}>
+          <Chip selected={date === today} onClick={() => {
+              setDate(today)
+              setError(null)
+            }}>
             Today
           </Chip>
-          <Chip selected={date === yesterday} onClick={() => setDate(yesterday)}>
+          <Chip selected={date === yesterday} onClick={() => {
+              setDate(yesterday)
+              setError(null)
+            }}>
             Yesterday
           </Chip>
           <label className="chip date-chip" data-selected={isOtherDate}>
@@ -267,7 +292,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
             <input
               type="date"
               className="date-chip__input"
-              aria-label="Pick a date"
+              aria-label={isOtherDate ? `Date, ${formatDate(date, today)}` : 'Pick date'}
               value={date}
               onClick={(event) => {
                 try {
@@ -277,7 +302,10 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
                 }
               }}
               onChange={(event) => {
-                if (isISODate(event.target.value)) setDate(event.target.value)
+                if (isISODate(event.target.value)) {
+                  setDate(event.target.value)
+                  setError(null)
+                }
               }}
             />
           </label>
@@ -294,7 +322,10 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
           value={note}
           placeholder="Optional"
           enterKeyHint="done"
-          onChange={(event) => setNote(event.target.value)}
+          onChange={(event) => {
+            setNote(event.target.value)
+            setError(null)
+          }}
           onKeyDown={blurOnEnter}
         />
       </div>
