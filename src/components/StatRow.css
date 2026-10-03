@@ -8,7 +8,7 @@
   background: var(--surface);
 }
 .stat-row__item {
-  flex: 1 1 6.5rem;
+  flex: 1 1 calc((19rem - 100%) * 999);
   display: flex;
   flex-direction: column-reverse;
   align-items: center;

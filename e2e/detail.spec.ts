@@ -11,8 +11,7 @@ test('shows a friend’s stats and history', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1, name: 'Alex' })).toBeVisible()
   await expect(page.getByText(/^Last seen .* · Today$/)).toBeVisible()
   const thisYear = page.locator('.stat-row__item').first()
-  await expect(thisYear).toContainText('This year')
-  await expect(thisYear).toContainText('1')
+  await expect(thisYear).toHaveText(/This year\s*1$/)
   const history = page.getByRole('region', { name: 'History' })
   await expect(history.getByRole('button', { name: /Meal.*with Sam.*Tacos/ })).toBeVisible()
 })
@@ -66,4 +65,20 @@ test('edits and deletes a friend', async ({ page }) => {
   await page.getByRole('dialog', { name: 'Edit friend' }).getByRole('button', { name: 'Delete friend' }).click()
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete friend' }).click()
   await expect(page.getByText('Add the people you want to keep up with.')).toBeVisible()
+})
+
+test('shows a future meetup as upcoming without counting it', async ({ page }) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await logMeetup(page, ['Alex'], { date: '2099-01-01' })
+  await page.getByRole('link', { name: /Alex/ }).click()
+
+  await expect(page.getByText('Not seen yet')).toBeVisible()
+  await expect(page.locator('.stat-row__item').first()).toHaveText(/This year\s*0$/)
+  await expect(page.getByRole('region', { name: 'History' })).toContainText('Upcoming')
+})
+
+test('redirects to Friends for an unknown friend', async ({ page }) => {
+  await page.goto('/#/friends/nope')
+  await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
 })

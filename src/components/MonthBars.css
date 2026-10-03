@@ -1,6 +1,6 @@
 .month-bars {
   margin: 0;
-  padding: var(--space-4);
+  padding: var(--space-4) 12px;
   border-radius: var(--radius-group);
   background: var(--surface);
 }
@@ -62,6 +62,6 @@
   background: var(--bar-current);
 }
 .month-bars__label {
-  font-size: var(--text-caption);
+  font-size: min(var(--text-caption), 18px);
   color: var(--ink-3);
 }

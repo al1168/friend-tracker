@@ -13,11 +13,11 @@ export function MonthBars({ current, previous, year }: MonthBarsProps) {
     (month, i) => `${month}: ${current[i]} in ${year}, ${previous[i]} in ${year - 1}`,
   ).join('. ')
   return (
-    <figure className="month-bars">
-      <figcaption className="month-bars__legend">
+    <div className="month-bars">
+      <div className="month-bars__legend" aria-hidden="true">
         <span className="month-bars__key month-bars__key--previous">{year - 1}</span>
         <span className="month-bars__key month-bars__key--current">{year}</span>
-      </figcaption>
+      </div>
       <div className="month-bars__chart" role="img" aria-label={`Meetups per month. ${description}.`}>
         {current.map((count, i) => (
           <div key={MONTH_NAMES[i]} className="month-bars__month">
@@ -34,6 +34,6 @@ export function MonthBars({ current, previous, year }: MonthBarsProps) {
           </div>
         ))}
       </div>
-    </figure>
+    </div>
   )
 }

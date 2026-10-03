@@ -106,7 +106,7 @@ Bottom tab bar: **Friends · Stats · Settings**. iOS-style large titles that sh
 - Inline stat row (not cards): **This year · Last year · All time**. Stacks vertically at large text sizes.
 - Month-by-month bars: 12 months, this year (peach) next to last year (warm gray), with a text legend.
 - History, newest first, grouped by month: type emoji + name, date, note, and "with Alex, Sam" for other friends present. Tapping opens the meetup sheet in edit mode. Empty: "Your first meetup will show up here."
-- Edit and Delete friend actions in the header menu.
+- An Edit button in the header opens the friend sheet; Delete friend lives at the bottom of that sheet (iOS Contacts pattern).
 
 ### Add / edit friend (sheet)
 - Name, group (picker with "None" and "New group…"), photo (iOS photo picker / camera via file input; resized before saving; removable), notes.

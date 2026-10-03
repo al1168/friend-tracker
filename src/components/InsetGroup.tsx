@@ -16,7 +16,7 @@ export function InsetGroup({ title, level = 2, footer, children }: InsetGroupPro
   const titleId = useId()
   const Heading = level === 3 ? 'h3' : 'h2'
   return (
-    <section className="inset-group" aria-labelledby={title ? titleId : undefined}>
+    <section className="inset-group" aria-labelledby={title && level !== 3 ? titleId : undefined}>
       {title && (
         <Heading id={titleId} className="group-title">
           {title}

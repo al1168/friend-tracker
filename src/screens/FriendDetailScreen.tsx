@@ -109,7 +109,7 @@ export function FriendDetailScreen() {
                     }
                     title={
                       <>
-                        {type?.name ?? 'Meetup'}
+                        {type?.name ?? 'Meetup'}{meetup.date > today && ' '}
                         {meetup.date > today && <span className="upcoming-badge">Upcoming</span>}
                       </>
                     }
