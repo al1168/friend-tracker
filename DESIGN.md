@@ -167,7 +167,7 @@ components:
   toast:
     backgroundColor: "{colors.warm-ink}"
     textColor: "{colors.warm-paper}"
-    rounded: "{rounded.pill}"
+    rounded: "26px"
     height: "52px"
   stat-row:
     backgroundColor: "{colors.paper-white}"
@@ -312,7 +312,7 @@ Used for adding or editing a friend, logging a meetup, and editing groups and ty
 iOS-style stacks pinned to the bottom with 8px margins: a Paper White group (14px corners) with an optional centered Footnote 600 title and message, 56px buttons in Terracotta Ink at 1.1rem divided by hairlines, then a separate Cancel group in 600. Destructive buttons use Danger Red. The sort chooser is a `dialog`; destructive confirms are an `alertdialog`.
 
 ### Toast
-The one happy moment. An inverted pill (Warm Ink background, Warm Paper text, Float shadow), 52px tall, above the Log pill. A 24px Peach circle draws its check mark in over 420ms; an optional "Undo" pill sits at the end. It stays 5 seconds, 8 with an action, and pauses while touched or focused.
+The one happy moment. An inverted pill (Warm Ink background, Warm Paper text, Float shadow), 52px tall, above the Log pill. Its 26px corners keep it a pill on one line and make it a soft box when a long message wraps. It layers above sheets but below action sheets, so an open action sheet's scrim covers it. A 24px Peach circle draws its check mark in over 420ms; an optional "Undo" pill sits at the end. It stays 5 seconds, 8 with an action, and pauses while touched or focused.
 
 ### Navigation
 - **Nav bar:** sticky, 44px plus the safe area, solid Warm Paper. Back and actions in Terracotta Ink. When the large title scrolls away, a centered Body 600 title fades in and a 0.5px Soft Rule appears underneath.
