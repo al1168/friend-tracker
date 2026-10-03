@@ -138,7 +138,7 @@ Using a separate password-check key = HMAC-SHA256(`SESSION_SECRET`, `"ft-passwor
 - **Wrong-PIN backoff:**
   - Failures 1–4 have no wait.
   - Failure 5 imposes a 30 s wait, doubling with each further failure up to 15 min. `lockedUntil` is persisted, so reloading doesn't reset it.
-  - A correct PIN or a Face ID unlock resets the count.
+  - A correct PIN, a Face ID unlock, or a PIN reset resets the count.
 
 ### PIN (`src/lock/pin.ts`)
 

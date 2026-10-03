@@ -156,7 +156,13 @@ test('a double tap on the Face ID switch only turns it off', async ({ page }) =>
   await page.reload()
   const faceId = page.getByRole('switch', { name: 'Face ID' })
   await expect(faceId).toHaveAttribute('aria-checked', 'true')
-  await faceId.dblclick()
+  // A real double tap: the second tap lands about 100 ms after the first.
+  await faceId.evaluate(async (element) => {
+    const button = element as HTMLElement
+    button.click()
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    button.click()
+  })
   await expect(faceId).toHaveAttribute('aria-checked', 'false')
   await page.waitForTimeout(600)
   await expect(page.locator('[role=dialog]')).toHaveCount(0)

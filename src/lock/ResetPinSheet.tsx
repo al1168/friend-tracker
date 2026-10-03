@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Sheet } from '../components/Sheet'
 import { isPlainEnter } from '../lib/keys'
 import { PinStep } from './LockSheets'
@@ -6,9 +6,15 @@ import { changePin } from './lockStore'
 import { verifySitePassword, type PasswordCheck } from './sitePassword'
 import { useNewPin } from './useNewPin'
 
-type Problem = Exclude<PasswordCheck, 'ok'>
+type Kind = Exclude<PasswordCheck, 'ok'>
 
-const MESSAGES: Record<Problem, string> = {
+/** `n` changes with every failure, so an identical message replaces the old alert and is announced again. */
+interface Problem {
+  kind: Kind
+  n: number
+}
+
+const MESSAGES: Record<Kind, string> = {
   wrong: "That password didn't work.",
   'too-many': 'Too many attempts. Try again in 15 minutes.',
   'signed-out': 'Your sign-in expired. Sign in again, then reset your PIN.',
@@ -42,6 +48,24 @@ export function ResetPinSheet({ open, onClose, onReset }: ResetPinSheetProps) {
     if (!newPin.savingRef.current) onClose()
   }
 
+  // An unfinished reset doesn't survive the app going to the background: the lock screen remounts the sheet on the
+  // next open, so the password and the verified step are gone. (Once the PIN is being saved, it finishes.)
+  const cancelRef = useRef(cancel)
+  cancelRef.current = cancel
+  useEffect(() => {
+    if (!open) return
+    const hide = () => cancelRef.current()
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') hide()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('pagehide', hide)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pagehide', hide)
+    }
+  }, [open])
+
   async function submitPassword() {
     if (checkingRef.current || password.length === 0) return
     checkingRef.current = true
@@ -54,18 +78,19 @@ export function ResetPinSheet({ open, onClose, onReset }: ResetPinSheetProps) {
       setProblem(null)
       setVerified(true)
     } else {
-      setProblem(result)
+      setProblem((previous) => ({ kind: result, n: (previous?.n ?? 0) + 1 }))
     }
   }
 
+  function signInAgain() {
+    setPassword('')
+    window.location.assign('/__login?next=%2F')
+  }
+
   let footer = null
-  if (!verified && problem === 'signed-out') {
+  if (!verified && problem?.kind === 'signed-out') {
     footer = (
-      <button
-        type="button"
-        className="button button--primary button--block"
-        onClick={() => window.location.assign('/__login?next=%2F')}
-      >
+      <button type="button" className="button button--primary button--block" onClick={signInAgain}>
         Sign in
       </button>
     )
@@ -77,7 +102,7 @@ export function ResetPinSheet({ open, onClose, onReset }: ResetPinSheetProps) {
         onClick={submitPassword}
         disabled={checking || password.length === 0}
       >
-        Continue
+        {checking ? 'Checking…' : 'Continue'}
       </button>
     )
   }
@@ -85,12 +110,22 @@ export function ResetPinSheet({ open, onClose, onReset }: ResetPinSheetProps) {
   return (
     <Sheet open={open} title="Reset PIN" onRequestClose={cancel} footer={footer}>
       {verified ? (
-        <PinStep prompt={newPin.prompt} pinPad={newPin.pinPad} message={newPin.message} />
+        <PinStep prompt={newPin.prompt} pinPad={newPin.pinPad} message={newPin.message} messageKey={newPin.messageKey} />
       ) : (
         <div className="form-section">
           <p className="lock-sheet__intro">
             Enter your website password to choose a new PIN. Your friends and meetups stay as they are.
           </p>
+          {/* Same name as on the sign-in page, so Keychain offers the saved password. */}
+          <input
+            className="visually-hidden"
+            type="text"
+            value="Friend Tracker"
+            autoComplete="username"
+            readOnly
+            tabIndex={-1}
+            aria-hidden="true"
+          />
           <label className="field-label" htmlFor={passwordId}>
             Website password
           </label>
@@ -101,7 +136,7 @@ export function ResetPinSheet({ open, onClose, onReset }: ResetPinSheetProps) {
             value={password}
             autoComplete="current-password"
             enterKeyHint="go"
-            aria-invalid={problem === 'wrong'}
+            aria-invalid={problem?.kind === 'wrong'}
             aria-describedby={problem ? errorId : undefined}
             onKeyDown={(event) => {
               if (isPlainEnter(event)) {
@@ -115,8 +150,8 @@ export function ResetPinSheet({ open, onClose, onReset }: ResetPinSheetProps) {
             }}
           />
           {problem && (
-            <p className="field-error" id={errorId} role="alert">
-              {MESSAGES[problem]}
+            <p key={problem.n} className="field-error" id={errorId} role="alert">
+              {MESSAGES[problem.kind]}
             </p>
           )}
         </div>

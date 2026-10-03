@@ -22,7 +22,30 @@ describe('verifySitePassword', () => {
       body: '{"password":"maple otter"}',
       credentials: 'same-origin',
       cache: 'no-store',
+      redirect: 'manual',
     })
+  })
+
+  it('gives up after a time limit and reports it as offline', async () => {
+    const { fetcher, calls } = respondWith(204)
+    await verifySitePassword('x', fetcher)
+    const signal = calls[0].init?.signal
+    expect(signal).toBeInstanceOf(AbortSignal)
+    expect(signal?.aborted).toBe(false)
+    // What fetch throws when that signal's timeout fires.
+    const timedOut = (async () => {
+      throw new DOMException('The operation timed out.', 'TimeoutError')
+    }) as typeof fetch
+    expect(await verifySitePassword('x', timedOut)).toBe('offline')
+  })
+
+  it('never trusts a redirect, even one that ends in a 204', async () => {
+    const redirected = (async () => ({ status: 204, type: 'basic', redirected: true })) as unknown as typeof fetch
+    const opaque = (async () => ({ status: 0, type: 'opaqueredirect', redirected: false })) as unknown as typeof fetch
+    const disguised = (async () => ({ status: 204, type: 'opaqueredirect', redirected: false })) as unknown as typeof fetch
+    expect(await verifySitePassword('x', redirected)).toBe('error')
+    expect(await verifySitePassword('x', opaque)).toBe('error')
+    expect(await verifySitePassword('x', disguised)).toBe('error')
   })
 
   it('maps each answer from the server', async () => {
