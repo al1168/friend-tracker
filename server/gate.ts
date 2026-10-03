@@ -43,7 +43,7 @@ const SECURITY_HEADERS: Record<string, string> = {
 
 const PAGE_CSP = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
 
-function respond(status: number, body: string | null = null, headers: Record<string, string> = {}): Response {
+export function respond(status: number, body: string | null = null, headers: Record<string, string> = {}): Response {
   return new Response(body, { status, headers: { ...SECURITY_HEADERS, ...headers } })
 }
 
@@ -67,6 +67,9 @@ function clientIp(request: Request): string {
 /** A session with less than this left is renewed on its next request, so regular use never signs the owner out. */
 const RENEW_WITHIN_MS = 30 * 24 * 3600 * 1000
 
+/** A browser sends at most a few cookies of one name; checking more only costs time. */
+const MAX_SESSION_COOKIES = 4
+
 /**
  * Signed in when any cookie with the session name verifies (a stray duplicate can't lock the owner out).
  * Returns when the first valid session expires (ms), or null when there isn't one.
@@ -89,9 +92,6 @@ function isCrossSite(request: Request, url: URL): boolean {
   const origin = request.headers.get('Origin')
   return origin !== null && origin !== url.origin
 }
-
-/** A browser sends at most a few cookies of one name; checking more only costs time. */
-const MAX_SESSION_COOKIES = 4
 
 function isNavigation(request: Request): boolean {
   if (request.headers.get('Sec-Fetch-Mode') === 'navigate') return true

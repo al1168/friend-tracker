@@ -18,7 +18,8 @@ export async function verifySitePassword(password: string, fetcher: typeof fetch
       cache: 'no-store',
       // A redirect (a captive portal, say) is never an answer from the server.
       redirect: 'manual',
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      // AbortSignal.timeout is missing before iOS 16: without it the request just has no time limit.
+      signal: typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(TIMEOUT_MS) : undefined,
     })
   } catch {
     // No answer at all, or none within the time limit.

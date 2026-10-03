@@ -53,7 +53,7 @@ export function AppLockSection({ lock, passkeyAvailable }: AppLockSectionProps) 
   // Turning Face ID off is one tap. Turning it on asks for the PIN first (in a sheet).
   async function toggleFaceId() {
     // A double tap on "On" must not turn it off and then open "Turn on Face ID", and a double tap on "Off" must not
-    // hit the sheet that opens behind the second tap.
+    // open the sheet twice. (Only this switch is guarded, not taps on the sheet itself.)
     if (faceIdBusy.current) return
     faceIdBusy.current = true
     // Taps are ignored until the write (if any) is done, plus a moment for a second tap of a double tap.

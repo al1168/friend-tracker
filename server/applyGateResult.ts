@@ -1,7 +1,7 @@
 // Turns the gate's answer into the response the middleware sends. Anything it doesn't recognise is refused,
 // so a change to the gate's result type can never open the site by accident.
 
-import type { GateResult } from './gate.ts'
+import { MESSAGES, respond, type GateResult } from './gate.ts'
 
 export async function applyGateResult(result: GateResult, next: () => Promise<Response>): Promise<Response> {
   if (result === 'next') return next()
@@ -21,8 +21,5 @@ export async function applyGateResult(result: GateResult, next: () => Promise<Re
     return response
   }
   if (result instanceof Response) return result
-  return new Response("Friend Tracker isn't set up yet.", {
-    status: 500,
-    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
-  })
+  return respond(500, MESSAGES.notSetUp, { 'Content-Type': 'text/plain; charset=utf-8' })
 }

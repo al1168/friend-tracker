@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useId, useRef, useState } from 'react'
 import { Sheet } from '../components/Sheet'
 import { isPlainEnter } from '../lib/keys'
 import { PinStep } from './LockSheets'
@@ -50,11 +50,9 @@ export function ResetPinSheet({ open, onClose, onReset }: ResetPinSheetProps) {
 
   // An unfinished reset doesn't survive the app going to the background: the lock screen remounts the sheet on the
   // next open, so the password and the verified step are gone. (Once the PIN is being saved, it finishes.)
-  const cancelRef = useRef(cancel)
-  cancelRef.current = cancel
+  const hide = useEffectEvent(cancel)
   useEffect(() => {
     if (!open) return
-    const hide = () => cancelRef.current()
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') hide()
     }
@@ -120,9 +118,8 @@ export function ResetPinSheet({ open, onClose, onReset }: ResetPinSheetProps) {
           <input
             className="visually-hidden"
             type="text"
-            value="Friend Tracker"
+            defaultValue="Friend Tracker"
             autoComplete="username"
-            readOnly
             tabIndex={-1}
             aria-hidden="true"
           />

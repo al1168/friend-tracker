@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db, resetDatabase } from '../db/db'
 import { addFriend } from '../db/friends'
+import { getSetting, setSetting } from '../db/settings'
 import { addGroup } from '../db/groups'
 import { addMeetup } from '../db/meetups'
+import type { AppLock, LockFailures } from '../lock/types'
 import { friend, meetupType } from '../test/fixtures'
 import { createBackup, type BackupData } from './format'
 import { parseBackupFile, readAllData, replaceAllData } from './storage'
@@ -35,6 +37,22 @@ describe('backup storage', () => {
     await replaceAllData(parsed.data)
 
     expect(sortById(await readAllData())).toEqual(sortById(before))
+  })
+
+  it('keeps the lock settings, which a backup never carries', async () => {
+    const appLock: AppLock = {
+      enabled: true,
+      pin: { hash: 'aGFzaA==', salt: 'c2FsdA==', iterations: 600_000 },
+      passkeyId: 'credential-id',
+    }
+    const appLockFailures: LockFailures = { count: 5, lockedUntil: 1_800_000_000_000 }
+    await setSetting('appLock', appLock)
+    await setSetting('appLockFailures', appLockFailures)
+
+    await replaceAllData({ friends: [friend('f1', 'Alex')], groups: [], meetupTypes: [], meetups: [] })
+
+    expect(await getSetting('appLock')).toEqual(appLock)
+    expect(await getSetting('appLockFailures')).toEqual(appLockFailures)
   })
 
   it('reports a file that is not JSON', async () => {

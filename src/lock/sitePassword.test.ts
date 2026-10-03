@@ -39,6 +39,18 @@ describe('verifySitePassword', () => {
     expect(await verifySitePassword('x', timedOut)).toBe('offline')
   })
 
+  it('still sends the request, without a time limit, where AbortSignal.timeout is missing', async () => {
+    const original = AbortSignal.timeout
+    Object.defineProperty(AbortSignal, 'timeout', { value: undefined, configurable: true })
+    try {
+      const { fetcher, calls } = respondWith(204)
+      expect(await verifySitePassword('x', fetcher)).toBe('ok')
+      expect(calls[0].init?.signal).toBeUndefined()
+    } finally {
+      Object.defineProperty(AbortSignal, 'timeout', { value: original, configurable: true, writable: true })
+    }
+  })
+
   it('never trusts a redirect, even one that ends in a 204', async () => {
     const redirected = (async () => ({ status: 204, type: 'basic', redirected: true })) as unknown as typeof fetch
     const opaque = (async () => ({ status: 0, type: 'opaqueredirect', redirected: false })) as unknown as typeof fetch
