@@ -33,6 +33,12 @@ test('lists the app files for offline use in one classic script', async ({ reque
   expect(serviceWorker).not.toMatch(/\bimport\s*[{*("'`]|\bexport\s*[{*]|import\.meta/)
 })
 
+test('shows birthday reminders from the service worker', async ({ request }) => {
+  const serviceWorker = await (await request.get('sw.js')).text()
+  expect(serviceWorker).toMatch(/addEventListener\([`'"]push[`'"]/)
+  expect(serviceWorker).toMatch(/addEventListener\([`'"]notificationclick[`'"]/)
+})
+
 test.describe('with the service worker running', () => {
   test.use({ serviceWorkers: 'allow' })
 

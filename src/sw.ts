@@ -1,9 +1,11 @@
-// The service worker. vite-plugin-pwa bundles this file into dist/sw.js and puts the list of
-// files to keep offline in place of self.__WB_MANIFEST. It's type-checked by tsconfig.sw.json.
+// The service worker: keeps the app offline and shows birthday reminders. vite-plugin-pwa bundles
+// this file into dist/sw.js and puts the list of files to keep offline in place of
+// self.__WB_MANIFEST. It's type-checked by tsconfig.sw.json.
 
 import { clientsClaim } from 'workbox-core'
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching'
 import { NavigationRoute, registerRoute } from 'workbox-routing'
+import { onNotificationClick, onPush } from './sw/push'
 
 declare const self: ServiceWorkerGlobalScope
 
@@ -17,3 +19,7 @@ cleanupOutdatedCaches()
 // Every page load is answered with the app, offline too, except the website's own pages and
 // endpoints under /__ (sign-in, password check, reminders), which always go to the network.
 registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), { denylist: [/^\/__/] }))
+
+// Birthday reminders (see src/sw/push.ts).
+self.addEventListener('push', (event) => onPush(event, { registration: self.registration }))
+self.addEventListener('notificationclick', (event) => onNotificationClick(event, self.clients, self.registration.scope))
