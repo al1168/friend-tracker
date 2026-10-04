@@ -71,6 +71,12 @@ await check('the password check needs a signed-in session', async () => {
   assert.equal(response.status(), 403)
 })
 
+await check('the reminders endpoint needs a signed-in session', async () => {
+  const response = await anonymous.put('/__reminders', { data: { subscription: null, reminders: [] } })
+  assert.equal(response.status(), 401)
+  assert.equal(await response.text(), '')
+})
+
 const browser = await webkit.launch()
 const context = await browser.newContext({ ...devices['iPhone 13'] })
 const page = await context.newPage()
@@ -119,6 +125,17 @@ if (!password) {
     assert.equal(notJson.status(), 415)
     assert.equal((await page.request.post(url, { data: { password: wrongPassword } })).status(), 401)
     assert.equal((await page.request.post(url, { data: { password } })).status(), 204)
+  })
+
+  await check('the reminders endpoint is set up (the Worker is bound)', async () => {
+    // An empty schedule is refused by the endpoint's own checks (400), which run only once the
+    // REMINDERS binding exists. Without it the answer is 503 "Birthday reminders aren't set up yet."
+    const response = await page.request.put(new URL('/__reminders', base).href, {
+      data: { subscription: null, reminders: [] },
+      headers: { 'Sec-Fetch-Site': 'same-origin' },
+    })
+    assert.notEqual(response.status(), 503, await response.text())
+    assert.equal(response.status(), 400)
   })
 
   await check('the sign-in page is never answered from the offline cache', async () => {
