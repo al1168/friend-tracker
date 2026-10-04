@@ -13,8 +13,8 @@
   // The free plan needs SQLite-backed Durable Objects.
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ReminderSchedule"] }],
   "vars": {
-    // PLACEHOLDER until the rollout (plan Task 8) runs scripts/make-vapid-keys.ts. Nobody holds its private half.
-    "VAPID_PUBLIC_KEY": "BLwNAu9O6nqiNKx-6lPlhLk_2LslupgmkvBGz6Bwlfhz_vvn0VFdgSSsRGSIr29QPqsN0r8M8ZOY9Emd_t619ig",
+    // Written by scripts/make-vapid-keys.ts, with the same value as src/reminders/vapidKey.ts.
+    "VAPID_PUBLIC_KEY": "BKZYt6cvQeLcvXG4WTLjFwFOaFHrpvRblPwqNG9yyQ4UJyDNPmufAq463rm5XVVLbWPwqp5o9AVtvFKbcUQru4o",
     "VAPID_SUBJECT": "https://friend.aldenlu.com"
   },
   // The private key is a secret: npx --yes wrangler@4.147.0 secret put VAPID_PRIVATE_KEY --config reminders/wrangler.jsonc
