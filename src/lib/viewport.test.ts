@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { keyboardInset, revealOffset } from './viewport'
+import { caretEdge, keyboardInset, keyboardIsUp, revealOffset } from './viewport'
 
 describe('keyboardInset', () => {
   it('is zero with no keyboard', () => {
@@ -17,6 +17,37 @@ describe('keyboardInset', () => {
   it('rounds to whole pixels and never goes below zero', () => {
     expect(keyboardInset(664, { height: 323.6, offsetTop: 0 })).toBe(340)
     expect(keyboardInset(664, { height: 700, offsetTop: 0 })).toBe(0)
+  })
+})
+
+describe('keyboardIsUp', () => {
+  it('is false with no visual viewport at all', () => {
+    expect(keyboardIsUp(664, null)).toBe(false)
+    expect(keyboardIsUp(664, undefined)).toBe(false)
+  })
+
+  it('is false while the visual viewport is full height', () => {
+    expect(keyboardIsUp(664, { height: 664, scale: 1 })).toBe(false)
+  })
+
+  it('is true when the visual viewport is more than 50px shorter', () => {
+    expect(keyboardIsUp(664, { height: 324, scale: 1 })).toBe(true)
+    expect(keyboardIsUp(664, { height: 613, scale: 1 })).toBe(true)
+  })
+
+  it('takes a small shrink for browser chrome, not the keyboard', () => {
+    expect(keyboardIsUp(664, { height: 614, scale: 1 })).toBe(false)
+  })
+
+  it('stays true while iOS pans the visual viewport, whatever its offsetTop', () => {
+    // Panned all the way: keyboardInset says 0, yet the keyboard is still up.
+    const panned = { height: 324, offsetTop: 340, scale: 1 }
+    expect(keyboardInset(664, panned)).toBe(0)
+    expect(keyboardIsUp(664, panned)).toBe(true)
+  })
+
+  it('is false while zoomed in, where a short visual viewport is the zoom', () => {
+    expect(keyboardIsUp(664, { height: 332, scale: 2 })).toBe(false)
   })
 })
 
@@ -38,15 +69,61 @@ describe('revealOffset', () => {
     expect(revealOffset(port, { top: 105, bottom: 149 }, 12)).toBe(-7)
   })
 
+  it('with no margin, leaves a field that is just in view and shows one that is not flush with the edge', () => {
+    expect(revealOffset(port, { top: 256, bottom: 300 }, 0)).toBe(0)
+    expect(revealOffset(port, { top: 100, bottom: 144 }, 0)).toBe(0)
+    expect(revealOffset(port, { top: 260, bottom: 304 }, 0)).toBe(4)
+    expect(revealOffset(port, { top: 96, bottom: 140 }, 0)).toBe(-4)
+  })
+
+  it('scrolls whole pixels, rounding away from the field, so a field a fraction of a pixel out ends up inside', () => {
+    expect(revealOffset(port, { top: 256.44, bottom: 300.44 }, 0)).toBe(1)
+    expect(revealOffset(port, { top: 99.95, bottom: 143.95 }, 0)).toBe(-1)
+    expect(revealOffset(port, { top: 400.5, bottom: 444.5 }, 12)).toBe(157)
+  })
+
+  it('shows all of a field that fits in the view but not with the margins, splitting the room left', () => {
+    const below = { top: 400, bottom: 590 }
+    const offset = revealOffset(port, below, 12)
+    expect(below.top - offset).toBeGreaterThanOrEqual(port.top)
+    expect(below.bottom - offset).toBeLessThanOrEqual(port.bottom)
+    expect(offset).toBe(295)
+
+    const above = { top: -100, bottom: 90 }
+    expect(revealOffset(port, above, 12)).toBe(-205)
+  })
+
   it('shows the top of a field taller than the view that is below it', () => {
-    expect(revealOffset(port, { top: 250, bottom: 550 }, 12)).toBe(138)
+    expect(revealOffset(port, { top: 250, bottom: 550 }, 12)).toBe(150)
   })
 
-  it('shows the bottom of a field taller than the view that is above it', () => {
-    expect(revealOffset(port, { top: -200, bottom: 250 }, 12)).toBe(-38)
+  it('shows the top of a field taller than the view that is above it, unless the caret is at its end', () => {
+    expect(revealOffset(port, { top: -200, bottom: 250 }, 12)).toBe(-300)
+    expect(revealOffset(port, { top: -200, bottom: 250 }, 12, 'end')).toBe(-50)
   })
 
-  it('leaves a field that already fills the view', () => {
+  it('shows the bottom of a field taller than the view when the caret is at its end', () => {
+    expect(revealOffset(port, { top: 250, bottom: 550 }, 12, 'end')).toBe(250)
+    // Already flush with the bottom: nothing to do.
+    expect(revealOffset(port, { top: -100, bottom: 300 }, 12, 'end')).toBe(0)
+  })
+
+  it('leaves a field that already fills the view, unless the caret is at its hidden end', () => {
     expect(revealOffset(port, { top: 50, bottom: 350 }, 12)).toBe(0)
+    expect(revealOffset(port, { top: 50, bottom: 350 }, 12, 'end')).toBe(50)
+  })
+})
+
+describe('caretEdge', () => {
+  it('is the end when the caret or selection reaches the last character or past it', () => {
+    expect(caretEdge(20, 20)).toBe('end')
+    expect(caretEdge(19, 20)).toBe('end')
+    expect(caretEdge(0, 0)).toBe('end')
+  })
+
+  it('is the start anywhere earlier, or without a selection', () => {
+    expect(caretEdge(18, 20)).toBe('start')
+    expect(caretEdge(0, 20)).toBe('start')
+    expect(caretEdge(null, 20)).toBe('start')
   })
 })

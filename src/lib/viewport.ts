@@ -4,24 +4,63 @@ export interface Span {
   bottom: number
 }
 
+/** Which end of a field the caret is at: its last character, or anywhere before it. */
+export type CaretEdge = 'start' | 'end'
+
+/** How much shorter than the layout viewport the visual viewport must be before it counts as the keyboard. */
+const KEYBOARD_MIN_HEIGHT = 50
+
 /**
  * How much of the bottom of the layout viewport (`layoutHeight`, window.innerHeight) the on-screen
  * keyboard covers. iOS keeps the layout viewport full height and shrinks only the visual viewport.
+ * For placing things above the keyboard only: it drops to 0 when iOS pans the visual viewport down.
  */
 export function keyboardInset(layoutHeight: number, viewport: { height: number; offsetTop: number }): number {
   return Math.round(Math.max(0, layoutHeight - viewport.height - viewport.offsetTop))
 }
 
 /**
- * How far to scroll a box whose visible area is `port` so that `target` shows with `margin` to spare,
- * moving as little as possible (like scrollIntoView's "nearest"). Positive scrolls down.
+ * Whether the on-screen keyboard is up: the visual viewport, at normal zoom, is more than 50px shorter
+ * than the layout viewport. Unlike keyboardInset this ignores offsetTop, since iOS pans the visual
+ * viewport to show a field while the keyboard stays up. False without a visual viewport at all.
  */
-export function revealOffset(port: Span, target: Span, margin: number): number {
-  const top = port.top + margin
-  const bottom = port.bottom - margin
+export function keyboardIsUp(
+  layoutHeight: number,
+  viewport: { height: number; scale: number } | null | undefined,
+): boolean {
+  return viewport != null && viewport.scale === 1 && layoutHeight - viewport.height > KEYBOARD_MIN_HEIGHT
+}
+
+/** Where a text field's caret is (`selectionEnd`, null when it has none) against its text's `length`. */
+export function caretEdge(selectionEnd: number | null, length: number): CaretEdge {
+  return selectionEnd !== null && selectionEnd >= length - 1 ? 'end' : 'start'
+}
+
+/**
+ * How far to scroll a box whose visible area is `port` so that `target` shows with `margin` to spare,
+ * moving as little as possible (like scrollIntoView's "nearest"). Positive scrolls down. The margin
+ * shrinks to whatever room there is, so a field that fits always shows whole. A field taller than
+ * the view shows its top edge, or its bottom edge when the `caret` is at its end; one that already
+ * fills the view stays put unless that end is hidden. Whole pixels, a little further rather than short,
+ * since scrollTop drops a fraction and would leave a sliver of the field out.
+ */
+export function revealOffset(port: Span, target: Span, margin: number, caret: CaretEdge = 'start'): number {
+  const room = port.bottom - port.top - (target.bottom - target.top)
+  const spare = Math.max(0, Math.min(margin, room / 2))
+  const top = port.top + spare
+  const bottom = port.bottom - spare
   const above = target.top < top
   const below = target.bottom > bottom
-  if (above === below) return 0 // in view, or already filling it
-  const taller = target.bottom - target.top > bottom - top
-  return above !== taller ? target.top - top : target.bottom - bottom
+  if (room < 0) {
+    if (caret === 'end') return wholePixels(target.bottom - bottom)
+    return above && below ? 0 : wholePixels(target.top - top)
+  }
+  if (above) return wholePixels(target.top - top)
+  if (below) return wholePixels(target.bottom - bottom)
+  return 0
+}
+
+/** Rounds away from zero. */
+function wholePixels(offset: number): number {
+  return offset > 0 ? Math.ceil(offset) : Math.floor(offset)
 }
