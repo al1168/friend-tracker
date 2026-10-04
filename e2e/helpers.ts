@@ -32,7 +32,7 @@ export async function addFriend(page: Page, name: string, group?: string, birthd
 export async function logMeetup(
   page: Page,
   names: string[],
-  options: { type?: string; date?: string; note?: string } = {},
+  options: { type?: string; date?: string; note?: string; activities?: string[]; photos?: PhotoFile[] } = {},
 ) {
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
@@ -42,9 +42,136 @@ export async function logMeetup(
   }
   if (options.type) await sheet.getByRole('button', { name: options.type, exact: true }).click()
   if (options.date) await sheet.getByLabel('Pick date').fill(options.date)
+  for (const activity of options.activities ?? []) await pickActivity(sheet, activity)
+  if (options.photos) await addPhotos(sheet, options.photos)
   if (options.note) await sheet.getByLabel('Note').fill(options.note)
   await sheet.getByRole('button', { name: 'Save' }).click()
   await expect(sheet).toBeHidden()
+}
+
+/** A file for the photo picker (`setInputFiles`). */
+export interface PhotoFile {
+  name: string
+  mimeType: string
+  buffer: Buffer
+}
+
+/** A tiny photo for the picker: the 1×1 PNG. */
+export function tinyPhoto(name = 'photo.png'): PhotoFile {
+  return { name, mimeType: 'image/png', buffer: Buffer.from(ONE_PIXEL_PNG, 'base64') }
+}
+
+/** A file the picker hands over that isn't an image at all. */
+export function brokenPhoto(name = 'broken.jpg'): PhotoFile {
+  return { name, mimeType: 'image/jpeg', buffer: Buffer.from('not an image') }
+}
+
+/**
+ * A photo of a given size, drawn in the page: a soft diagonal gradient in `hue`, as a PNG. For
+ * checking the resize, and for screenshots that need something that looks like a picture.
+ */
+export async function drawnPhoto(
+  page: Page,
+  name: string,
+  width: number,
+  height: number,
+  hue = 30,
+): Promise<PhotoFile> {
+  const base64 = await page.evaluate(
+    ({ width, height, hue }) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const context = canvas.getContext('2d')
+      if (!context) throw new Error('No canvas')
+      const gradient = context.createLinearGradient(0, 0, width, height)
+      gradient.addColorStop(0, `hsl(${hue} 80% 82%)`)
+      gradient.addColorStop(1, `hsl(${hue + 50} 55% 48%)`)
+      context.fillStyle = gradient
+      context.fillRect(0, 0, width, height)
+      context.fillStyle = `hsl(${hue + 20} 90% 96% / 0.7)`
+      context.beginPath()
+      context.arc(width * 0.3, height * 0.35, Math.min(width, height) * 0.18, 0, Math.PI * 2)
+      context.fill()
+      return canvas.toDataURL('image/png').split(',')[1]
+    },
+    { width, height, hue },
+  )
+  return { name, mimeType: 'image/png', buffer: Buffer.from(base64, 'base64') }
+}
+
+/** In an open meetup sheet: selects an activity's chip, or adds it with "+ New" when there's no chip for it. */
+export async function pickActivity(sheet: Locator, name: string) {
+  const activities = sheet.getByRole('group', { name: 'Activities' })
+  const chip = activities.getByRole('button', { name, exact: true })
+  if ((await chip.count()) > 0) {
+    await chip.click()
+  } else {
+    await activities.getByRole('button', { name: 'New activity' }).click()
+    await sheet.getByRole('textbox', { name: 'New activity' }).fill(name)
+    await sheet.getByRole('button', { name: 'Add', exact: true }).click()
+  }
+  await expect(activities.getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true')
+}
+
+/** In an open meetup sheet: the Photos grid. */
+export function photoGrid(sheet: Locator): Locator {
+  return sheet.getByRole('list', { name: 'Photos' })
+}
+
+/** In an open meetup sheet: picks photos and waits until they've all been added. */
+export async function addPhotos(sheet: Locator, files: PhotoFile[]) {
+  const thumbnails = photoGrid(sheet).getByRole('img')
+  const before = await thumbnails.count()
+  await sheet.locator('input[type="file"]').setInputFiles(files)
+  await expect(thumbnails).toHaveCount(before + files.length)
+}
+
+/** Opens a friend's page from the Friends tab. */
+export async function openFriendPage(page: Page, name: string) {
+  await goToTab(page, 'Friends')
+  await page.getByRole('link', { name: new RegExp(name) }).click()
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+}
+
+/** On a friend's page: opens a meetup from their history in the Edit meetup sheet. */
+export async function editMeetup(page: Page, name: RegExp): Promise<Locator> {
+  await page.getByRole('region', { name: 'History' }).getByRole('button', { name }).click()
+  const sheet = page.getByRole('dialog', { name: 'Edit meetup' })
+  await expect(sheet).toBeVisible()
+  return sheet
+}
+
+/** Every stored meetup photo, read straight from IndexedDB. */
+export async function readMeetupPhotos(
+  page: Page,
+): Promise<{ id: string; order: number; full: string; thumb: string; width: number; height: number }[]> {
+  return page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const request = indexedDB.open('friend-tracker')
+        request.onerror = () => reject(request.error)
+        request.onsuccess = () => {
+          const database = request.result
+          const getAll = database.transaction('meetupPhotos').objectStore('meetupPhotos').getAll()
+          getAll.onsuccess = () => {
+            database.close()
+            resolve(getAll.result)
+          }
+          getAll.onerror = () => reject(getAll.error)
+        }
+      }),
+  )
+}
+
+/** The pixel size of an image data URL, decoded in the page. */
+export async function imageSize(page: Page, src: string): Promise<{ width: number; height: number }> {
+  return page.evaluate(async (src) => {
+    const image = new Image()
+    image.src = src
+    await image.decode()
+    return { width: image.naturalWidth, height: image.naturalHeight }
+  }, src)
 }
 
 /** A birthday to pick in the friend sheet. Leave out `year` for "No year". */

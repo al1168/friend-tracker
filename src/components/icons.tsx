@@ -80,6 +80,13 @@ export const IconCamera = (props: IconProps) => (
   </Icon>
 )
 
+export const IconCameraPlus = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7H8l1.5-2h5L16 7h2.5A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z" />
+    <path d="M12 10v6M9 13h6" />
+  </Icon>
+)
+
 export const IconCalendar = (props: IconProps) => (
   <Icon {...props}>
     <rect x="3.5" y="5" width="17" height="15.5" rx="3" />

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  describeSkippedPhotos,
   isPhotoDataUrl,
   isPixelSize,
   isValidPhotoData,
@@ -45,6 +46,15 @@ describe('isPixelSize', () => {
     expect(isPixelSize(12.5)).toBe(false)
     expect(isPixelSize('320')).toBe(false)
     expect(isPixelSize(Number.NaN)).toBe(false)
+  })
+})
+
+describe('describeSkippedPhotos', () => {
+  it('says why photos were left out', () => {
+    expect(describeSkippedPhotos(0, 0)).toBeNull()
+    expect(describeSkippedPhotos(3, 0)).toBe('A meetup can have up to 20 photos.')
+    expect(describeSkippedPhotos(0, 1)).toBe("1 photo couldn't be added.")
+    expect(describeSkippedPhotos(2, 2)).toBe("A meetup can have up to 20 photos. 2 photos couldn't be added.")
   })
 })
 

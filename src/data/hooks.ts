@@ -3,7 +3,7 @@ import { db } from '../db/db'
 import { photoCount } from '../db/meetups'
 import { getSetting, type Settings } from '../db/settings'
 import { compareNames } from '../lib/text'
-import type { Friend, Group, Meetup, MeetupType } from '../types'
+import type { Friend, Group, Meetup, MeetupPhoto, MeetupType } from '../types'
 
 // Each hook returns `undefined` while its first query is loading, then re-renders on every change.
 
@@ -26,6 +26,18 @@ export function useMeetupTypes(): MeetupType[] | undefined {
 
 export function useMeetups(): Meetup[] | undefined {
   return useLiveQuery(() => db.meetups.toArray())
+}
+
+/**
+ * A meetup's photos as ids and thumbnails, in order: what the meetup sheet shows. The full images
+ * are dropped as soon as they're read. Empty when there's no meetup yet.
+ */
+export function useMeetupPhotoThumbs(meetupId: string | undefined): Pick<MeetupPhoto, 'id' | 'thumb'>[] | undefined {
+  return useLiveQuery(async () => {
+    if (!meetupId) return []
+    const photos = await db.meetupPhotos.where('meetupId').equals(meetupId).sortBy('order')
+    return photos.map(({ id, thumb }) => ({ id, thumb }))
+  }, [meetupId])
 }
 
 /** How many meetup photos are stored. Counts without reading any image. */

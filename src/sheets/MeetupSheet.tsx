@@ -6,15 +6,26 @@ import { IconCalendar, IconCheck, IconClose, IconSearch } from '../components/ic
 import { InsetGroup, Row } from '../components/InsetGroup'
 import { Sheet } from '../components/Sheet'
 import { useToast } from '../components/Toast'
-import { useFriends, useMeetups, useMeetupTypes } from '../data/hooks'
+import { useFriends, useMeetupPhotoThumbs, useMeetups, useMeetupTypes } from '../data/hooks'
 import { ValidationError } from '../db/errors'
-import { addMeetup, deleteMeetup, restoreMeetup, updateMeetup } from '../db/meetups'
+import {
+  addMeetup,
+  deleteMeetup,
+  NO_PHOTO_CHANGES,
+  restoreMeetup,
+  updateMeetup,
+  type PhotoChanges,
+} from '../db/meetups'
 import { useToday } from '../hooks/useToday'
+import { activitySuggestions } from '../lib/activities'
 import { addDays, formatDate, isISODate, todayISO } from '../lib/dates'
 import { isPlainEnter } from '../lib/keys'
+import { askToKeepData } from '../lib/persist'
 import { compareNames, formatNameList } from '../lib/text'
 import { recentFriends } from '../stats/recent'
 import type { Friend } from '../types'
+import { MeetupActivities } from './MeetupActivities'
+import { MeetupPhotos, type DraftPhoto } from './MeetupPhotos'
 import type { MeetupSheetRequest } from './sheetsContext'
 import './MeetupSheet.css'
 
@@ -48,16 +59,30 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
     typeId: editing?.typeId ?? null,
     date: editing?.date ?? todayISO(),
     note: editing?.note ?? '',
+    activities: editing?.activities ?? [],
   }))
   const [friendIds, setFriendIds] = useState<string[]>(start.friendIds)
   const [typeId, setTypeId] = useState<string | null>(start.typeId)
   const [date, setDate] = useState(start.date)
   const [note, setNote] = useState(start.note)
+  const [activities, setActivities] = useState<string[]>(start.activities)
+  const [activityDraft, setActivityDraft] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const searchRef = useRef<HTMLInputElement>(null)
+
+  // Photos change only in the sheet until Save. A saved meetup's photos load once, as ids and thumbnails.
+  const storedPhotos = useMeetupPhotoThumbs(editing?.id)
+  const [photos, setPhotos] = useState<DraftPhoto[] | null>(null)
+  const [startPhotoIds, setStartPhotoIds] = useState<string[]>([])
+  const [addingPhotos, setAddingPhotos] = useState(false)
+  if (photos === null && storedPhotos) {
+    setPhotos(storedPhotos)
+    setStartPhotoIds(storedPhotos.map((photo) => photo.id))
+  }
+  const suggestions = useMemo(() => activitySuggestions(meetups ?? []), [meetups])
 
   const effectiveTypeId = typeId ?? types?.[0]?.id ?? null
   const yesterday = addDays(today, -1)
@@ -84,7 +109,10 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
     !sameFriends ||
     effectiveTypeId !== startTypeId ||
     date !== start.date ||
-    note !== start.note
+    note !== start.note ||
+    activities.join('\n') !== start.activities.join('\n') ||
+    !!activityDraft?.trim() ||
+    (photos !== null && photos.map((photo) => photo.id).join() !== startPhotoIds.join())
 
   function toggleFriend(id: string) {
     setFriendIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
@@ -101,17 +129,26 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
   }
 
   async function save() {
-    if (savingRef.current) return
+    if (savingRef.current || addingPhotos) return
     if (friendIds.length === 0 || !effectiveTypeId) return
     savingRef.current = true
     setSaving(true)
     try {
-      const input = { date, typeId: effectiveTypeId, friendIds, note, activities: editing?.activities ?? [] }
+      // An activity typed into "+ New" but not added yet is saved too.
+      const typed = activityDraft?.trim() ? [...activities, activityDraft] : activities
+      const input = { date, typeId: effectiveTypeId, friendIds, note, activities: typed }
+      const photoChanges: PhotoChanges = photos
+        ? {
+            add: photos.flatMap((photo) => (photo.added ? [photo.added] : [])),
+            removeIds: startPhotoIds.filter((id) => !photos.some((photo) => photo.id === id)),
+            order: photos.map((photo) => photo.id),
+          }
+        : NO_PHOTO_CHANGES
       if (editing) {
-        await updateMeetup(editing.id, input)
+        await updateMeetup(editing.id, input, photoChanges)
         toast({ message: 'Saved' })
       } else {
-        const meetup = await addMeetup(input)
+        const meetup = await addMeetup(input, photoChanges)
         toast({
           message: `Logged with ${formatNameList(selected.map((f) => f.name))}`,
           actionLabel: 'Undo',
@@ -120,6 +157,8 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
           },
         })
       }
+      // Photos take real space, so ask Safari to keep the data when the phone runs low (best effort).
+      if (photoChanges.add.length > 0) void askToKeepData()
       onClose()
     } catch (caught) {
       setError(caught instanceof ValidationError ? caught.message : "Couldn't save. Please try again.")
@@ -171,7 +210,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
             type="button"
             className="button button--primary button--block"
             onClick={save}
-            disabled={saving || friendIds.length === 0 || effectiveTypeId === null}
+            disabled={saving || addingPhotos || friendIds.length === 0 || effectiveTypeId === null}
           >
             {friendIds.length === 0 ? 'Pick a friend' : 'Save'}
           </button>
@@ -321,6 +360,26 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
           </label>
         </div>
       </section>
+
+      <MeetupActivities
+        suggestions={suggestions}
+        selected={activities}
+        onChange={(next) => {
+          setActivities(next)
+          setError(null)
+        }}
+        draft={activityDraft}
+        onDraftChange={setActivityDraft}
+      />
+
+      {photos && (
+        <MeetupPhotos
+          photos={photos}
+          setPhotos={setPhotos}
+          onBusyChange={setAddingPhotos}
+          open={request !== null}
+        />
+      )}
 
       <div className="form-section">
         <label htmlFor={noteId} className="form-section__label">

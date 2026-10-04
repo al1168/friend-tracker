@@ -83,8 +83,74 @@
   cursor: pointer;
 }
 
+/* "+ New" activity: the field and its Add button on their own line under the chips. */
+.activity-new {
+  display: flex;
+  gap: var(--space-2);
+}
+.activity-new .field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Photos (the grid itself is in base.css). Remove: a 44px hit area in the tile's corner around a small
+   Warm Ink circle with a cross, ringed in Warm Paper so it stands off any photo. */
+.photo-tile__remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+}
+.photo-tile__remove-glyph {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1.5px solid var(--bg);
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--bg);
+  transition: transform var(--dur-fast) var(--ease-out-quart);
+}
+.photo-tile__remove:active .photo-tile__remove-glyph {
+  transform: scale(0.9);
+}
+/* The dashed outline marks an empty slot to fill, not a container. */
+.photo-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-2);
+  border: 1.5px dashed var(--ink-3);
+  border-radius: var(--radius-field);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: var(--text-footnote);
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+  transition: background-color var(--dur-fast);
+}
+.photo-add:active {
+  background: var(--surface-pressed);
+}
+.photo-add[aria-disabled='true'] {
+  cursor: progress;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .recent-friend__check {
     animation: fade-in var(--dur) linear;
+  }
+  .photo-tile__remove:active .photo-tile__remove-glyph {
+    transform: none;
   }
 }
