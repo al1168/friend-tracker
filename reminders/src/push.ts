@@ -3,6 +3,7 @@
 // {"kind":"birthday"} or {"kind":"test"}: the phone looks up who it's for in its own data.
 
 import { buildPushPayload } from '@block65/webcrypto-web-push'
+import { normalizePushEndpoint } from './endpoint.ts'
 import type { PushKind, SendPush } from './schedule.ts'
 
 export interface VapidEnv {
@@ -51,12 +52,16 @@ export function vapidKeys(env: VapidEnv): { subject: string; publicKey: string; 
 /** A SendPush that posts to the subscription's push service. */
 export function pushSender(env: VapidEnv, fetcher: typeof fetch = fetch): SendPush {
   return async (subscription, kind: PushKind) => {
+    // The endpoint was checked when it was stored; check again so this never fetches anywhere else.
+    // One that fails counts as gone: the schedule drops it.
+    const endpoint = normalizePushEndpoint(subscription.endpoint)
+    if (endpoint === null) return 410
     const request = await buildPushPayload(
       { data: { kind }, options: { ttl: PUSH_TTL_SECONDS, urgency: 'high' } },
-      { endpoint: subscription.endpoint, expirationTime: null, keys: subscription.keys },
+      { endpoint, expirationTime: null, keys: subscription.keys },
       vapidKeys(env),
     )
-    const response = await fetcher(subscription.endpoint, {
+    const response = await fetcher(endpoint, {
       method: 'POST',
       headers: request.headers,
       body: request.body,

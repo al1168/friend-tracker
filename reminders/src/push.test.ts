@@ -164,6 +164,25 @@ describe('pushSender', () => {
     expect(valid).toBe(true)
   })
 
+  it('fetches the normalized endpoint', async () => {
+    const phone = await phoneSubscription()
+    const { env } = await vapidEnv()
+    const { fetcher, requests } = fakeFetch(201)
+    const subscription = { ...phone.subscription, endpoint: 'https://WEB.PUSH.APPLE.COM/QGuQ yavX' }
+    expect(await pushSender(env, fetcher)(subscription, 'birthday')).toBe(201)
+    expect(requests.map((request) => request.url)).toEqual(['https://web.push.apple.com/QGuQ%20yavX'])
+  })
+
+  it('does not fetch an endpoint outside the push services: it counts as gone', async () => {
+    const phone = await phoneSubscription()
+    const { env } = await vapidEnv()
+    for (const endpoint of ['https://evil.example/abc', 'http://web.push.apple.com/abc', 'https://169.254.169.254/x', 'nonsense']) {
+      const { fetcher, requests } = fakeFetch(201)
+      expect(await pushSender(env, fetcher)({ ...phone.subscription, endpoint }, 'birthday')).toBe(410)
+      expect(requests).toEqual([])
+    }
+  })
+
   it("passes on the push service's answer", async () => {
     const phone = await phoneSubscription()
     const { env } = await vapidEnv()

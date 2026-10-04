@@ -7,7 +7,10 @@
 //   POST   /__reminders/test                                → sendTest → 204, or 409 / 410 / 502
 
 import type { Reminder, Subscription, SyncInput, TestResult } from '../reminders/src/schedule.ts'
+import { isPushEndpoint, normalizePushEndpoint } from '../reminders/src/endpoint.ts'
 import { respond } from './gate.ts'
+
+export { isPushEndpoint }
 
 export const REMINDERS_PATH = '/__reminders'
 export const REMINDERS_TEST_PATH = '/__reminders/test'
@@ -25,13 +28,8 @@ export interface RemindersEnv {
   REMINDERS?: RemindersService
 }
 
-/** Push services the Worker may send to, so it can't be used to send requests anywhere else. */
-const PUSH_HOSTS = ['web.push.apple.com', 'fcm.googleapis.com', 'updates.push.services.mozilla.com']
-const PUSH_HOST_SUFFIXES = ['.push.apple.com', '.notify.windows.com']
-
 export const MAX_REMINDERS = 1000
 export const MAX_FRIEND_ID_LENGTH = 64
-const MAX_ENDPOINT_LENGTH = 1024
 /** 1,000 reminders take about 70 KB. */
 const MAX_BODY_LENGTH = 200_000
 const DAY_MS = 86_400_000
@@ -50,20 +48,6 @@ function isObj(value: unknown): value is Obj {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** An https: URL on a known push service, with no user name, password or port. */
-export function isPushEndpoint(endpoint: string): boolean {
-  if (endpoint.length > MAX_ENDPOINT_LENGTH) return false
-  let url: URL
-  try {
-    url = new URL(endpoint)
-  } catch {
-    return false
-  }
-  if (url.protocol !== 'https:' || url.username !== '' || url.password !== '' || url.port !== '') return false
-  const host = url.hostname
-  return PUSH_HOSTS.includes(host) || PUSH_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix))
-}
-
 /** The number of bytes a base64url key decodes to, or -1 when it isn't base64url. */
 function base64urlLength(text: string): number {
   if (!/^[A-Za-z0-9_-]+={0,2}$/.test(text)) return -1
@@ -73,11 +57,11 @@ function base64urlLength(text: string): number {
 
 function readSubscription(value: unknown): Subscription | null {
   if (!isObj(value) || typeof value.endpoint !== 'string' || !isObj(value.keys)) return null
-  const { endpoint } = value
+  const endpoint = normalizePushEndpoint(value.endpoint)
   const { p256dh, auth } = value.keys
-  if (!isPushEndpoint(endpoint)) return null
-  // p256dh is an uncompressed P-256 point (65 bytes); auth is a 16-byte secret.
-  if (typeof p256dh !== 'string' || base64urlLength(p256dh) !== 65) return null
+  if (endpoint === null) return null
+  // p256dh is an uncompressed P-256 point: 65 bytes, the first 0x04 (base64url "B..."). auth is a 16-byte secret.
+  if (typeof p256dh !== 'string' || base64urlLength(p256dh) !== 65 || !p256dh.startsWith('B')) return null
   if (typeof auth !== 'string' || base64urlLength(auth) !== 16) return null
   return { endpoint, keys: { p256dh, auth } }
 }

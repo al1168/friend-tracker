@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import {
   EARLY_MS,
   GIVE_UP_MS,
@@ -64,6 +64,18 @@ function setup(answers: (number | null)[] = []) {
 }
 
 const reminder = (at: number, friendId: string): Reminder => ({ at, friendId })
+
+/** The schedule logs why a push failed. The logs are checked here and kept out of the test output. */
+let logged: MockInstance<typeof console.error>
+beforeEach(() => {
+  logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+})
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+/** Everything logged, as one string. */
+const logText = () => logged.mock.calls.flat().map(String).join(' ')
 
 describe('groupByMinute', () => {
   it('groups reminders that share a minute, earliest first', () => {
@@ -161,6 +173,53 @@ describe('alarm', () => {
     }
   })
 
+  it('tries again in a minute after any other status too, like a 400 or a 403', async () => {
+    for (const status of [400, 403]) {
+      const { schedule, data, state } = setup([status])
+      await schedule.sync({ subscription: SUBSCRIPTION, reminders: [reminder(AT, 'alex'), reminder(AT + DAY, 'kim')] })
+      await schedule.alarm()
+      expect(data.get('reminders')).toEqual([reminder(AT, 'alex'), reminder(AT + DAY, 'kim')])
+      expect(state.alarm).toBe(AT + RETRY_MS)
+    }
+  })
+
+  it('keeps the minute that failed and drops the one that was sent', async () => {
+    const { schedule, clock, data, state, sent } = setup([503, 201])
+    await schedule.sync({
+      subscription: SUBSCRIPTION,
+      reminders: [reminder(AT, 'alex'), reminder(AT + 60_000, 'kim'), reminder(AT + DAY, 'sam')],
+    })
+    clock.now = AT + 60_000
+    await schedule.alarm()
+    expect(sent).toHaveLength(2)
+    expect(data.get('reminders')).toEqual([reminder(AT, 'alex'), reminder(AT + DAY, 'sam')])
+    expect(state.alarm).toBe(AT + 60_000 + RETRY_MS)
+  })
+
+  it('logs why a push failed, without the endpoint or any key', async () => {
+    const { schedule, clock } = setup([429, null])
+    await schedule.sync({ subscription: SUBSCRIPTION, reminders: [reminder(AT, 'alex'), reminder(AT + 60_000, 'kim')] })
+    clock.now = AT + 60_000
+    await schedule.alarm()
+    expect(logText()).toContain('status 429')
+    expect(logText()).toContain('network error')
+    expect(logText()).not.toContain('web.push.apple.com')
+    expect(logText()).not.toContain(SUBSCRIPTION.keys.p256dh)
+    expect(logText()).not.toContain(SUBSCRIPTION.keys.auth)
+  })
+
+  it('blanks out any URL in a logged error', async () => {
+    const store = fakeStorage()
+    const send = async (subscription: Subscription): Promise<number> => {
+      throw new Error(`failed to fetch ${subscription.endpoint} now`)
+    }
+    const schedule = new Schedule(store.storage, send, () => AT)
+    await schedule.sync({ subscription: SUBSCRIPTION, reminders: [reminder(AT, 'alex')] })
+    await schedule.alarm()
+    expect(logText()).toContain('failed to fetch [url] now')
+    expect(logText()).not.toContain('QGuQyavXutnMH')
+  })
+
   it('sends on a later try and then moves on', async () => {
     const { schedule, clock, data, state, sent } = setup([503, 201])
     await schedule.sync({ subscription: SUBSCRIPTION, reminders: [reminder(AT, 'alex'), reminder(AT + DAY, 'kim')] })
@@ -192,6 +251,7 @@ describe('alarm', () => {
     state.failGets = true
     await expect(schedule.alarm()).resolves.toBeUndefined()
     expect(state.alarm).toBe(AT + RETRY_MS)
+    expect(logText()).toContain('storage is unavailable')
   })
 
   it('cleans up when there is no subscription', async () => {
@@ -251,5 +311,8 @@ describe('sendTest', () => {
       await schedule.sync({ subscription: SUBSCRIPTION, reminders: [] })
       expect(await schedule.sendTest()).toBe('failed')
     }
+    expect(logText()).toContain('status 500')
+    expect(logText()).toContain('status 403')
+    expect(logText()).not.toContain('web.push.apple.com')
   })
 })

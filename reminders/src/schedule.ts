@@ -55,6 +55,16 @@ function isGone(status: number): boolean {
   return status === 404 || status === 410
 }
 
+/**
+ * An error's message for the log. It never includes a push endpoint (a capability URL) or a key:
+ * the send and storage code only ever throws messages about the network or the storage, and any
+ * URL in one is blanked out anyway.
+ */
+function reason(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.replace(/[a-z][a-z0-9+.-]*:\/\/\S*/gi, '[url]').slice(0, 200)
+}
+
 function key(reminder: Reminder): string {
   return `${reminder.at}:${reminder.friendId}`
 }
@@ -109,7 +119,8 @@ export class Schedule {
       let status: number
       try {
         status = await this.send(subscription, 'test')
-      } catch {
+      } catch (error) {
+        console.error('Test push failed:', reason(error))
         return 'failed'
       }
       if (isSent(status)) return 'sent'
@@ -117,6 +128,7 @@ export class Schedule {
         await this.clearNow()
         return 'gone'
       }
+      console.error('Test push refused with status', status)
       return 'failed'
     })
   }
@@ -130,7 +142,8 @@ export class Schedule {
     return this.exclusive(async () => {
       try {
         await this.sendDue()
-      } catch {
+      } catch (error) {
+        console.error('Alarm failed, trying again in a minute:', reason(error))
         await this.storage.setAlarm(this.now() + RETRY_MS).catch(() => {})
       }
     })
@@ -165,7 +178,8 @@ export class Schedule {
       let status: number | null
       try {
         status = await this.send(subscription, 'birthday')
-      } catch {
+      } catch (error) {
+        console.error('Birthday push got no answer:', reason(error))
         status = null
       }
       if (status !== null && isGone(status)) {
@@ -176,6 +190,7 @@ export class Schedule {
         for (const reminder of group) done.add(key(reminder))
       } else {
         // 429, 5xx, any other answer, or none: keep them and try again in a minute.
+        if (status !== null) console.error('Birthday push refused with status', status)
         retrying = true
       }
     }

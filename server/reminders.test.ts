@@ -105,6 +105,14 @@ describe('PUT /__reminders', () => {
     expect(calls).toEqual([{ method: 'sync', input: { subscription: SUBSCRIPTION, reminders: REMINDERS } }])
   })
 
+  it('stores the normalized endpoint', async () => {
+    const { env, calls } = fakeService()
+    const raw = 'https://WEB.PUSH.APPLE.COM/QGuQ yavX'
+    const body = { subscription: { ...SUBSCRIPTION, endpoint: raw }, reminders: REMINDERS }
+    expect(await statusOf(put(body), env)).toBe(204)
+    expect(calls[0].input?.subscription.endpoint).toBe('https://web.push.apple.com/QGuQ%20yavX')
+  })
+
   it('accepts an empty list', async () => {
     const { env, calls } = fakeService()
     expect(await statusOf(put({ subscription: SUBSCRIPTION, reminders: [] }), env)).toBe(204)
@@ -179,6 +187,12 @@ describe('PUT /__reminders limits', () => {
     expect(await refused((body) => (body.subscription.keys = { p256dh: P256DH, auth: `${AUTH}AAAA` }))).toBe(true)
     expect(await refused((body) => (body.subscription.keys = { p256dh: `${P256DH.slice(1)}+`, auth: AUTH }))).toBe(true)
     expect(await refused((body) => (body.subscription.keys = { p256dh: P256DH }))).toBe(true)
+  })
+
+  it('refuses a 65-byte key that is not an uncompressed point (first byte not 0x04)', async () => {
+    for (const first of ['C', 'A', '_']) {
+      expect(await refused((body) => (body.subscription.keys = { p256dh: `${first}${P256DH.slice(1)}`, auth: AUTH }))).toBe(true)
+    }
   })
 
   it('takes at most 1,000 reminders', async () => {
