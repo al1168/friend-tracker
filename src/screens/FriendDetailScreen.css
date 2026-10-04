@@ -38,15 +38,3 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-
-.upcoming-badge {
-  display: inline-block;
-  margin-left: var(--space-1);
-  padding: 1px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--accent-soft);
-  color: var(--accent-ink);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  vertical-align: 2px;
-}

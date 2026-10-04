@@ -28,6 +28,19 @@ export function useMeetups(): Meetup[] | undefined {
   return useLiveQuery(() => db.meetups.toArray())
 }
 
+/** `null` when no meetup has this id. */
+export function useMeetup(id: string | undefined): Meetup | null | undefined {
+  return useLiveQuery(async () => (id ? ((await db.meetups.get(id)) ?? null) : null), [id])
+}
+
+/** A meetup's photos in order, full images included: the Meetup page and its viewer. */
+export function useMeetupPhotos(meetupId: string | undefined): MeetupPhoto[] | undefined {
+  return useLiveQuery(
+    async () => (meetupId ? db.meetupPhotos.where('meetupId').equals(meetupId).sortBy('order') : []),
+    [meetupId],
+  )
+}
+
 /**
  * A meetup's photos as ids and thumbnails, in order: what the meetup sheet shows. The full images
  * are dropped as soon as they're read. Empty when there's no meetup yet.

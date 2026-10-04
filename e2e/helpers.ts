@@ -134,9 +134,10 @@ export async function openFriendPage(page: Page, name: string) {
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
 }
 
-/** On a friend's page: opens a meetup from their history in the Edit meetup sheet. */
+/** On a friend's page: opens a meetup from their history, then its Edit meetup sheet. */
 export async function editMeetup(page: Page, name: RegExp): Promise<Locator> {
-  await page.getByRole('region', { name: 'History' }).getByRole('button', { name }).click()
+  await page.getByRole('region', { name: 'History' }).getByRole('link', { name }).click()
+  await page.getByRole('button', { name: 'Edit', exact: true }).click()
   const sheet = page.getByRole('dialog', { name: 'Edit meetup' })
   await expect(sheet).toBeVisible()
   return sheet

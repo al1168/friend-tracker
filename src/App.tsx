@@ -7,6 +7,7 @@ import { ReminderSync } from './reminders/useReminderSync'
 import { FriendDetailScreen } from './screens/FriendDetailScreen'
 import { FriendsScreen } from './screens/FriendsScreen'
 import { GroupsScreen } from './screens/GroupsScreen'
+import { MeetupScreen } from './screens/MeetupScreen'
 import { MeetupTypesScreen } from './screens/MeetupTypesScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { SheetsProvider } from './sheets/SheetsProvider'
@@ -24,6 +25,7 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<FriendsScreen />} />
                 <Route path="/friends/:id" element={<FriendDetailScreen />} />
+                <Route path="/meetups/:id" element={<MeetupScreen />} />
                 <Route path="/stats" element={<StatsScreen />} />
                 <Route path="/settings" element={<SettingsScreen />} />
                 <Route path="/settings/groups" element={<GroupsScreen />} />

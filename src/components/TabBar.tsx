@@ -4,7 +4,12 @@ import { IconFriends, IconSettings, IconStats } from './icons'
 import './TabBar.css'
 
 const TABS = [
-  { to: '/', label: 'Friends', Icon: IconFriends, matches: (path: string) => path === '/' || path.startsWith('/friends') },
+  {
+    to: '/',
+    label: 'Friends',
+    Icon: IconFriends,
+    matches: (path: string) => path === '/' || path.startsWith('/friends') || path.startsWith('/meetups'),
+  },
   { to: '/stats', label: 'Stats', Icon: IconStats, matches: (path: string) => path.startsWith('/stats') },
   { to: '/settings', label: 'Settings', Icon: IconSettings, matches: (path: string) => path.startsWith('/settings') },
 ]

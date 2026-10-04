@@ -1,0 +1,87 @@
+.meetup-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  text-align: center;
+}
+/* The type's emoji, as big as the friend page's avatar. */
+.meetup-hero__badge {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 48px;
+  line-height: 1;
+}
+.meetup-hero__title {
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-rounded);
+  font-size: var(--text-title);
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.meetup-hero__date {
+  margin: 0;
+  color: var(--ink-2);
+}
+.meetup-hero__with {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.meetup-hero__with-label {
+  font-size: var(--text-footnote);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.meetup-hero__people {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.meetup-hero__people .person-chip {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* Read-only activity chips: the chip look without a press state. */
+.meetup-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.meetup-tag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: 1.2em;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: var(--text-subhead);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.meetup-note {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-group);
+  background: var(--surface);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

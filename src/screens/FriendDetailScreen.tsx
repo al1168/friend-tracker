@@ -1,12 +1,12 @@
 import { useMemo } from 'react'
-import { Navigate, useParams } from 'react-router'
+import { Navigate, useLocation, useParams } from 'react-router'
 import { Avatar } from '../components/Avatar'
 import { Chip } from '../components/Chip'
 import { IconPlus } from '../components/icons'
 import { InsetGroup, Row, Section } from '../components/InsetGroup'
 import { LogButton } from '../components/LogButton'
 import { MonthBars } from '../components/MonthBars'
-import { Page } from '../components/Page'
+import { Page, type NavState } from '../components/Page'
 import { StatRow } from '../components/StatRow'
 import { useFriend, useFriends, useGroups, useMeetups, useMeetupTypes } from '../data/hooks'
 import { useToday } from '../hooks/useToday'
@@ -28,7 +28,8 @@ export function FriendDetailScreen() {
   const meetups = useMeetups()
   const types = useMeetupTypes()
   const today = useToday()
-  const { openFriendSheet, openMeetupSheet } = useSheets()
+  const location = useLocation()
+  const { openFriendSheet } = useSheets()
 
   const data = useMemo(() => {
     if (!friend || !meetups) return null
@@ -52,6 +53,8 @@ export function FriendDetailScreen() {
   const groupName = groups.find((group) => group.id === friend.groupId)?.name
   const typeById = new Map(types.map((type) => [type.id, type] as const))
   const nameById = new Map(friends.map((f) => [f.id, f.name] as const))
+  // A meetup opened from here says the friend's name on its back button, and keeps the tab this page came from.
+  const fromFriend: NavState = { backLabel: friend.name, tab: (location.state as NavState | null)?.tab }
 
   return (
     <Page
@@ -137,7 +140,8 @@ export function FriendDetailScreen() {
                 return (
                   <Row
                     key={meetup.id}
-                    onClick={() => openMeetupSheet({ meetup })}
+                    to={`/meetups/${meetup.id}`}
+                    state={fromFriend}
                     leading={
                       <span className="emoji-badge" aria-hidden="true">
                         {type?.emoji ?? '✨'}

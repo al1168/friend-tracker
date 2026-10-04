@@ -251,6 +251,37 @@ textarea.field {
   gap: var(--space-2);
 }
 
+/* A friend as a link: avatar and name in a Paper White pill (Stats, the Meetup page). */
+.person-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  padding: 0 var(--space-4) 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-subhead);
+  text-decoration: none;
+  transition: background-color var(--dur-fast);
+}
+.person-chip:active {
+  background: var(--surface-pressed);
+}
+
+/* A future meetup (the friend page's history, the Meetup page). */
+.upcoming-badge {
+  display: inline-block;
+  margin-left: var(--space-1);
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  vertical-align: 2px;
+}
+
 /* Photo grids (the meetup sheet and the Meetup page): square tiles, three across. */
 .photo-grid {
   display: grid;
