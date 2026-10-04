@@ -1,0 +1,22 @@
+// The reminders Worker (see README.md, "Birthday reminders"). Deploy from the project root:
+//   npx --yes wrangler@4.147.0 deploy --config reminders/wrangler.jsonc
+{
+  "name": "friend-tracker-reminders",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  // No public URL: only the Pages project's REMINDERS service binding reaches it.
+  "workers_dev": false,
+  "preview_urls": false,
+  "durable_objects": {
+    "bindings": [{ "name": "SCHEDULE", "class_name": "ReminderSchedule" }]
+  },
+  // The free plan needs SQLite-backed Durable Objects.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ReminderSchedule"] }],
+  "vars": {
+    // Written by scripts/make-vapid-keys.ts, with the same value as src/reminders/vapidKey.ts.
+    "VAPID_PUBLIC_KEY": "BLwNAu9O6nqiNKx-6lPlhLk_2LslupgmkvBGz6Bwlfhz_vvn0VFdgSSsRGSIr29QPqsN0r8M8ZOY9Emd_t619ig",
+    "VAPID_SUBJECT": "https://friend.aldenlu.com"
+  },
+  // The private key is a secret: npx --yes wrangler@4.147.0 secret put VAPID_PRIVATE_KEY --config reminders/wrangler.jsonc
+  "observability": { "enabled": true }
+}

@@ -21,6 +21,7 @@
     "react-router": "^7.18.4"
   },
   "devDependencies": {
+    "@block65/webcrypto-web-push": "2.0.0",
     "@cloudflare/workers-types": "^5.20261003.1",
     "@playwright/test": "^1.63.0",
     "@types/node": "^24.13.3",
