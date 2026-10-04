@@ -3,6 +3,7 @@ import {
   addFriend,
   addToList,
   dayFromToday,
+  drawnPhoto,
   goToTab,
   lockHeading,
   logMeetup,
@@ -39,7 +40,19 @@ async function seed(page: Page) {
   await addFriend(page, 'Jordan Lee', 'Work')
   await addFriend(page, 'Maya Patel', undefined, { month: today.month, day: today.day })
   await addFriend(page, 'Theo Brooks', 'Family', { month: inNine.month, day: inNine.day })
-  await logMeetup(page, ['Alex Rivera', 'Sam Chen'], { type: 'Meal', note: 'Ramen night', date: daysAgo(3) })
+  // The meetup page, the viewer and the sheet show this one: two activities and three photos.
+  const photos = [
+    await drawnPhoto(page, 'ramen.png', 1200, 900, 25),
+    await drawnPhoto(page, 'karaoke.png', 900, 1200, 300),
+    await drawnPhoto(page, 'street.png', 1200, 800, 200),
+  ]
+  await logMeetup(page, ['Alex Rivera', 'Sam Chen'], {
+    type: 'Meal',
+    note: 'Ramen night',
+    date: daysAgo(3),
+    activities: ['Karaoke', 'Board games'],
+    photos,
+  })
   await logMeetup(page, ['Kim Park'], { type: 'Coffee', date: daysAgo(20) })
   await logMeetup(page, ['Alex Rivera'], { type: 'Drinks', date: daysAgo(45) })
   await logMeetup(page, ['Theo Brooks'], { type: 'Call', date: daysAgo(120) })
@@ -79,6 +92,25 @@ async function captureAll(page: Page, prefix: string) {
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${DIR}/${prefix}-04-friend.png` })
   await page.screenshot({ path: `${DIR}/${prefix}-05-friend-full.png`, fullPage: true })
+
+  await page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Meal/ }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-12-meetup.png`, fullPage: true })
+
+  await page.getByRole('region', { name: 'Photos' }).getByRole('button').first().click()
+  await expect(page.getByRole('dialog', { name: 'Photo 1 of 3' })).toBeVisible()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-13-viewer.png` })
+  await page.keyboard.press('Escape')
+
+  await page.getByRole('button', { name: 'Edit', exact: true }).click()
+  const editSheet = page.getByRole('dialog', { name: 'Edit meetup' })
+  await editSheet.getByRole('region', { name: 'Photos' }).scrollIntoViewIfNeeded()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-14-meetup-sheet.png` })
+  await editSheet.getByRole('button', { name: 'Cancel' }).click()
+  await expect(editSheet).toBeHidden()
 
   await goToTab(page, 'Stats')
   await page.screenshot({ path: `${DIR}/${prefix}-06-stats.png`, fullPage: true })

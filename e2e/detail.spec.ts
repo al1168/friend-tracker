@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { addFriend, logMeetup } from './helpers.ts'
+import { addFriend, logMeetup, tinyPhoto } from './helpers.ts'
 
 test('shows a friend’s stats and history', async ({ page }) => {
   await page.goto('/')
@@ -14,6 +14,26 @@ test('shows a friend’s stats and history', async ({ page }) => {
   await expect(thisYear).toHaveText(/This year\s*1$/)
   const history = page.getByRole('region', { name: 'History' })
   await expect(history.getByRole('link', { name: /Meal.*with Sam.*Tacos/ })).toBeVisible()
+})
+
+test('history rows show activities and the first photo', async ({ page }) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await addFriend(page, 'Sam')
+  await logMeetup(page, ['Alex', 'Sam'], {
+    type: 'Meal',
+    activities: ['Karaoke', 'Walk'],
+    note: 'Tacos',
+    photos: [tinyPhoto('one.png'), tinyPhoto('two.png')],
+  })
+  await logMeetup(page, ['Alex'])
+  await page.getByRole('link', { name: /Alex/ }).click()
+
+  const history = page.getByRole('region', { name: 'History' })
+  const meal = history.getByRole('link', { name: /Meal.*with Sam · Karaoke, Walk · Tacos/ })
+  await expect(meal).toBeVisible()
+  await expect(meal.locator('img.history-thumb')).toHaveAttribute('src', /^data:image\/jpeg/)
+  await expect(history.getByRole('link', { name: /Coffee/ }).locator('img')).toHaveCount(0)
 })
 
 test('logs from the friend page with them preselected', async ({ page }) => {

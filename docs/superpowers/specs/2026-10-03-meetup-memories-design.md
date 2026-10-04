@@ -132,3 +132,26 @@ Add:
 - a backup round trip keeps photos and activities.
 
 **Screenshots:** the meetup sheet with activities and photos, the Meetup page, and the viewer, in light, dark and large text.
+
+## Decisions made while planning
+
+Recorded in [the plan](../plans/2026-10-03-meetup-memories.md):
+
+- **Index.** The photos table is `meetupPhotos: 'id, meetupId, [meetupId+order]'`. The compound index lets a history row read just the first photo's record (IndexedDB returns whole records, so the full image is read once and dropped; only the thumbnail is kept). The v3 upgrade adds only this table; meetups get `activities` from the reading hook.
+- **Activity messages.** "Keep each activity under 60 characters." and "A meetup can have up to 20 activities.". The "+ New" field stops at 60 characters; a 21st pick shows the second message under the chips.
+- **"+ New"** adds one activity (commas are kept). Text matching a chip selects that chip's spelling. Enter or Add on an empty field, and Escape, close it. Text left in the open field is saved with Save and counts as a change.
+- **Suggestions** merge spellings that differ only in case, shown as the latest meetup spells them.
+- **Chips shown:** the first 12 suggestions, then this meetup's other activities, then new ones. A chip tapped off stays in place until the sheet closes. "More" moves focus to the first chip it revealed.
+- **Change set.** The sheet chooses new photos' ids, so `order` lists new and kept photos together; photos left out keep their order after the listed ones; another meetup's ids in `removeIds` are ignored. Over 20, a duplicate id or an invalid image throws inside the transaction, so the meetup write rolls back too ("A photo couldn't be saved." for an invalid image).
+- **Resizing.** One decode, the full image drawn first and the thumbnail drawn from it; canvases are released right after encoding. Results over the backup limits count as "couldn't be added". Friend photos use the same decode.
+- **Adding.** One file at a time with "Adding 2 of 5…"; Save waits; closing the sheet stops the rest; with 20 photos already, the tile shows the limit message instead of opening the picker; both messages can show together; "Added 2 photos." is announced; after a remove, focus goes to the next remove button.
+- **Storage.** After a save that adds photos, `navigator.storage.persist()` is asked unless the data is already kept; failures are ignored.
+- **Backups.** Any problem with a version 4 photo, including an unknown `meetupId` or a 21st photo for a meetup, gives `Photo N is invalid.`. Sizes are data URL lengths in characters. Duplicate photo ids and a missing `meetupPhotos` list have their own messages. Version 4 friends keep birthdays.
+- **Export.** The backup is stringified once. Settings never holds photos in memory: it watches only a live photo count. With no photos, Export is synchronous and keeps the tap's share gesture. With photos, Export reads them at tap time; if the share sheet then refuses because the tap expired, a "Backup ready" toast with a "Share" action shares the file from a fresh tap.
+- **Footer.** "Last backup: today. Includes 12 photos." or "Never backed up. Includes 1 photo.", unchanged with no photos.
+- **Meetup page.** It belongs to the Friends tab (or keeps Stats when the friend page came from there). Friend chips open the friend with the meetup type as their back label. There is no "+ Log meetup" pill. An unknown or deleted meetup goes back one step (or to Friends when opened directly).
+- **Viewer.** The dialog is named "Photo 2 of 5", the counter is a polite live region, the image alt is "Photo 2 of 5, Coffee, Sat, Sep 12" (type and date), and grid thumbnails are "Photo 2 of 5". No wrap-around; Previous and Next are `aria-disabled` at the ends. Keys are heard on the whole document, since Safari doesn't focus tapped buttons. Focus returns to the thumbnail of the photo showing at close. The iOS status bar keeps the app's theme color.
+- **History rows.** Activities come between "with …" and the note; the thumbnail is decorative.
+- **Shared styles.** `.person-chip`, `.upcoming-badge` and the photo grid live in `base.css`.
+- **Frozen default.** `NO_PHOTO_CHANGES` is frozen, so the one shared "no changes" default can't be changed by a caller.
+- **Shared item key.** `itemKey`, the case-insensitive key for list items, is exported from `src/lib/preferences.ts` and shared between preferences and activities.

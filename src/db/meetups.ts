@@ -145,6 +145,18 @@ export async function restoreMeetup({ meetup, photos }: DeletedMeetup): Promise<
   })
 }
 
+/**
+ * The thumbnail of a meetup's first photo, or null when it has none. Reads just that one photo,
+ * through the [meetupId+order] index, and keeps only its thumbnail.
+ */
+export async function firstPhotoThumb(meetupId: string): Promise<string | null> {
+  const first = await db.meetupPhotos
+    .where('[meetupId+order]')
+    .between([meetupId, -Infinity], [meetupId, Infinity])
+    .first()
+  return first?.thumb ?? null
+}
+
 /** How many meetup photos are stored, across all meetups. */
 export function photoCount(): Promise<number> {
   return db.meetupPhotos.count()

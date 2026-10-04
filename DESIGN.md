@@ -38,6 +38,9 @@ colors:
   last-year-bar-dark: "oklch(54% 0.012 55)"
   danger-red-dark: "oklch(70% 0.17 25)"
   scrim-dark: "oklch(8% 0.01 45 / 0.55)"
+  # The photo viewer only, the same in both themes (src/styles/tokens.css)
+  viewer-ground: "oklch(13% 0.006 55)"        # --viewer-bg
+  viewer-ink: "oklch(96% 0.006 70)"           # --viewer-ink
 typography:
   large-title:
     fontFamily: "ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', sans-serif"
@@ -179,6 +182,14 @@ components:
     textColor: "{colors.warm-ink}"
     rounded: "{rounded.group}"
     padding: "1rem"
+  photo-add-tile:
+    backgroundColor: "{colors.linen}"
+    textColor: "{colors.warm-ink-secondary}"
+    typography: "{typography.footnote}"
+    rounded: "{rounded.field}"
+  photo-viewer:
+    backgroundColor: "{colors.viewer-ground}"
+    textColor: "{colors.viewer-ink}"
 ---
 
 # Design System: Friend Tracker
@@ -224,6 +235,7 @@ Warm, paper-toned neutrals tinted toward peach, with a single soft peach accent 
 - **Warm Ink Secondary** (`--ink-2`, light `oklch(47% 0.014 50)`, dark `oklch(76% 0.012 60)`): subtitles, section labels, footers, trailing values, the stats comparison line, neutral reorder arrows. 6.2:1 on paper.
 - **Warm Ink Tertiary** (`--ink-3`, light `oklch(52% 0.012 50)`, dark `oklch(67% 0.012 60)`): placeholders, chevrons, inactive tabs, month initials. Still 5.0:1 on paper and 4.6:1 on Linen, so it passes AA as text.
 - **Scrim** (`--scrim`, light `oklch(22% 0.02 45 / 0.32)`, dark `oklch(8% 0.01 45 / 0.55)`): dims the page behind sheets and action sheets.
+- **Viewer Ground** (`--viewer-bg`, `oklch(13% 0.006 55)` in both themes) with **Viewer Ink** (`--viewer-ink`, `oklch(96% 0.006 70)`, about 18:1) and **Viewer Pressed** (`--viewer-pressed`, white at 14%): the photo viewer only. It is the one near-black ground in the app (see the One Dark Room Rule).
 
 ### Destructive
 - **Danger Red** (`--danger`, light `oklch(55% 0.19 27)`, dark `oklch(70% 0.17 25)`): destructive action-sheet buttons ("Delete friend", "Discard changes", "Replace all data"), destructive rows, and form field errors. Nothing else.
@@ -238,6 +250,8 @@ Six soft pastel pairs (`.tint-0` to `.tint-5`, hues 50, 85, 145, 215, 285, 350),
 
 **The No Alarm Rule.** No red, orange, or warning colors for "haven't seen in a while". Time since is plain Warm Ink Secondary text. Danger Red is reserved for destructive actions only.
 
+**The One Dark Room Rule.** Only the photo viewer sits on the near-black Viewer Ground, in both themes, so photos look true and nothing competes with them. Everything else, dark mode included, stays on warm paper.
+
 ## 3. Typography
 
 **Display Font:** SF Pro Rounded (with ui-rounded first, then the system font; also used for numerals)
@@ -247,7 +261,7 @@ Six soft pastel pairs (`.tint-0` to `.tint-5`, hues 50, 85, 145, 215, 285, 350),
 
 ### Hierarchy
 - **Large Title** (rounded, 700, 2rem, line-height 1.15): the page title on Friends, Stats, Settings, Groups, and Meetup types. Wraps (never truncates) and shares the 16px left edge with the content below.
-- **Title** (rounded, 700, 1.5rem, line-height 1.2): the friend's name in the detail hero and the Stats year. The Stats summary sentence ("4 meetups with 4 friends.") uses it at 600 with `text-wrap: balance`.
+- **Title** (rounded, 700, 1.5rem, line-height 1.2): the friend's name in the detail hero, the meetup type on the Meetup page, and the Stats year. The Stats summary sentence ("4 meetups with 4 friends.") uses it at 600 with `text-wrap: balance`.
 - **Title 3** (rounded, 600, 1.18rem): empty-state headlines (balanced, max 22ch). The "+ Log meetup" pill uses rounded 600 at 1.06rem.
 - **Body** (SF Pro, 400, 1rem, line-height 1.35): row titles, fields, buttons (600), sheet titles (600). Prose blocks (notes, About your data) cap at 65ch.
 - **Subhead** (0.88rem): row subtitles, chips, the "Last seen" pill, hint and note text (line-height 1.45 for multi-line help).
@@ -255,7 +269,7 @@ Six soft pastel pairs (`.tint-0` to `.tint-5`, hues 50, 85, 145, 215, 285, 350),
 - **Caption** (0.7rem): tab bar labels (500, capped at 13px), the "this year" label under counts, the "Upcoming" badge (600), month initials (capped at 18px).
 
 ### Named Rules
-**The Dynamic Type Rule.** The root font is `-apple-system-body`, so 1rem follows the iPhone text-size setting; every type size and spacing step is in rem. Layouts must survive the largest standard size (about 23px body): rows grow taller, subtitles wrap, the stat row stays three across up to about 28px and stacks beyond, the "+ Log meetup" pill stays on one line. The only fixed-pixel exceptions are avatars, icons (except the Log pill's plus, which is 1.15em), tab labels (capped at 13px), month initials (capped at 18px), input text (never below 16px, so iOS doesn't zoom), and the lock screen's keypad and the Settings switches (listed under "Lock screen and PIN pad").
+**The Dynamic Type Rule.** The root font is `-apple-system-body`, so 1rem follows the iPhone text-size setting; every type size and spacing step is in rem. Layouts must survive the largest standard size (about 23px body): rows grow taller, subtitles wrap, the stat row stays three across up to about 28px and stacks beyond, the "+ Log meetup" pill stays on one line. The only fixed-pixel exceptions are avatars, the Meetup page's emoji badge (96px with a 48px emoji), the history thumbnail (40px) and the remove button's glyph on photos (24px), icons (except the Log pill's plus, which is 1.15em), tab labels (capped at 13px), month initials (capped at 18px), input text (never below 16px, so iOS doesn't zoom), and the lock screen's keypad and the Settings switches (listed under "Lock screen and PIN pad").
 
 **The Rounded Numbers Rule.** Counts and years use the `.numeric` treatment: the rounded face with tabular numerals, so columns of numbers line up.
 
@@ -290,8 +304,8 @@ The thumb-reachable primary action on Friends and friend detail. Peach fill, On-
 ### Chips
 - **Style:** Linen pill, 36px tall with an invisible extension to a 44px hit area, `0 14px` padding, Subhead 500 text, no wrapping inside a chip (except the wrapping variant below).
 - **Selected:** Peach fill with On-Peach text, announced with `aria-pressed`. Selected-friend tokens in the log sheet use the same look with a 24px avatar and a close glyph.
-- **Wrapping (`.chip--wrap`):** for user-entered items, such as a friend's likes and dislikes. Long text wraps inside the chip instead of overflowing. It keeps the 36px minimum height with `6px 14px` padding, is capped at the full width, and has `1.2em` corners: a pill on one line, a soft rounded box when the text wraps.
-- **Layouts:** a horizontally scrolling row that bleeds to the screen edges for filters and meetup types; a wrapping cluster for group pickers, dates, and a friend's likes and dislikes.
+- **Wrapping (`.chip--wrap`):** for user-entered items, such as a friend's likes and dislikes and a meetup's activities. Long text wraps inside the chip instead of overflowing. It keeps the 36px minimum height with `6px 14px` padding, is capped at the full width, and has `1.2em` corners: a pill on one line, a soft rounded box when the text wraps.
+- **Layouts:** a horizontally scrolling row that bleeds to the screen edges for filters and meetup types; a wrapping cluster for group pickers, dates, a friend's likes and dislikes, and a meetup's activities.
 
 ### Inset groups and rows
 - **Container:** Paper White, 14px corners, no shadow, no border. A Footnote section label sits above (inset 16px from the group edge, aligned with row text) and an optional footer below.
@@ -310,6 +324,11 @@ The thumb-reachable primary action on Friends and friend detail. Peach fill, On-
 ### Bottom sheets
 Used for adding or editing a friend, logging a meetup, and editing groups and types. Warm Paper with 22px top corners and the Float shadow, rising over 340ms with ease-out-expo, draggable to dismiss from its header. Header: a 36×5px Soft Rule grabber, then a three-column bar with Cancel (text button), a centered Body 600 title, and an optional trailing action. Body: 16px side padding, sections 1.5rem apart. Footer: a hairline-topped bar holding the block primary button above the safe area. Cancelling with unsaved changes asks first through an action sheet.
 
+### Meetup sheet: Activities and Photos
+Two sections between **When** and **Note** in the Log and Edit meetup sheet. Both hold their changes until Save, so Cancel (after "Discard changes?") throws them away.
+- **Activities:** a wrapping cluster of chips (the wrapping variant): activities used before, most used first, then the starters (Board games, Karaoke, Movie, Walk, Concert, Shopping, Cooking, Sports, Beach, Museum). Twelve show at first and a "More" chip shows the rest; an activity already on the meetup always shows. Selected chips are Peach, announced with `aria-pressed`, and a chip tapped off stays where it is until the sheet closes. The cluster ends with "+ New", which puts a Paper White field and a secondary **Add** button on their own line under the chips, like the friend sheet's New group; adding selects it. "A meetup can have up to 20 activities." is a Footnote Warm Ink Secondary hint, never red.
+- **Photos:** a 3-across grid of square thumbnails (12px corners, 8px gaps), shared with the Meetup page. Each has a remove button ("Remove photo 2"): a 44px hit area in the corner around a 24px Warm Ink circle with a Warm Paper cross and a 1.5px Warm Paper ring that keeps it visible on any photo. The grid ends with the **Add photos** tile: Linen with a 1.5px dashed Warm Ink Tertiary outline (an empty slot, not a container), a 26px camera-plus icon, and a Footnote 600 Warm Ink Secondary label that reads "Adding 2 of 5…" while photos are resized. Hints under the grid, never red: "A meetup can have up to 20 photos." and "1 photo couldn't be added.".
+
 ### Action sheets and confirms
 iOS-style stacks pinned to the bottom with 8px margins: a Paper White group (14px corners) with an optional centered Footnote 600 title and message, 56px buttons in Terracotta Ink at 1.1rem divided by hairlines, then a separate Cancel group in 600. Destructive buttons use Danger Red. The sort chooser is a `dialog`; destructive confirms are an `alertdialog`.
 
@@ -318,7 +337,7 @@ The one happy moment. An inverted pill (Warm Ink background, Warm Paper text, Fl
 
 ### Navigation
 - **Nav bar:** sticky, 44px plus the safe area, solid Warm Paper. Back and actions in Terracotta Ink. When the large title scrolls away, a centered Body 600 title fades in and a 0.5px Soft Rule appears underneath.
-- **Tab bar:** fixed, Paper White, 50px plus the safe area, hairline on top. Three tabs (Friends, Stats, Settings) with 26px line icons over Caption labels: Warm Ink Tertiary at rest, Terracotta Ink with a heavier stroke and 600 label when current.
+- **Tab bar:** fixed, Paper White, 50px plus the safe area, hairline on top. Three tabs (Friends, Stats, Settings) with 26px line icons over Caption labels: Warm Ink Tertiary at rest, Terracotta Ink with a heavier stroke and 600 label when current. A friend's page and a Meetup page belong to Friends, unless they were opened from Stats, which then stays current.
 
 ### Avatars
 Circles. Initials in the rounded face (600, 40% of the size) on a per-friend pastel tint, or a cropped photo. Sizes: 44px in rows, 52px in the recent-friends grid, 96px in the detail hero, 24 to 28px inside chips.
@@ -327,6 +346,16 @@ Circles. Initials in the rounded face (600, 40% of the size) on a per-friend pas
 Reads as one calm column, not a grid of cards: centered 96px avatar, Title name, group in Warm Ink Secondary, then a Paper White "Last seen" pill (Subhead, 1em corners so it becomes a soft box if large text wraps it between the date and the time since). Below: the notes, then **Birthday**, **Likes** and **Dislikes** (people before numbers), then the stat row, "Month by month", and the history grouped by month.
 - **Birthday:** always shown. With a birthday, one inset row: a 🎂 emoji badge leading, the date as the title ("March 14, 1996", or "March 14" without a year), the countdown as the subtitle ("In 12 days · turns 31", "Tomorrow", "Today"), and a chevron. Tapping it opens the Edit friend sheet. Without one, a "+ Add birthday" chip opens the same sheet. Plain facts: no color, badge or reminder copy.
 - **Likes and Dislikes:** each a section with a Footnote label over a wrapping cluster of item chips (the wrapping variant) on the page background, with no container. The cluster ends with a "+ Add" chip; tapping it puts a Paper White field and a secondary **Add** button in its place (one field open at a time). Notes under the field ("Already in Likes.", "This list is full.") are Footnote Warm Ink Secondary with `role="alert"`, never red. Tapping an item opens an action sheet titled with it: **Move to Dislikes** (or **Move to Likes**) and a destructive **Remove**, which an Undo toast reverses. An empty list shows only the "+ Add" chip.
+- **History:** rows grouped by month, each with the type's emoji badge, the type (and "Upcoming"), and a subtitle of the date, "with" the others, the activities and the note. A meetup with photos ends its row with its first photo, a 40px thumbnail with 8px corners, before the chevron. Tapping a row opens the Meetup page.
+
+### Meetup page
+The memory view of one meetup, pushed like a friend's page. Nav bar: back ("Back", or the friend's name when opened from their history) and **Edit**, which opens the Edit meetup sheet.
+- **Hero:** centered: the type's emoji in a 96px Linen circle (a 48px emoji), the type name in Title, the date in Warm Ink Secondary with the "Upcoming" badge for a future date, then a Footnote "With" label over the friends as person chips (a 28px avatar and the name in a Paper White pill) that open the friend.
+- **Then, each hidden when empty:** **Activities** as read-only chips (the chip look without a press state), **Note** as Body text in a Paper White box with 14px corners, and **Photos** in the 3-across grid; a thumbnail opens the photo viewer.
+- When the meetup is deleted from the sheet, the page goes back.
+
+### Photo viewer
+Full screen over everything, on the Viewer Ground with Viewer Ink controls: a Close button top left; the photo fit between the bars, letterboxed, with no zoom; and Previous, "2 of 5" (rounded, tabular) and Next along the bottom, all 44px. A sideways swipe or the arrow keys change photos: the next one slides 32px and fades in over 220ms (with Reduce Motion it only fades). Previous and Next dim to 35% at the ends. Escape closes it. It is a modal dialog named "Photo 2 of 5", the image's alt names the photo, the type and the date ("Photo 2 of 5, Coffee, Sat, Sep 12"), focus stays inside, and closing puts focus back on the photo's thumbnail.
 
 ### Birthdays soon
 An inset group titled "Birthdays soon" at the top of the Friends tab, above the search field, listing friends whose birthday is today or in the next 14 days, soonest first. Each row is a link with the 44px avatar, the name and the countdown ("Today · turns 31", "Tomorrow", "In 5 days"), like the friend rows below it. At most 3 rows; the footer counts the rest ("And 3 more in the next two weeks."). The group is hidden when no birthday is that close, while searching, and while a group filter is on, so the list below stays a plain filtered list.
@@ -372,7 +401,7 @@ Shown instead of the app, never over it, when the app lock is on and the app has
 - **Don't** add guilt-trip streaks: no Duolingo-style pressure, red alerts, overdue badges, or "you're losing touch!" shaming.
 - **Don't** feel like a social media feed: nothing busy, noisy, attention-grabbing, or endlessly scrolling.
 - **Don't** look like a generic template app: no purple gradients, identical card grids, gradient text, or glassmorphism.
-- **Don't** use colored side-stripe borders on rows or cards, or any border thicker than a 0.5px hairline.
+- **Don't** use colored side-stripe borders on rows or cards, or any border thicker than a 0.5px hairline. (Two small exceptions: the Add photos tile's 1.5px dashed outline, which marks an empty slot, and the 1.5px Warm Paper ring that keeps a photo's remove button visible.)
 - **Don't** put a shadow on anything that rests on the page; Float is for the sheet, the Log pill, and the toast only.
 - **Don't** use Danger Red, orange, or any warning color for anything except a destructive action.
 - **Don't** set peach text on paper; use Terracotta Ink.

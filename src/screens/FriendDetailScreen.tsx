@@ -8,7 +8,7 @@ import { LogButton } from '../components/LogButton'
 import { MonthBars } from '../components/MonthBars'
 import { Page, type NavState } from '../components/Page'
 import { StatRow } from '../components/StatRow'
-import { useFriend, useFriends, useGroups, useMeetups, useMeetupTypes } from '../data/hooks'
+import { useFirstPhotoThumb, useFriend, useFriends, useGroups, useMeetups, useMeetupTypes } from '../data/hooks'
 import { useToday } from '../hooks/useToday'
 import { describeNextBirthday, formatBirthday } from '../lib/birthdays'
 import { daysBetween, formatDate, formatMonthYear, yearOf } from '../lib/dates'
@@ -19,6 +19,12 @@ import { groupByMonth } from '../stats/history'
 import { lastSeenByFriend } from '../stats/lastSeen'
 import { FriendPreferences } from './FriendPreferences'
 import './FriendDetailScreen.css'
+
+/** A history row's picture: the meetup's first photo, when it has any. Each row reads only that thumbnail. */
+function HistoryThumb({ meetupId }: { meetupId: string }) {
+  const thumb = useFirstPhotoThumb(meetupId)
+  return thumb ? <img className="history-thumb" src={thumb} alt="" /> : null
+}
 
 export function FriendDetailScreen() {
   const { id } = useParams()
@@ -156,10 +162,12 @@ export function FriendDetailScreen() {
                     subtitle={[
                       formatDate(meetup.date, today),
                       others.length > 0 ? `with ${formatNameList(others)}` : null,
+                      meetup.activities.length > 0 ? meetup.activities.join(', ') : null,
                       meetup.note || null,
                     ]
                       .filter(Boolean)
                       .join(' · ')}
+                    trailing={<HistoryThumb meetupId={meetup.id} />}
                     chevron
                   />
                 )

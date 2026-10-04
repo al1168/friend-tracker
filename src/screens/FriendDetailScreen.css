@@ -38,3 +38,12 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* The first photo of a meetup, at the end of its history row. */
+.history-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  object-fit: cover;
+}

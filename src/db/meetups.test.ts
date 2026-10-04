@@ -5,6 +5,7 @@ import { addFriend, deleteFriend } from './friends'
 import {
   addMeetup,
   deleteMeetup,
+  firstPhotoThumb,
   photoCount,
   restoreMeetup,
   updateMeetup,
@@ -182,6 +183,15 @@ describe('photos saved with a meetup', () => {
     expect(Object.isFrozen(NO_PHOTO_CHANGES.add)).toBe(true)
     expect(Object.isFrozen(NO_PHOTO_CHANGES.removeIds)).toBe(true)
     expect(Object.isFrozen(NO_PHOTO_CHANGES.order)).toBe(true)
+  })
+
+  it('finds the first photo’s thumbnail, or none', async () => {
+    const meetup = await addMeetup(base, { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: ['b', 'a'] })
+    const other = await addMeetup(base)
+    expect(await firstPhotoThumb(meetup.id)).toBe('data:image/jpeg;base64,THUMBb')
+    await updateMeetup(meetup.id, base, { add: [], removeIds: ['b'], order: ['a'] })
+    expect(await firstPhotoThumb(meetup.id)).toBe('data:image/jpeg;base64,THUMBa')
+    expect(await firstPhotoThumb(other.id)).toBeNull()
   })
 
   it('counts every stored photo', async () => {
