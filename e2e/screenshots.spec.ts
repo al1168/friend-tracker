@@ -10,6 +10,7 @@ import {
   seedAppLock,
   setBirthday,
   stubFaceId,
+  stubPush,
 } from './helpers.ts'
 
 const DIR = 'e2e/screenshots'
@@ -86,6 +87,18 @@ async function captureAll(page: Page, prefix: string) {
   await page.screenshot({ path: `${DIR}/${prefix}-07-settings.png` })
 }
 
+/** Settings with birthday reminders just turned on, as in the Home Screen app (push is faked). */
+async function captureReminders(page: Page, prefix: string, largeText = false) {
+  await stubPush(page)
+  await page.route('**/__reminders', (route) => route.fulfill({ status: 204 }))
+  await page.goto('/#/settings')
+  if (largeText) await page.addStyleTag({ content: LARGE_TEXT })
+  await page.getByRole('switch', { name: 'Birthday reminders' }).click()
+  await expect(page.getByRole('status')).toContainText('Birthday reminders are on')
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-11-reminders-on.png` })
+}
+
 async function captureLock(page: Page, prefix: string, largeText = false, faceId = false) {
   await page.goto('/')
   // The Face ID button shows whenever a passkey id is stored, so seeding one is enough.
@@ -116,6 +129,10 @@ for (const scheme of ['light', 'dark'] as const) {
     test('lock screen', async ({ page }) => {
       await captureLock(page, scheme)
     })
+
+    test('reminders on', async ({ page }) => {
+      await captureReminders(page, scheme)
+    })
   })
 }
 
@@ -124,6 +141,10 @@ test('large text', async ({ page }) => {
   await seed(page)
   await page.addStyleTag({ content: LARGE_TEXT })
   await captureAll(page, 'large-text')
+})
+
+test('large text reminders on', async ({ page }) => {
+  await captureReminders(page, 'large-text', true)
 })
 
 test('large text lock screen', async ({ page }) => {

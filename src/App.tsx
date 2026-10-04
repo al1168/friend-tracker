@@ -3,6 +3,7 @@ import { ActionSheetProvider } from './components/ActionSheet'
 import { ScrollManager } from './components/ScrollManager'
 import { TabBar } from './components/TabBar'
 import { ToastProvider } from './components/Toast'
+import { ReminderSync } from './reminders/useReminderSync'
 import { FriendDetailScreen } from './screens/FriendDetailScreen'
 import { FriendsScreen } from './screens/FriendsScreen'
 import { GroupsScreen } from './screens/GroupsScreen'
@@ -18,6 +19,7 @@ export default function App() {
         <ActionSheetProvider>
           <SheetsProvider>
             <ScrollManager />
+            <ReminderSync />
             <main className="app">
               <Routes>
                 <Route path="/" element={<FriendsScreen />} />

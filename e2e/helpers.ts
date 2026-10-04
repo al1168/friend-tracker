@@ -245,3 +245,76 @@ export async function turnOnAppLock(page: Page, pin: string) {
   await expect(sheet).toBeHidden()
   await expect(page.getByRole('button', { name: 'Change PIN' })).toBeVisible()
 }
+
+/** The push subscription `stubPush` hands out: an Apple endpoint and keys of the right sizes. */
+export const FAKE_SUBSCRIPTION = {
+  endpoint: 'https://web.push.apple.com/QGuQyavXutnMH-e2e',
+  keys: { p256dh: `B${'A'.repeat(86)}`, auth: 'A'.repeat(22) },
+}
+
+/** Where `stubPush` keeps the subscription, so it survives reloads. Remove it to play iOS dropping it. */
+export const FAKE_SUBSCRIPTION_KEY = 'e2e:push-subscription'
+
+/**
+ * Makes every later page load look like the installed Home Screen app with Web Push:
+ * `navigator.standalone`, a Notification whose permission prompt answers `answer`, and a service
+ * worker registration whose PushManager hands out FAKE_SUBSCRIPTION. (Real service workers are
+ * blocked in these tests.)
+ */
+export async function stubPush(page: Page, { answer = 'granted' }: { answer?: NotificationPermission } = {}) {
+  await page.addInitScript(
+    ({ answer, subscription, storeKey }) => {
+      const permissionKey = 'e2e:notification-permission'
+      Object.defineProperty(navigator, 'standalone', { configurable: true, value: true })
+      class FakeNotification {
+        static get permission() {
+          return localStorage.getItem(permissionKey) ?? 'default'
+        }
+        static async requestPermission() {
+          localStorage.setItem(permissionKey, answer)
+          return answer
+        }
+      }
+      Object.defineProperty(window, 'Notification', { configurable: true, writable: true, value: FakeNotification })
+      function FakePushManager() {}
+      Object.defineProperty(window, 'PushManager', { configurable: true, writable: true, value: FakePushManager })
+      // The subscription is stored as its application server key (base64), so a test can see which key made it.
+      const subscriptionFor = (key: string) => ({
+        endpoint: subscription.endpoint,
+        expirationTime: null,
+        options: {
+          userVisibleOnly: true,
+          applicationServerKey: Uint8Array.from(atob(key), (char) => char.charCodeAt(0)).buffer,
+        },
+        toJSON: () => ({ endpoint: subscription.endpoint, expirationTime: null, keys: subscription.keys }),
+        unsubscribe: async () => {
+          localStorage.removeItem(storeKey)
+          return true
+        },
+      })
+      const pushManager = {
+        getSubscription: async () => {
+          const key = localStorage.getItem(storeKey)
+          return key === null ? null : subscriptionFor(key)
+        },
+        subscribe: async ({ applicationServerKey }: { applicationServerKey: Uint8Array }) => {
+          const key = btoa(String.fromCharCode(...new Uint8Array(applicationServerKey)))
+          localStorage.setItem(storeKey, key)
+          return subscriptionFor(key)
+        },
+      }
+      const registration = { pushManager }
+      Object.defineProperty(navigator, 'serviceWorker', {
+        configurable: true,
+        value: {
+          ready: Promise.resolve(registration),
+          register: async () => registration,
+          controller: null,
+          addEventListener() {},
+          removeEventListener() {},
+        },
+      })
+    },
+    { answer, subscription: FAKE_SUBSCRIPTION, storeKey: FAKE_SUBSCRIPTION_KEY },
+  )
+}

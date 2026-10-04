@@ -6,6 +6,7 @@ import { addGroup } from '../db/groups'
 import { addMeetup } from '../db/meetups'
 import { addPreferences } from '../db/preferences'
 import type { AppLock, LockFailures } from '../lock/types'
+import type { BirthdayReminders } from '../reminders/types'
 import { friend, meetupType } from '../test/fixtures'
 import { createBackup, type BackupData } from './format'
 import { parseBackupFile, readAllData, replaceAllData } from './storage'
@@ -68,6 +69,22 @@ describe('backup storage', () => {
 
     expect(await getSetting('appLock')).toEqual(appLock)
     expect(await getSetting('appLockFailures')).toEqual(appLockFailures)
+  })
+
+  it('keeps the reminder settings, which a backup never carries', async () => {
+    const birthdayReminders: BirthdayReminders = {
+      enabled: true,
+      lastSyncedHash: 'hash',
+      lastSyncedAt: '2026-10-03T12:00:00.000Z',
+      lastError: null,
+    }
+    await setSetting('birthdayReminders', birthdayReminders)
+
+    const file = createBackup(await readAllData(), new Date('2026-10-03T12:00:00.000Z'))
+    expect(JSON.stringify(file)).not.toContain('birthdayReminders')
+    await replaceAllData({ friends: [friend('f1', 'Alex')], groups: [], meetupTypes: [], meetups: [] })
+
+    expect(await getSetting('birthdayReminders')).toEqual(birthdayReminders)
   })
 
   it('reports a file that is not JSON', async () => {

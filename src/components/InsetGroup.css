@@ -62,8 +62,17 @@
   cursor: pointer;
   transition: background-color var(--dur-fast);
 }
-.row--interactive:active {
+.row--interactive:active:not(:disabled) {
   background: var(--surface-pressed);
+}
+.row:disabled {
+  cursor: default;
+}
+.row:disabled .row__title {
+  color: var(--ink-2);
+}
+.row:disabled .switch {
+  opacity: 0.45;
 }
 .row__leading {
   flex: none;

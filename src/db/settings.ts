@@ -1,4 +1,5 @@
 import { LOCK_OFF, NO_FAILURES, type AppLock, type LockFailures } from '../lock/types'
+import { REMINDERS_OFF, type BirthdayReminders } from '../reminders/types'
 import { db } from './db'
 
 export interface Settings {
@@ -6,6 +7,7 @@ export interface Settings {
   installHintDismissed: boolean
   appLock: AppLock
   appLockFailures: LockFailures
+  birthdayReminders: BirthdayReminders
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -13,6 +15,7 @@ export const DEFAULT_SETTINGS: Settings = {
   installHintDismissed: false,
   appLock: LOCK_OFF,
   appLockFailures: NO_FAILURES,
+  birthdayReminders: REMINDERS_OFF,
 }
 
 export async function getSetting<K extends keyof Settings>(key: K): Promise<Settings[K]> {

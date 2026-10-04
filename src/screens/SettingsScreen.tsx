@@ -10,6 +10,7 @@ import { useToday } from '../hooks/useToday'
 import { describeLastBackup, plural } from '../lib/text'
 import { AppLockSection } from '../lock/AppLockSection'
 import { usePasskeyAvailable } from '../lock/usePasskeyAvailable'
+import { RemindersSection } from '../reminders/RemindersSection'
 import './SettingsScreen.css'
 
 export function SettingsScreen() {
@@ -19,6 +20,7 @@ export function SettingsScreen() {
   const meetups = useMeetups()
   const lastBackupAt = useSetting('lastBackupAt')
   const appLock = useSetting('appLock')
+  const birthdayReminders = useSetting('birthdayReminders')
   const passkeyAvailable = usePasskeyAvailable()
   const today = useToday()
   const toast = useToast()
@@ -28,7 +30,7 @@ export function SettingsScreen() {
   const [importError, setImportError] = useState<{ message: string; n: number } | null>(null)
 
   if (!friends || !groups || !meetupTypes || !meetups || lastBackupAt === undefined) return null
-  if (appLock === undefined || passkeyAvailable === undefined) return null
+  if (appLock === undefined || passkeyAvailable === undefined || birthdayReminders === undefined) return null
 
   // Uses data that's already loaded, so the iOS share sheet opens straight from the tap.
   const exportData = async () => {
@@ -77,6 +79,8 @@ export function SettingsScreen() {
         <Row to="/settings/types" title="Meetup types" trailing={meetupTypes.length} chevron />
       </InsetGroup>
 
+      <RemindersSection reminders={birthdayReminders} />
+
       <InsetGroup title="Backup" footer={describeLastBackup(lastBackupAt, today)}>
         <Row title="Export backup" accent onClick={exportData} />
         <Row title="Import backup" accent onClick={() => fileInput.current?.click()} />
@@ -100,9 +104,9 @@ export function SettingsScreen() {
 
       <InsetGroup title="About your data">
         <p className="about-text">
-          Everything you add stays on this iPhone. Nothing is sent anywhere. Open the app from its Home Screen icon:
-          anything added in a Safari tab is kept separately. Export a backup now and then so you can restore it on a
-          new phone.
+          Everything you add stays on this iPhone. Nothing is sent anywhere, except the times for birthday reminders
+          when they're on (never names). Open the app from its Home Screen icon: anything added in a Safari tab is kept
+          separately. Export a backup now and then so you can restore it on a new phone.
         </p>
       </InsetGroup>
     </Page>

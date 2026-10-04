@@ -53,6 +53,8 @@ interface RowProps {
   onClick?: () => void
   /** Makes the row an on/off switch (a button with role "switch") showing a switch on the right. */
   switchOn?: boolean
+  /** Dims a button row and makes it unpressable (the group's footer says why). */
+  disabled?: boolean
   chevron?: boolean
   accent?: boolean
   destructive?: boolean
@@ -67,6 +69,7 @@ export function Row({
   state,
   onClick,
   switchOn,
+  disabled,
   chevron,
   accent,
   destructive,
@@ -110,6 +113,7 @@ export function Row({
         type="button"
         className={className}
         onClick={onClick}
+        disabled={disabled}
         role={switchOn === undefined ? undefined : 'switch'}
         aria-checked={switchOn}
       >
