@@ -176,3 +176,22 @@ Use Vitest with a fake storage and a fake `fetch`.
 - the existing PWA tests still pass with the `injectManifest` service worker. Service workers are blocked in e2e, so keep the existing build and precache checks.
 
 **On device:** the test notification arrives, and a reminder set a few minutes ahead arrives. A temporary test mode is not shipped; use "Send a test notification" plus one real birthday set for tomorrow.
+
+## Decisions made while planning
+
+Recorded in [the plan](../plans/2026-10-03-birthday-reminders.md):
+
+- **The test RPC is `sendTest()`, not `test()`.** `test` is the name of a Workers handler, so it can't be an RPC method. The endpoint stays `POST /__reminders/test`.
+- **Routes.** `functions/__reminders.ts` serves `/__reminders` and `functions/__reminders/test.ts` serves `/__reminders/test`; both call `handleReminders` in `server/reminders.ts`, which answers 405 for other methods.
+- **Test answers.** `sendTest()` returns `sent`, `no-subscription`, `gone` or `failed`, sent on as 204, 409, 410 or 502. On 409 the app sends the schedule again and retries once; on 410 reminders stop ("Reminders stopped. Turn them on again."). Toasts: "Test notification sent", or "Couldn't send a test notification. Please try again.".
+- **Validation.** `at` is a whole number of ms from a day ago to 732 days ahead. `p256dh` is 65 bytes and `auth` 16 bytes of base64url. The endpoint is at most 1,024 characters with no user name, password or port, and the body at most 200,000 characters. Only `endpoint`, `keys.p256dh`, `keys.auth`, `at` and `friendId` are passed on. A Worker failure gives 502.
+- **The Durable Object's logic** is a plain `Schedule` class over the storage's key-value methods, tested in plain Vitest. Calls run one at a time. A push with no answer in 15 seconds, or any status other than 2xx, 404 or 410, is retried like a 429 or 5xx; a reminder more than 30 minutes late is dropped without sending.
+- **The push library** is `@block65/webcrypto-web-push` 2.0.0, pinned (current, small, WebCrypto only, `aes128gcm` with the `vapid` scheme). The secret stays a JWK; the Worker refuses one that isn't the pair of `VAPID_PUBLIC_KEY`. No `nodejs_compat`.
+- **Notifications.** Several friends after midnight: "🎂 Alex and Sam: birthdays today". The test notification uses the tag `reminders-test` and opens Settings. Friend ids in links are URI-encoded, a tap opens only pages on this site, and the service worker gives the database 5 seconds before it shows the fallback.
+- **Reminders.** With a known birth year there's no reminder for the day they were born. With more than 1,000, the soonest 1,000 are sent. The hash is SHA-256 over the endpoint, both keys and every reminder.
+- **`lastError`** is `"sync"`, `"revoked"` or `"delete"`. `"delete"`: off, but the server's schedule wasn't deleted yet; the app retries when it opens or comes back. `"revoked"` also covers notifications turned off in the iPhone's Settings and a subscription made with another key.
+- **Settings.** The Reminders group sits right after Organize. A switch that can't be used is disabled and dimmed. A dismissed permission prompt counts as a failure. Turning off shows "Birthday reminders are off". Each row ignores taps while it works and for 300 ms after.
+- **Honest copy.** "About your data" now says the times for birthday reminders are sent when they're on (never names). The README adds a "One iPhone" limit and notes that each time gives away a date, but not whose birthday it is.
+- **Build.** The service worker stays one classic script, type-checked by `tsconfig.sw.json` with the WebWorker library. The Worker's tests run in the root `npm test`. Wrangler isn't a dependency: the rollout runs the pinned `npx --yes wrangler@4.147.0`.
+- **Keys.** The committed public key starts as a marked placeholder that the rollout replaces. `scripts/make-vapid-keys.ts` writes the private key only to a new file outside the repo, or into a pipe.
+- **verify-live** checks a signed-out `PUT /__reminders` (401) and, signed in, that an empty schedule gets 400, which proves the binding without changing the schedule.

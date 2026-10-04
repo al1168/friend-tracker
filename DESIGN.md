@@ -255,7 +255,7 @@ Six soft pastel pairs (`.tint-0` to `.tint-5`, hues 50, 85, 145, 215, 285, 350),
 - **Caption** (0.7rem): tab bar labels (500, capped at 13px), the "this year" label under counts, the "Upcoming" badge (600), month initials (capped at 18px).
 
 ### Named Rules
-**The Dynamic Type Rule.** The root font is `-apple-system-body`, so 1rem follows the iPhone text-size setting; every type size and spacing step is in rem. Layouts must survive the largest standard size (about 23px body): rows grow taller, subtitles wrap, the stat row stays three across up to about 28px and stacks beyond, the "+ Log meetup" pill stays on one line. The only fixed-pixel exceptions are avatars, icons (except the Log pill's plus, which is 1.15em), tab labels (capped at 13px), month initials (capped at 18px), input text (never below 16px, so iOS doesn't zoom), and the lock screen's keypad and the Face ID switch (listed under "Lock screen and PIN pad").
+**The Dynamic Type Rule.** The root font is `-apple-system-body`, so 1rem follows the iPhone text-size setting; every type size and spacing step is in rem. Layouts must survive the largest standard size (about 23px body): rows grow taller, subtitles wrap, the stat row stays three across up to about 28px and stacks beyond, the "+ Log meetup" pill stays on one line. The only fixed-pixel exceptions are avatars, icons (except the Log pill's plus, which is 1.15em), tab labels (capped at 13px), month initials (capped at 18px), input text (never below 16px, so iOS doesn't zoom), and the lock screen's keypad and the Settings switches (listed under "Lock screen and PIN pad").
 
 **The Rounded Numbers Rule.** Counts and years use the `.numeric` treatment: the rounded face with tabular numerals, so columns of numbers line up.
 
@@ -298,6 +298,7 @@ The thumb-reachable primary action on Friends and friend detail. Peach fill, On-
 - **Row:** at least 52px tall, `0.5rem 1rem` padding, `0.75rem` gap. Leading slot is 44px wide (avatar or emoji badge); main text is a Body title with a Subhead Warm Ink Secondary subtitle, both wrapping; trailing values in Warm Ink Secondary; an 18px Warm Ink Tertiary chevron for navigation.
 - **Separators:** 0.5px Soft Rule hairlines, inset to the text edge (past the 44px leading slot when rows have one), never full-bleed.
 - **Press:** Linen Pressed background over 160ms. Accent rows use Terracotta Ink titles; destructive rows use Danger Red.
+- **Switch rows:** a button with `role="switch"` and the 51×31px switch at the end (Face ID, Birthday reminders). One that can't be used here is disabled: its title turns Warm Ink Secondary, the switch fades to 45%, it has no press state, and the group's footer says why.
 
 ### Inputs and fields
 - **Field:** Paper White on Warm Paper (inside sheets), 12px corners, 44px minimum height, `0.6rem 0.9rem` padding, no border. Labels are Footnote 600 Warm Ink Secondary above the field. Placeholders are Warm Ink Tertiary.
@@ -330,6 +331,10 @@ Reads as one calm column, not a grid of cards: centered 96px avatar, Title name,
 ### Birthdays soon
 An inset group titled "Birthdays soon" at the top of the Friends tab, above the search field, listing friends whose birthday is today or in the next 14 days, soonest first. Each row is a link with the 44px avatar, the name and the countdown ("Today · turns 31", "Tomorrow", "In 5 days"), like the friend rows below it. At most 3 rows; the footer counts the rest ("And 3 more in the next two weeks."). The group is hidden when no birthday is that close, while searching, and while a group filter is on, so the list below stays a plain filtered list.
 
+### Reminders group
+The "Reminders" inset group in Settings, right after Organize: a "Birthday reminders" switch row and, while it's on, a "Send a test notification" accent row. The footer says in plain words what the switch does, that it's on, or why it can't be used: "A notification at 11:55 PM the night before each birthday.", "On. You'll get a note at 11:55 PM the night before each birthday." (plus "Couldn't update reminders just now. The app will try again next time it opens." after a failed update), "Open Friend Tracker from your Home Screen to turn on reminders.", "Notifications are off for Friend Tracker. Turn them on in the iPhone's Settings app, under Notifications.", or "Reminders stopped. Turn them on again.". Toasts: "Birthday reminders are on" and "Test notification sent" with the check; "Birthday reminders are off", "Couldn't turn on reminders. Please try again." and "Couldn't send a test notification. Please try again." plain.
+- **The notification** is drawn by iOS: "🎂 Alex's birthday starts in 5 minutes" over "Send them a message.", one per night, naming everyone whose birthday it is ("🎂 Alex and Sam: birthdays at midnight"). Tapping it opens that friend, or the Friends tab for several. When the app can't tell who, it says "🎂 A birthday is coming up" and "Open Friend Tracker to see who.".
+
 ### Stat row
 One Paper White group (not three cards) with three centered items: a 1.6rem rounded numeral over a Footnote Warm Ink Secondary label. Wraps to one item per line only at accessibility text sizes.
 
@@ -345,7 +350,7 @@ Shown instead of the app, never over it, when the app lock is on and the app has
 - **Dots:** six 14px circles with a 1.5px Warm Ink Secondary ring, filled Warm Ink as digits go in. A wrong PIN clears them with one 400ms shake (none with Reduce Motion).
 - **Message line:** one reserved Subhead line under the dots in Warm Ink Secondary, never red: "Wrong PIN. Try again.", or the "Try again in 0:30" countdown (`role="timer"`) while PIN entry is paused.
 - **Keys:** Paper White circles, 72px (shrinking to no less than 64px on short screens, so large text still fits) with rounded tabular digits (capped at 34px), Linen Pressed on press, in a 3×4 grid: 1 to 9, a blank, 0, and a quiet delete glyph that appears once a digit is entered.
-- **Fixed pixel sizes (exceptions to the Dynamic Type Rule):** the keypad is a touch target and a fixed shape, so it does not grow with text size. The key size `clamp(64px, 10dvh, 72px)`, the 14px row and 24px column gaps between keys, the 14px dots, and the 51×31px Face ID switch in Settings stay in pixels. Everything around them (prompts, messages, buttons, the sheet's intro) follows the text size.
+- **Fixed pixel sizes (exceptions to the Dynamic Type Rule):** the keypad is a touch target and a fixed shape, so it does not grow with text size. The key size `clamp(64px, 10dvh, 72px)`, the 14px row and 24px column gaps between keys, the 14px dots, and the 51×31px switches in Settings (Face ID, Birthday reminders) stay in pixels. Everything around them (prompts, messages, buttons, the sheet's intro) follows the text size.
 - The same pad sits in the Turn on app lock, Change PIN, Turn off app lock and Reset PIN sheets, under a Title 3 prompt that takes focus when the step changes, so VoiceOver reads it once.
 - The website sign-in page (`server/loginPage.ts`) is a standalone copy of this look: the mark, a Title, a password field and a block primary button, in both themes.
 
