@@ -49,6 +49,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 async function noticeFor(payload: unknown, options: PushOptions, now: number): Promise<Notice> {
   if (pushKind(payload) === 'test') return TEST_NOTICE
   try {
+    // The worker uses the app's Dexie database, so a future schema upgrade (`version(n).upgrade`) or `populate` may run
+    // inside the service worker: migrations must not rely on `window` or `document`.
     const readFriends = options.readFriends ?? (() => db.friends.toArray())
     return birthdayNotice(await withTimeout(readFriends(), options.timeoutMs ?? READ_TIMEOUT_MS), now)
   } catch {
@@ -98,8 +100,12 @@ export function clickTarget(data: unknown, scope: string): string {
   const home = new URL('/#/', scope).href
   const url = typeof data === 'object' && data !== null ? (data as { url?: unknown }).url : undefined
   if (typeof url !== 'string') return home
-  const target = new URL(url, scope)
-  return target.origin === new URL(scope).origin ? target.href : home
+  try {
+    const target = new URL(url, scope)
+    return target.origin === new URL(scope).origin ? target.href : home
+  } catch {
+    return home
+  }
 }
 
 /** Brings an open window to the front and takes it to `url`, or opens the app there. */

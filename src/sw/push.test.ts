@@ -177,6 +177,10 @@ describe('clickTarget', () => {
       expect(clickTarget(data, SCOPE)).toBe('https://friend.example/#/')
     }
   })
+
+  it('goes to the Friends tab when the link cannot be parsed', () => {
+    expect(clickTarget({ url: 'https://[' }, SCOPE)).toBe('https://friend.example/#/')
+  })
 })
 
 describe('openApp', () => {

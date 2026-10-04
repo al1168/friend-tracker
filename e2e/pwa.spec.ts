@@ -1,3 +1,4 @@
+import vm from 'node:vm'
 import { expect, test } from '@playwright/test'
 
 test('ships a web app manifest and an iPhone icon', async ({ page, request }) => {
@@ -30,7 +31,10 @@ test('lists the app files for offline use in one classic script', async ({ reque
   expect(serviceWorker).toMatch(/"?url"?:"manifest\.webmanifest"/)
   expect(serviceWorker).toContain('self.skipWaiting()')
   // registerSW.js registers it as a classic script, so it must not use module syntax.
-  expect(serviceWorker).not.toMatch(/\bimport\s*[{*("'`]|\bexport\s*[{*]|import\.meta/)
+  // Parsing it as a classic script rejects any import or export statement, and import.meta.
+  expect(() => new vm.Script(serviceWorker)).not.toThrow()
+  // A service worker also forbids dynamic import().
+  expect(serviceWorker).not.toMatch(/\bimport\s*\(/)
 })
 
 test('shows birthday reminders from the service worker', async ({ request }) => {
