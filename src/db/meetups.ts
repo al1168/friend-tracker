@@ -21,14 +21,18 @@ export type NewPhoto = Pick<MeetupPhoto, 'id' | 'full' | 'thumb' | 'width' | 'he
 
 /** Photo changes saved together with a meetup, in the same transaction. */
 export interface PhotoChanges {
-  add: NewPhoto[]
+  add: readonly NewPhoto[]
   /** Photos of this meetup to delete. Ids of other meetups' photos are ignored. */
-  removeIds: string[]
+  removeIds: readonly string[]
   /** Photo ids in their new order. Photos left out keep their order after these. */
-  order: string[]
+  order: readonly string[]
 }
 
-export const NO_PHOTO_CHANGES: PhotoChanges = { add: [], removeIds: [], order: [] }
+export const NO_PHOTO_CHANGES: PhotoChanges = Object.freeze({
+  add: Object.freeze([]),
+  removeIds: Object.freeze([]),
+  order: Object.freeze([]),
+})
 
 export const PHOTO_NOT_SAVED = "A photo couldn't be saved."
 

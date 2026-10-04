@@ -102,7 +102,7 @@ The spec leaves these open. Task 8 records them at the end of the spec.
 
 **Files:**
 - Create: `src/lib/activities.ts`, `src/lib/activities.test.ts`
-- Modify: `src/types.ts` (the `Meetup` interface, a new `MeetupPhoto`), `src/db/db.ts` (version 3, meetups reading hook), `src/db/meetups.ts` (`MeetupInput.activities`, `clean`, `updateMeetup`), `src/test/fixtures.ts` (`meetup()`), `src/backup/format.ts` (meetups parse with `activities: []`), `src/sheets/MeetupSheet.tsx` (`save` passes the meetup's activities through)
+- Modify: `src/lib/preferences.ts` (exports `itemKey`), `src/types.ts` (the `Meetup` interface, a new `MeetupPhoto`), `src/db/db.ts` (version 3, meetups reading hook), `src/db/meetups.ts` (`MeetupInput.activities`, `clean`, `updateMeetup`), `src/test/fixtures.ts` (`meetup()`), `src/backup/format.ts` (meetups parse with `activities: []`), `src/sheets/MeetupSheet.tsx` (`save` passes the meetup's activities through)
 - Test: `src/db/db.test.ts`, `src/db/meetups.test.ts`, and the `addMeetup` inputs in `src/db/friends.test.ts`, `src/db/meetupTypes.test.ts`, `src/backup/storage.test.ts`
 
 - [ ] **Step 1: Write the failing tests for the activity rules**
@@ -253,6 +253,18 @@ export interface MeetupPhoto {
 }
 ```
 
+In `src/lib/preferences.ts`, replace:
+
+```ts
+function itemKey(item: string): string {
+```
+
+with:
+
+```ts
+export function itemKey(item: string): string {
+```
+
 Create `src/lib/activities.ts`:
 
 ```ts
@@ -261,7 +273,7 @@ Create `src/lib/activities.ts`:
 // 60 characters, and unique ignoring case.
 
 import type { Meetup } from '../types'
-import { cleanItem, indexOfItem, MAX_ITEM_LENGTH } from './preferences'
+import { cleanItem, indexOfItem, itemKey, MAX_ITEM_LENGTH } from './preferences'
 import { compareNames } from './text'
 
 /** The most activities one meetup can have. */
@@ -302,7 +314,7 @@ export function activitySuggestions(meetups: readonly Pick<Meetup, 'activities' 
     for (const activity of meetup.activities) {
       const name = cleanItem(activity)
       if (name === '') continue
-      const key = name.toLocaleLowerCase()
+      const key = itemKey(name)
       const entry = used.get(key)
       if (entry) entry.count += 1
       else used.set(key, { name, count: 1 })
@@ -371,6 +383,10 @@ describe('upgrade from version 2', () => {
       birthday: { month: 3, day: 14, year: null },
       createdAt: '2026-01-01T00:00:00.000Z',
     }
+    const v2Group = { id: 'g1', name: 'Work' }
+    const v2Type = { id: 'type-custom', name: 'Hike', emoji: 'x', order: 7 }
+    const v2Lock = { enabled: true, pin: null, passkeyId: null }
+    const v2Reminders = { enabled: true, lastSyncedHash: 'abc', lastSyncedAt: '2026-10-01T00:00:00.000Z', lastError: null }
     const v2Meetup = {
       id: 'm1',
       date: '2026-09-01',
@@ -388,6 +404,10 @@ describe('upgrade from version 2', () => {
     try {
       await v2.table('friends').add(v2Friend)
       await v2.table('meetups').add(v2Meetup)
+      await v2.table('groups').add(v2Group)
+      await v2.table('meetupTypes').add(v2Type)
+      await v2.table('settings').put({ key: 'appLock', value: v2Lock })
+      await v2.table('settings').put({ key: 'birthdayReminders', value: v2Reminders })
       await v2.table('settings').put({ key: 'lastBackupAt', value: '2026-10-02T10:00:00.000Z' })
     } finally {
       v2.close()
@@ -414,7 +434,11 @@ describe('upgrade from version 2', () => {
     // The stored meetup is untouched; the reading hook gives it activities.
     expect(await db.meetups.get('m1')).toEqual({ ...v2Meetup, activities: [] })
     expect(await db.friends.get('f1')).toEqual(v2Friend)
+    expect(await db.groups.get('g1')).toEqual(v2Group)
+    expect(await db.meetupTypes.get('type-custom')).toEqual(v2Type)
     expect(await getSetting('lastBackupAt')).toBe('2026-10-02T10:00:00.000Z')
+    expect(await getSetting('appLock')).toEqual(v2Lock)
+    expect(await getSetting('birthdayReminders')).toEqual(v2Reminders)
   })
 })
 
@@ -801,7 +825,7 @@ Expected: `94 passed`.
 - [ ] **Step 11: Commit**
 
 ```bash
-git add src/types.ts src/lib/activities.ts src/lib/activities.test.ts src/db/db.ts src/db/db.test.ts src/db/meetups.ts src/db/meetups.test.ts src/db/friends.test.ts src/db/meetupTypes.test.ts src/test/fixtures.ts src/backup/format.ts src/backup/storage.test.ts src/sheets/MeetupSheet.tsx
+git add src/types.ts src/lib/preferences.ts src/lib/activities.ts src/lib/activities.test.ts src/db/db.ts src/db/db.test.ts src/db/meetups.ts src/db/meetups.test.ts src/db/friends.test.ts src/db/meetupTypes.test.ts src/test/fixtures.ts src/backup/format.ts src/backup/storage.test.ts src/sheets/MeetupSheet.tsx
 git commit -F - <<'EOF'
 feat: meetup activities, suggestions, and the meetup photos table (Dexie version 3)
 
@@ -1001,6 +1025,7 @@ import {
   restoreMeetup,
   updateMeetup,
   type MeetupInput,
+  NO_PHOTO_CHANGES,
   type NewPhoto,
 } from './meetups'
 ```
@@ -1107,6 +1132,19 @@ describe('photos saved with a meetup', () => {
     expect(await db.meetupPhotos.count()).toBe(0)
   })
 
+  it('rolls everything back when one add repeats a photo id', async () => {
+    await expect(addMeetup(base, { add: [newPhoto('a'), newPhoto('a')], removeIds: [], order: [] })).rejects.toThrow()
+    expect(await db.meetups.count()).toBe(0)
+    expect(await db.meetupPhotos.count()).toBe(0)
+  })
+
+  it('shares one frozen "no changes" default', () => {
+    expect(Object.isFrozen(NO_PHOTO_CHANGES)).toBe(true)
+    expect(Object.isFrozen(NO_PHOTO_CHANGES.add)).toBe(true)
+    expect(Object.isFrozen(NO_PHOTO_CHANGES.removeIds)).toBe(true)
+    expect(Object.isFrozen(NO_PHOTO_CHANGES.order)).toBe(true)
+  })
+
   it('counts every stored photo', async () => {
     expect(await photoCount()).toBe(0)
     await addMeetup(base, { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: [] })
@@ -1146,6 +1184,30 @@ with:
     expect(await restoreMeetup(deleted!)).toBe(true)
     expect(await db.meetups.get(meetup.id)).toEqual(meetup)
     expect(await db.meetupPhotos.where('meetupId').equals(meetup.id).sortBy('order')).toEqual(before)
+  })
+
+  it('puts the photos back when only some friends are gone', async () => {
+    const alex = await addFriend(friendInput('Alex'))
+    const sam = await addFriend(friendInput('Sam'))
+    const meetup = await addMeetup(
+      { ...base, friendIds: [alex.id, sam.id] },
+      { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: [] },
+    )
+    const deleted = await deleteMeetup(meetup.id)
+    await deleteFriend(alex.id)
+    expect(await restoreMeetup(deleted!)).toBe(true)
+    expect((await db.meetups.get(meetup.id))?.friendIds).toEqual([sam.id])
+    expect(await photoIds(meetup.id)).toEqual(['a', 'b'])
+  })
+
+  it('puts nothing back when the type is gone', async () => {
+    const alex = await addFriend(friendInput('Alex'))
+    const meetup = await addMeetup({ ...base, friendIds: [alex.id] }, { add: [newPhoto('a')], removeIds: [], order: [] })
+    const deleted = await deleteMeetup(meetup.id)
+    await db.meetupTypes.delete(meetup.typeId)
+    expect(await restoreMeetup(deleted!)).toBe(false)
+    expect(await db.meetups.get(meetup.id)).toBeUndefined()
+    expect(await db.meetupPhotos.count()).toBe(0)
   })
 
   it('puts no photos back when the meetup cannot be restored', async () => {
@@ -1387,14 +1449,18 @@ export type NewPhoto = Pick<MeetupPhoto, 'id' | 'full' | 'thumb' | 'width' | 'he
 
 /** Photo changes saved together with a meetup, in the same transaction. */
 export interface PhotoChanges {
-  add: NewPhoto[]
+  add: readonly NewPhoto[]
   /** Photos of this meetup to delete. Ids of other meetups' photos are ignored. */
-  removeIds: string[]
+  removeIds: readonly string[]
   /** Photo ids in their new order. Photos left out keep their order after these. */
-  order: string[]
+  order: readonly string[]
 }
 
-export const NO_PHOTO_CHANGES: PhotoChanges = { add: [], removeIds: [], order: [] }
+export const NO_PHOTO_CHANGES: PhotoChanges = Object.freeze({
+  add: Object.freeze([]),
+  removeIds: Object.freeze([]),
+  order: Object.freeze([]),
+})
 
 export const PHOTO_NOT_SAVED = "A photo couldn't be saved."
 
@@ -1604,6 +1670,7 @@ import { db } from '../db/db'
 import type { MeetupPhoto } from '../types'
 import { parseBackup, type BackupData, type ParseResult } from './format'
 
+/** Reads everything in one snapshot, every full photo included: only for backups and tests. */
 export async function readAllData(): Promise<BackupData> {
   return db.transaction('r', [db.friends, db.groups, db.meetupTypes, db.meetups, db.meetupPhotos], async () => {
     const [friends, groups, meetupTypes, meetups, meetupPhotos] = await Promise.all([
@@ -1857,15 +1924,28 @@ export async function shareBackupFile(file: File): Promise<{ outcome: 'shared' |
 In `src/data/hooks.ts`, replace:
 
 ```ts
+import { getSetting, type Settings } from '../db/settings'
+```
+
+with:
+
+```ts
+import { photoCount } from '../db/meetups'
+import { getSetting, type Settings } from '../db/settings'
+```
+
+Replace:
+
+```ts
 export function useSetting<K extends keyof Settings>(key: K): Settings[K] | undefined {
 ```
 
 with:
 
 ```ts
-/** How many meetup photos are stored. A cheap live count: it never reads an image. */
+/** How many meetup photos are stored. Counts without reading any image. */
 export function usePhotoCount(): number | undefined {
-  return useLiveQuery(() => db.meetupPhotos.count())
+  return useLiveQuery(() => photoCount())
 }
 
 export function useSetting<K extends keyof Settings>(key: K): Settings[K] | undefined {
@@ -1894,7 +1974,7 @@ import { parseBackupFile, replaceAllData } from '../backup/storage'
 with:
 
 ```ts
-import { parseBackupFile, readAllPhotos, replaceAllData } from '../backup/storage'
+import { parseBackupFile, readAllData, replaceAllData } from '../backup/storage'
 ```
 
 Replace:
@@ -1965,7 +2045,7 @@ with:
       const { outcome } = await shareBackupFile(file)
       if (outcome !== 'cancelled') toast({ message: 'Backup saved' })
     } catch {
-      toast({ message: "Couldn't create the backup.", tone: 'plain' })
+      toast({ message: "Couldn't share the backup.", tone: 'plain' })
     }
   }
 
@@ -1977,11 +2057,19 @@ with:
     exportingRef.current = true
     try {
       const hasPhotos = photoCount > 0
-      const meetupPhotos = hasPhotos ? await readAllPhotos() : []
-      const result = await exportBackup({ friends, groups, meetupTypes, meetups, meetupPhotos }, hasPhotos)
+      // With photos, one read transaction gives a consistent snapshot (the rendered lists could be a moment old).
+      const snapshot = hasPhotos ? await readAllData() : { friends, groups, meetupTypes, meetups, meetupPhotos: [] }
+      const meetupIds = new Set(snapshot.meetups.map((meetup) => meetup.id))
+      const data = { ...snapshot, meetupPhotos: snapshot.meetupPhotos.filter((photo) => meetupIds.has(photo.meetupId)) }
+      const result = await exportBackup(data, hasPhotos)
       if (result.outcome === 'needs-tap') {
         const { file } = result
-        toast({ message: 'Backup ready', actionLabel: 'Share', onAction: () => void shareReadyBackup(file) })
+        toast({
+          message: 'Backup ready',
+          actionLabel: 'Share',
+          tone: 'plain',
+          onAction: () => void shareReadyBackup(file),
+        })
       } else if (result.outcome !== 'cancelled') {
         toast({ message: 'Backup saved' })
       }
@@ -1996,7 +2084,7 @@ with:
 - [ ] **Step 10: Run everything**
 
 Run: `npm test`
-Expected: `Test Files  46 passed (46)` and `Tests  503 passed (503)`.
+Expected: `Test Files  46 passed (46)` and `Tests  507 passed (507)`.
 
 Run: `npm run build`
 Expected: `tsc -b` passes and Vite prints `✓ built in ...`.
@@ -2234,12 +2322,12 @@ export async function processPhoto(file: Blob): Promise<ProcessedPhoto> {
 - [ ] **Step 4: Run them to see them pass**
 
 Run: `npx vitest run src/lib/image.test.ts`
-Expected: PASS, `Tests  5 passed (5)`.
+Expected: PASS, `Tests  9 passed (9)`.
 
 - [ ] **Step 5: Run everything**
 
 Run: `npm test`
-Expected: `Test Files  47 passed (47)` and `Tests  508 passed (508)`.
+Expected: `Test Files  47 passed (47)` and `Tests  512 passed (512)`.
 
 Run: `npm run build`
 Expected: `tsc -b` passes (TypeScript 6's DOM types accept `imageOrientation: 'from-image'`) and Vite prints `✓ built in ...`.
@@ -2857,7 +2945,7 @@ with:
 - [ ] **Step 7: Run everything**
 
 Run: `npm test`
-Expected: `Test Files  47 passed (47)` and `Tests  516 passed (516)`.
+Expected: `Test Files  47 passed (47)` and `Tests  520 passed (520)`.
 
 Run: `npm run build`
 Expected: `tsc -b` passes and Vite prints `✓ built in ...`.
@@ -3034,7 +3122,7 @@ export async function askToKeepData(): Promise<void> {
 - [ ] **Step 4: Run them to see them pass**
 
 Run: `npx vitest run src/lib/photos.test.ts src/lib/persist.test.ts`
-Expected: PASS, `Tests  10 passed (10)`.
+Expected: PASS, `Tests  14 passed (14)`.
 
 - [ ] **Step 5: Write the end-to-end helpers**
 
@@ -3432,6 +3520,18 @@ export const IconCalendar = (props: IconProps) => (
 ```
 
 In `src/data/hooks.ts`, replace:
+
+```ts
+import type { Friend, Group, Meetup, MeetupType } from '../types'
+```
+
+with:
+
+```ts
+import type { Friend, Group, Meetup, MeetupPhoto, MeetupType } from '../types'
+```
+
+Replace:
 
 ```ts
 /** How many meetup photos are stored. Counts without reading any image. */
@@ -4149,7 +4249,7 @@ Expected: `7 passed`.
 - [ ] **Step 14: Run everything**
 
 Run: `npm test`
-Expected: `Test Files  48 passed (48)` and `Tests  520 passed (520)`.
+Expected: `Test Files  48 passed (48)` and `Tests  524 passed (524)`.
 
 Run: `npm run build`
 Expected: `tsc -b` passes and Vite prints `✓ built in ...`.
@@ -4811,7 +4911,7 @@ Expected: `16 passed`.
 - [ ] **Step 9: Run everything**
 
 Run: `npm test`
-Expected: `Test Files  48 passed (48)` and `Tests  520 passed (520)`.
+Expected: `Test Files  48 passed (48)` and `Tests  524 passed (524)`.
 
 Run: `npm run build`
 Expected: `tsc -b` passes and Vite prints `✓ built in ...`.
@@ -5341,7 +5441,7 @@ Expected: `5 passed`.
 - [ ] **Step 7: Run everything**
 
 Run: `npm test`
-Expected: `Test Files  48 passed (48)` and `Tests  520 passed (520)`.
+Expected: `Test Files  48 passed (48)` and `Tests  524 passed (524)`.
 
 Run: `npm run build`
 Expected: `tsc -b` passes and Vite prints `✓ built in ...`.
@@ -5901,7 +6001,7 @@ Recorded in [the plan](../plans/2026-10-03-meetup-memories.md):
 - [ ] **Step 10: Run every check**
 
 Run: `npm test`
-Expected: `Test Files  48 passed (48)` and `Tests  521 passed (521)`.
+Expected: `Test Files  48 passed (48)` and `Tests  525 passed (525)`.
 
 Run: `npm run build`
 Expected: `tsc -b` passes and Vite prints `✓ built in ...`.

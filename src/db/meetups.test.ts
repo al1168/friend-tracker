@@ -9,6 +9,7 @@ import {
   restoreMeetup,
   updateMeetup,
   type MeetupInput,
+  NO_PHOTO_CHANGES,
   type NewPhoto,
 } from './meetups'
 
@@ -170,6 +171,19 @@ describe('photos saved with a meetup', () => {
     expect(await db.meetupPhotos.count()).toBe(0)
   })
 
+  it('rolls everything back when one add repeats a photo id', async () => {
+    await expect(addMeetup(base, { add: [newPhoto('a'), newPhoto('a')], removeIds: [], order: [] })).rejects.toThrow()
+    expect(await db.meetups.count()).toBe(0)
+    expect(await db.meetupPhotos.count()).toBe(0)
+  })
+
+  it('shares one frozen "no changes" default', () => {
+    expect(Object.isFrozen(NO_PHOTO_CHANGES)).toBe(true)
+    expect(Object.isFrozen(NO_PHOTO_CHANGES.add)).toBe(true)
+    expect(Object.isFrozen(NO_PHOTO_CHANGES.removeIds)).toBe(true)
+    expect(Object.isFrozen(NO_PHOTO_CHANGES.order)).toBe(true)
+  })
+
   it('counts every stored photo', async () => {
     expect(await photoCount()).toBe(0)
     await addMeetup(base, { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: [] })
@@ -234,6 +248,30 @@ describe('deleteMeetup and restoreMeetup', () => {
     expect(await restoreMeetup(deleted!)).toBe(true)
     expect(await db.meetups.get(meetup.id)).toEqual(meetup)
     expect(await db.meetupPhotos.where('meetupId').equals(meetup.id).sortBy('order')).toEqual(before)
+  })
+
+  it('puts the photos back when only some friends are gone', async () => {
+    const alex = await addFriend(friendInput('Alex'))
+    const sam = await addFriend(friendInput('Sam'))
+    const meetup = await addMeetup(
+      { ...base, friendIds: [alex.id, sam.id] },
+      { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: [] },
+    )
+    const deleted = await deleteMeetup(meetup.id)
+    await deleteFriend(alex.id)
+    expect(await restoreMeetup(deleted!)).toBe(true)
+    expect((await db.meetups.get(meetup.id))?.friendIds).toEqual([sam.id])
+    expect(await photoIds(meetup.id)).toEqual(['a', 'b'])
+  })
+
+  it('puts nothing back when the type is gone', async () => {
+    const alex = await addFriend(friendInput('Alex'))
+    const meetup = await addMeetup({ ...base, friendIds: [alex.id] }, { add: [newPhoto('a')], removeIds: [], order: [] })
+    const deleted = await deleteMeetup(meetup.id)
+    await db.meetupTypes.delete(meetup.typeId)
+    expect(await restoreMeetup(deleted!)).toBe(false)
+    expect(await db.meetups.get(meetup.id)).toBeUndefined()
+    expect(await db.meetupPhotos.count()).toBe(0)
   })
 
   it('puts no photos back when the meetup cannot be restored', async () => {

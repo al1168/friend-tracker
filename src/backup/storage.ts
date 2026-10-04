@@ -2,6 +2,7 @@ import { db } from '../db/db'
 import type { MeetupPhoto } from '../types'
 import { parseBackup, type BackupData, type ParseResult } from './format'
 
+/** Reads everything in one snapshot, every full photo included: only for backups and tests. */
 export async function readAllData(): Promise<BackupData> {
   return db.transaction('r', [db.friends, db.groups, db.meetupTypes, db.meetups, db.meetupPhotos], async () => {
     const [friends, groups, meetupTypes, meetups, meetupPhotos] = await Promise.all([

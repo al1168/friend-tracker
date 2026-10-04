@@ -1,6 +1,6 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 import { exportBackup, shareBackupFile } from '../backup/exportBackup'
-import { parseBackupFile, readAllPhotos, replaceAllData } from '../backup/storage'
+import { parseBackupFile, readAllData, replaceAllData } from '../backup/storage'
 import { useConfirm } from '../components/ActionSheet'
 import { InsetGroup, Row } from '../components/InsetGroup'
 import { Page } from '../components/Page'
@@ -41,7 +41,7 @@ export function SettingsScreen() {
       const { outcome } = await shareBackupFile(file)
       if (outcome !== 'cancelled') toast({ message: 'Backup saved' })
     } catch {
-      toast({ message: "Couldn't create the backup.", tone: 'plain' })
+      toast({ message: "Couldn't share the backup.", tone: 'plain' })
     }
   }
 
@@ -53,11 +53,19 @@ export function SettingsScreen() {
     exportingRef.current = true
     try {
       const hasPhotos = photoCount > 0
-      const meetupPhotos = hasPhotos ? await readAllPhotos() : []
-      const result = await exportBackup({ friends, groups, meetupTypes, meetups, meetupPhotos }, hasPhotos)
+      // With photos, one read transaction gives a consistent snapshot (the rendered lists could be a moment old).
+      const snapshot = hasPhotos ? await readAllData() : { friends, groups, meetupTypes, meetups, meetupPhotos: [] }
+      const meetupIds = new Set(snapshot.meetups.map((meetup) => meetup.id))
+      const data = { ...snapshot, meetupPhotos: snapshot.meetupPhotos.filter((photo) => meetupIds.has(photo.meetupId)) }
+      const result = await exportBackup(data, hasPhotos)
       if (result.outcome === 'needs-tap') {
         const { file } = result
-        toast({ message: 'Backup ready', actionLabel: 'Share', onAction: () => void shareReadyBackup(file) })
+        toast({
+          message: 'Backup ready',
+          actionLabel: 'Share',
+          tone: 'plain',
+          onAction: () => void shareReadyBackup(file),
+        })
       } else if (result.outcome !== 'cancelled') {
         toast({ message: 'Backup saved' })
       }

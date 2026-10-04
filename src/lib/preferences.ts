@@ -17,7 +17,7 @@ export function cleanItem(item: string): string {
 }
 
 /** Items are compared ignoring case. */
-function itemKey(item: string): string {
+export function itemKey(item: string): string {
   return cleanItem(item).toLocaleLowerCase()
 }
 

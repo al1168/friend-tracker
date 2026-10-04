@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
+import { photoCount } from '../db/meetups'
 import { getSetting, type Settings } from '../db/settings'
 import { compareNames } from '../lib/text'
 import type { Friend, Group, Meetup, MeetupType } from '../types'
@@ -27,9 +28,9 @@ export function useMeetups(): Meetup[] | undefined {
   return useLiveQuery(() => db.meetups.toArray())
 }
 
-/** How many meetup photos are stored. A cheap live count: it never reads an image. */
+/** How many meetup photos are stored. Counts without reading any image. */
 export function usePhotoCount(): number | undefined {
-  return useLiveQuery(() => db.meetupPhotos.count())
+  return useLiveQuery(() => photoCount())
 }
 
 export function useSetting<K extends keyof Settings>(key: K): Settings[K] | undefined {

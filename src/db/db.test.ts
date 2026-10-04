@@ -68,6 +68,10 @@ describe('upgrade from version 2', () => {
       birthday: { month: 3, day: 14, year: null },
       createdAt: '2026-01-01T00:00:00.000Z',
     }
+    const v2Group = { id: 'g1', name: 'Work' }
+    const v2Type = { id: 'type-custom', name: 'Hike', emoji: 'x', order: 7 }
+    const v2Lock = { enabled: true, pin: null, passkeyId: null }
+    const v2Reminders = { enabled: true, lastSyncedHash: 'abc', lastSyncedAt: '2026-10-01T00:00:00.000Z', lastError: null }
     const v2Meetup = {
       id: 'm1',
       date: '2026-09-01',
@@ -85,6 +89,10 @@ describe('upgrade from version 2', () => {
     try {
       await v2.table('friends').add(v2Friend)
       await v2.table('meetups').add(v2Meetup)
+      await v2.table('groups').add(v2Group)
+      await v2.table('meetupTypes').add(v2Type)
+      await v2.table('settings').put({ key: 'appLock', value: v2Lock })
+      await v2.table('settings').put({ key: 'birthdayReminders', value: v2Reminders })
       await v2.table('settings').put({ key: 'lastBackupAt', value: '2026-10-02T10:00:00.000Z' })
     } finally {
       v2.close()
@@ -111,7 +119,11 @@ describe('upgrade from version 2', () => {
     // The stored meetup is untouched; the reading hook gives it activities.
     expect(await db.meetups.get('m1')).toEqual({ ...v2Meetup, activities: [] })
     expect(await db.friends.get('f1')).toEqual(v2Friend)
+    expect(await db.groups.get('g1')).toEqual(v2Group)
+    expect(await db.meetupTypes.get('type-custom')).toEqual(v2Type)
     expect(await getSetting('lastBackupAt')).toBe('2026-10-02T10:00:00.000Z')
+    expect(await getSetting('appLock')).toEqual(v2Lock)
+    expect(await getSetting('birthdayReminders')).toEqual(v2Reminders)
   })
 })
 

@@ -3,7 +3,7 @@
 // 60 characters, and unique ignoring case.
 
 import type { Meetup } from '../types'
-import { cleanItem, indexOfItem, MAX_ITEM_LENGTH } from './preferences'
+import { cleanItem, indexOfItem, itemKey, MAX_ITEM_LENGTH } from './preferences'
 import { compareNames } from './text'
 
 /** The most activities one meetup can have. */
@@ -44,7 +44,7 @@ export function activitySuggestions(meetups: readonly Pick<Meetup, 'activities' 
     for (const activity of meetup.activities) {
       const name = cleanItem(activity)
       if (name === '') continue
-      const key = name.toLocaleLowerCase()
+      const key = itemKey(name)
       const entry = used.get(key)
       if (entry) entry.count += 1
       else used.set(key, { name, count: 1 })
