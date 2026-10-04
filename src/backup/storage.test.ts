@@ -36,7 +36,13 @@ describe('backup storage', () => {
     const sam = await addFriend({ name: 'Sam', groupId: null, photo: null, notes: '', birthday: null })
     await addPreferences(alex.id, 'likes', 'Sushi, Board games')
     await addPreferences(alex.id, 'dislikes', 'Early mornings')
-    await addMeetup({ date: '2026-09-01', typeId: 'type-meal', friendIds: [alex.id, sam.id], note: 'Tacos' })
+    await addMeetup({
+      date: '2026-09-01',
+      typeId: 'type-meal',
+      friendIds: [alex.id, sam.id],
+      note: 'Tacos',
+      activities: [],
+    })
     const before = await readAllData()
     const text = JSON.stringify(createBackup(before, new Date()))
 

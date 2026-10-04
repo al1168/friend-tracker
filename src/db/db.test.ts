@@ -5,7 +5,7 @@ import { DEFAULT_MEETUP_TYPES } from './defaults'
 import { updateFriend } from './friends'
 import { addPreferences } from './preferences'
 import { getSetting, setSetting } from './settings'
-import type { Friend } from '../types'
+import type { Friend, Meetup } from '../types'
 
 beforeEach(resetDatabase)
 
@@ -43,8 +43,91 @@ describe('upgrade from version 1', () => {
     // (The reading hook adds `birthday: null`, which the upgrade doesn't store.)
     expect(await db.friends.get('f1')).toEqual({ ...v1Friend, likes: [], dislikes: [], birthday: null })
     expect(await db.friends.get('f2')).toEqual({ ...nullListsFriend, likes: [], dislikes: [], birthday: null })
+    // Dexie stores the version times 10. Read it from the native database to prove the upgrades ran.
+    expect(db.backendDB().version).toBe(30)
+  })
+})
+
+describe('upgrade from version 2', () => {
+  it('adds the meetup photos table, gives meetups empty activities and changes nothing else', async () => {
+    const v2Stores = {
+      friends: 'id, groupId',
+      groups: 'id',
+      meetupTypes: 'id, order',
+      meetups: 'id, date, typeId, *friendIds',
+      settings: 'key',
+    }
+    const v2Friend = {
+      id: 'f1',
+      name: 'Alex',
+      groupId: null,
+      photo: null,
+      notes: '',
+      likes: ['Sushi'],
+      dislikes: [],
+      birthday: { month: 3, day: 14, year: null },
+      createdAt: '2026-01-01T00:00:00.000Z',
+    }
+    const v2Meetup = {
+      id: 'm1',
+      date: '2026-09-01',
+      typeId: 'type-coffee',
+      friendIds: ['f1'],
+      note: 'Tacos',
+      createdAt: '2026-09-01T12:00:00.000Z',
+    }
+    // Build the database as version 2 of the app left it, under the app's own name.
+    // (The next test's resetDatabase deletes it and reopens the app database fresh.)
+    db.close()
+    await Dexie.delete('friend-tracker')
+    const v2 = new Dexie('friend-tracker')
+    v2.version(2).stores(v2Stores)
+    try {
+      await v2.table('friends').add(v2Friend)
+      await v2.table('meetups').add(v2Meetup)
+      await v2.table('settings').put({ key: 'lastBackupAt', value: '2026-10-02T10:00:00.000Z' })
+    } finally {
+      v2.close()
+    }
+
+    await db.open()
+
     // Dexie stores the version times 10. Read it from the native database to prove the upgrade ran.
-    expect(db.backendDB().version).toBe(20)
+    const native = db.backendDB()
+    expect(native.version).toBe(30)
+    expect([...native.objectStoreNames].sort()).toEqual([
+      'friends',
+      'groups',
+      'meetupPhotos',
+      'meetupTypes',
+      'meetups',
+      'settings',
+    ])
+    const photoIndexes = native.transaction('meetupPhotos').objectStore('meetupPhotos').indexNames
+    expect([...photoIndexes].sort()).toEqual(['[meetupId+order]', 'meetupId'])
+    const meetupIndexes = native.transaction('meetups').objectStore('meetups').indexNames
+    expect([...meetupIndexes].sort()).toEqual(['date', 'friendIds', 'typeId'])
+    expect(await db.meetupPhotos.count()).toBe(0)
+    // The stored meetup is untouched; the reading hook gives it activities.
+    expect(await db.meetups.get('m1')).toEqual({ ...v2Meetup, activities: [] })
+    expect(await db.friends.get('f1')).toEqual(v2Friend)
+    expect(await getSetting('lastBackupAt')).toBe('2026-10-02T10:00:00.000Z')
+  })
+})
+
+describe('meetups read from the database', () => {
+  it('get empty activities when the stored record has none', async () => {
+    await db.meetups.put({
+      id: 'old',
+      date: '2026-09-01',
+      typeId: 'type-coffee',
+      friendIds: ['alex'],
+      note: '',
+      createdAt: '2026-09-01T12:00:00.000Z',
+    } as unknown as Meetup)
+    expect(await db.meetups.get('old')).toMatchObject({ activities: [] })
+    expect((await db.meetups.toArray())[0]).toMatchObject({ activities: [] })
+    expect((await db.meetups.where('friendIds').equals('alex').toArray())[0]).toMatchObject({ activities: [] })
   })
 })
 
@@ -93,6 +176,7 @@ describe('database', () => {
     expect(await db.friends.count()).toBe(0)
     expect(await db.groups.count()).toBe(0)
     expect(await db.meetups.count()).toBe(0)
+    expect(await db.meetupPhotos.count()).toBe(0)
   })
 })
 

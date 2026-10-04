@@ -161,6 +161,8 @@ function readBackup(raw: unknown, today: ISODate): BackupData {
       typeId: text(r, 'typeId', where, true),
       friendIds: [...new Set(friendIds as string[])],
       note: text(r, 'note', where),
+      // Backups up to version 3 were made before activities existed.
+      activities: [],
       createdAt: text(r, 'createdAt', where),
     }
   })

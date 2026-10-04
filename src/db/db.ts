@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Friend, Group, Meetup, MeetupType } from '../types'
+import type { Friend, Group, Meetup, MeetupPhoto, MeetupType } from '../types'
 import { DEFAULT_MEETUP_TYPES } from './defaults'
 
 export interface SettingRow {
@@ -12,6 +12,7 @@ export type FriendTrackerDB = Dexie & {
   groups: EntityTable<Group, 'id'>
   meetupTypes: EntityTable<MeetupType, 'id'>
   meetups: EntityTable<Meetup, 'id'>
+  meetupPhotos: EntityTable<MeetupPhoto, 'id'>
   settings: EntityTable<SettingRow, 'key'>
 }
 
@@ -44,7 +45,21 @@ db.version(2)
       }),
   )
 
-// The upgrade above runs once, but older code that is still running (a second tab, or a
+// Version 3 adds the meetup photos table. Photos never live inside meetups, so everything that
+// loads every meetup (stats, history, last seen) stays light. `[meetupId+order]` finds a meetup's
+// first photo without reading the others. No other store changes, so there is no upgrade step:
+// meetups get their activities from the reading hook below.
+// (The service worker opens this database too, so nothing here may touch window or document.)
+db.version(3).stores({
+  friends: 'id, groupId',
+  groups: 'id',
+  meetupTypes: 'id, order',
+  meetups: 'id, date, typeId, *friendIds',
+  settings: 'key',
+  meetupPhotos: 'id, meetupId, [meetupId+order]',
+})
+
+// The version 2 upgrade runs once, but older code that is still running (a second tab, or a
 // rollback) can write friends without lists later. Fill them in on every read.
 // Birthdays came without a version bump (no index changed), so friends saved before them
 // get "no birthday" here too.
@@ -56,6 +71,12 @@ db.friends.hook('reading', (friend) => {
     friend.birthday ??= null
   }
   return friend
+})
+
+// Meetups saved before activities existed have none.
+db.meetups.hook('reading', (meetup) => {
+  if (meetup) meetup.activities ??= []
+  return meetup
 })
 
 // Runs once, when the database is first created on this device.

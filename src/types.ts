@@ -42,5 +42,23 @@ export interface Meetup {
   typeId: string
   friendIds: string[]
   note: string
+  /** What you did, in the order picked. Cleaned like likes (see src/lib/activities.ts). */
+  activities: string[]
+  createdAt: string
+}
+
+/** One photo of a meetup. Stored in its own table, never inside the meetup. */
+export interface MeetupPhoto {
+  id: string
+  meetupId: string
+  /** 0-based position in the meetup */
+  order: number
+  /** JPEG data URL, longest side ≤ 1600px */
+  full: string
+  /** JPEG data URL, longest side ≤ 320px */
+  thumb: string
+  /** Size of `full` in pixels */
+  width: number
+  height: number
   createdAt: string
 }

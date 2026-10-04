@@ -4,7 +4,7 @@ import { ValidationError } from './errors'
 import { addFriend, deleteFriend } from './friends'
 import { addMeetup, deleteMeetup, restoreMeetup, updateMeetup, type MeetupInput } from './meetups'
 
-const base: MeetupInput = { date: '2026-09-01', typeId: 'type-coffee', friendIds: ['alex'], note: '' }
+const base: MeetupInput = { date: '2026-09-01', typeId: 'type-coffee', friendIds: ['alex'], note: '', activities: [] }
 
 beforeEach(resetDatabase)
 
@@ -23,6 +23,21 @@ describe('addMeetup', () => {
   it('rejects an invalid date', async () => {
     await expect(addMeetup({ ...base, date: '2026-02-30' })).rejects.toThrow('Please pick a valid date.')
   })
+
+  it('cleans activities like likes, keeping the order picked', async () => {
+    const meetup = await addMeetup({ ...base, activities: [' Board   games ', 'Karaoke', 'board games', ' ', 'karaoke'] })
+    expect(meetup.activities).toEqual(['Board games', 'Karaoke'])
+    expect((await db.meetups.get(meetup.id))?.activities).toEqual(['Board games', 'Karaoke'])
+  })
+
+  it('refuses an activity over 60 characters or more than 20 activities, and saves nothing', async () => {
+    await expect(addMeetup({ ...base, activities: ['x'.repeat(61)] })).rejects.toThrow(
+      'Keep each activity under 60 characters.',
+    )
+    const tooMany = Array.from({ length: 21 }, (_, i) => `Activity ${i + 1}`)
+    await expect(addMeetup({ ...base, activities: tooMany })).rejects.toThrow('A meetup can have up to 20 activities.')
+    expect(await db.meetups.count()).toBe(0)
+  })
 })
 
 describe('updateMeetup', () => {
@@ -30,6 +45,21 @@ describe('updateMeetup', () => {
     const meetup = await addMeetup(base)
     await updateMeetup(meetup.id, { ...base, date: '2026-09-05', note: 'Pizza' })
     expect(await db.meetups.get(meetup.id)).toMatchObject({ date: '2026-09-05', note: 'Pizza' })
+  })
+
+  it('replaces the activities with the cleaned list', async () => {
+    const meetup = await addMeetup({ ...base, activities: ['Walk'] })
+    await updateMeetup(meetup.id, { ...base, activities: ['Movie ', ' movie', 'Walk'] })
+    expect((await db.meetups.get(meetup.id))?.activities).toEqual(['Movie', 'Walk'])
+  })
+
+  it('refuses too many activities and keeps the old ones', async () => {
+    const meetup = await addMeetup({ ...base, activities: ['Walk'] })
+    const tooMany = Array.from({ length: 21 }, (_, i) => `Activity ${i + 1}`)
+    await expect(updateMeetup(meetup.id, { ...base, activities: tooMany })).rejects.toThrow(
+      'A meetup can have up to 20 activities.',
+    )
+    expect((await db.meetups.get(meetup.id))?.activities).toEqual(['Walk'])
   })
 })
 

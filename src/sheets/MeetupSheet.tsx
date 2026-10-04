@@ -106,7 +106,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
     savingRef.current = true
     setSaving(true)
     try {
-      const input = { date, typeId: effectiveTypeId, friendIds, note }
+      const input = { date, typeId: effectiveTypeId, friendIds, note, activities: editing?.activities ?? [] }
       if (editing) {
         await updateMeetup(editing.id, input)
         toast({ message: 'Saved' })

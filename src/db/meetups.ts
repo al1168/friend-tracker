@@ -1,5 +1,7 @@
+import { activitiesProblem } from '../lib/activities'
 import { isISODate, type ISODate } from '../lib/dates'
 import { newId } from '../lib/ids'
+import { cleanItems } from '../lib/preferences'
 import type { Meetup } from '../types'
 import { db } from './db'
 import { ValidationError } from './errors'
@@ -9,6 +11,8 @@ export interface MeetupInput {
   typeId: string
   friendIds: string[]
   note: string
+  /** In the order picked. Cleaned like likes: empties and repeats are dropped. */
+  activities: string[]
 }
 
 function clean(input: MeetupInput): MeetupInput {
@@ -16,7 +20,10 @@ function clean(input: MeetupInput): MeetupInput {
   if (!input.typeId) throw new ValidationError('Please pick a meetup type.')
   const friendIds = [...new Set(input.friendIds)]
   if (friendIds.length === 0) throw new ValidationError('Pick at least one friend.')
-  return { date: input.date, typeId: input.typeId, friendIds, note: input.note.trim() }
+  const activities = cleanItems(input.activities)
+  const problem = activitiesProblem(activities)
+  if (problem) throw new ValidationError(problem)
+  return { date: input.date, typeId: input.typeId, friendIds, note: input.note.trim(), activities }
 }
 
 export async function addMeetup(input: MeetupInput): Promise<Meetup> {
@@ -26,10 +33,10 @@ export async function addMeetup(input: MeetupInput): Promise<Meetup> {
 }
 
 export async function updateMeetup(id: string, input: MeetupInput): Promise<void> {
-  const { date, typeId, friendIds, note } = clean(input)
+  const { date, typeId, friendIds, note, activities } = clean(input)
   await db.transaction('rw', db.meetups, async () => {
     if (!(await db.meetups.get(id))) throw new ValidationError('This meetup no longer exists.')
-    await db.meetups.update(id, { date, typeId, friendIds, note })
+    await db.meetups.update(id, { date, typeId, friendIds, note, activities })
   })
 }
 

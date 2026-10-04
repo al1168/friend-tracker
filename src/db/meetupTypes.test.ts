@@ -53,7 +53,7 @@ describe('moveMeetupType', () => {
 
 describe('deleteMeetupType', () => {
   it('refuses to delete a type that is in use', async () => {
-    await addMeetup({ date: '2026-09-01', typeId: 'type-coffee', friendIds: ['alex'], note: '' })
+    await addMeetup({ date: '2026-09-01', typeId: 'type-coffee', friendIds: ['alex'], note: '', activities: [] })
     expect(await countMeetupsUsingType('type-coffee')).toBe(1)
     await expect(deleteMeetupType('type-coffee')).rejects.toThrow('This type is used by 1 meetup')
     expect(await db.meetupTypes.get('type-coffee')).toBeDefined()
