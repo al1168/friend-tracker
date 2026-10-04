@@ -48,11 +48,12 @@ async function markBackedUp() {
  * may then refuse because the tap's activation expired, which gives 'needs-tap' instead of a download.
  */
 export async function exportBackup(data: BackupData, afterAsyncRead = false): Promise<ExportOutcome> {
-  const backup = createBackup(data, new Date())
+  // Turned into text once: with photos a backup can be large, and every copy costs memory.
+  const json = JSON.stringify(createBackup(data, new Date()))
   // Self-check before sharing: never hand out a file our own importer would reject. Synchronous, so share() keeps its user gesture.
-  const check = parseBackup(JSON.parse(JSON.stringify(backup)))
+  const check = parseBackup(JSON.parse(json))
   if (!check.ok) throw new Error(`Backup failed validation: ${check.error}`)
-  const file = new File([JSON.stringify(backup)], backupFileName(todayISO()), { type: 'application/json' })
+  const file = new File([json], backupFileName(todayISO()), { type: 'application/json' })
 
   const attempt = await attemptShare(file, afterAsyncRead)
   if (attempt === 'cancelled') return { outcome: 'cancelled' }

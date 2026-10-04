@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   compareNames,
+  describeBackup,
   describeLastBackup,
   firstGrapheme,
   formatNameList,
@@ -83,5 +84,14 @@ describe('describeLastBackup', () => {
     expect(describeLastBackup(new Date(2026, 9, 2, 9, 30).toISOString(), '2026-10-02')).toBe('Last backup: today')
     expect(describeLastBackup(new Date(2026, 9, 1, 22, 0).toISOString(), '2026-10-02')).toBe('Last backup: yesterday')
     expect(describeLastBackup(new Date(2026, 8, 11, 12, 0).toISOString(), '2026-10-02')).toBe('Last backup: 3 weeks ago')
+  })
+})
+
+describe('describeBackup', () => {
+  it('adds the photo count when there are photos', () => {
+    const today = new Date(2026, 9, 2, 9, 30).toISOString()
+    expect(describeBackup(today, '2026-10-02', 0)).toBe('Last backup: today')
+    expect(describeBackup(today, '2026-10-02', 12)).toBe('Last backup: today. Includes 12 photos.')
+    expect(describeBackup(null, '2026-10-02', 1)).toBe('Never backed up. Includes 1 photo.')
   })
 })

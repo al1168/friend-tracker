@@ -1,5 +1,7 @@
+import { activitiesProblem } from '../lib/activities'
 import { isValidBirthday } from '../lib/birthdays'
 import { addDays, isISODate, todayISO, type ISODate } from '../lib/dates'
+import { isPhotoDataUrl, isPixelSize, MAX_FULL_LENGTH, MAX_PHOTOS, MAX_THUMB_LENGTH } from '../lib/photos'
 import { cleanItems, indexOfItem, MAX_ITEM_LENGTH, MAX_ITEMS, type PreferenceKind } from '../lib/preferences'
 import type { Birthday, Friend, Group, Meetup, MeetupPhoto, MeetupType } from '../types'
 
@@ -13,14 +15,14 @@ export interface BackupData {
 
 export interface BackupFile extends BackupData {
   app: 'friend-tracker'
-  version: 3
+  version: 4
   exportedAt: string
 }
 
 export type ParseResult = { ok: true; data: BackupData } | { ok: false; error: string }
 
 export function createBackup(data: BackupData, exportedAt: Date): BackupFile {
-  return { app: 'friend-tracker', version: 3, exportedAt: exportedAt.toISOString(), ...data }
+  return { app: 'friend-tracker', version: 4, exportedAt: exportedAt.toISOString(), ...data }
 }
 
 export function backupFileName(today: ISODate): string {
@@ -101,6 +103,36 @@ function birthdayOf(record: Obj, where: string, today: ISODate): Birthday | null
   return { month: value.month, day: value.day, year: value.year }
 }
 
+/** A version 4 meetup's activities, cleaned like the app cleans them. Empties and repeats are dropped quietly. */
+function activityList(record: Obj, where: string): string[] {
+  const value = record.activities
+  const invalid = () => new BackupError(`${where} has an invalid "activities" list.`)
+  if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) throw invalid()
+  const activities = cleanItems(value)
+  if (activitiesProblem(activities) !== null) throw invalid()
+  return activities
+}
+
+/** A version 4 photo (copied, so stray fields are dropped). Whatever is wrong with it, the message is the same. */
+function photoOf(value: unknown, where: string): MeetupPhoto {
+  const invalid = () => new BackupError(`${where} is invalid.`)
+  if (!isObj(value)) throw invalid()
+  const { id, meetupId, order, full, thumb, width, height, createdAt } = value
+  if (typeof id !== 'string' || id.trim() === '' || typeof meetupId !== 'string' || typeof createdAt !== 'string') {
+    throw invalid()
+  }
+  if (typeof order !== 'number' || !Number.isInteger(order) || order < 0) throw invalid()
+  if (
+    !isPhotoDataUrl(full, MAX_FULL_LENGTH) ||
+    !isPhotoDataUrl(thumb, MAX_THUMB_LENGTH) ||
+    !isPixelSize(width) ||
+    !isPixelSize(height)
+  ) {
+    throw invalid()
+  }
+  return { id, meetupId, order, full, thumb, width, height, createdAt }
+}
+
 function assertUnique(ids: string[], what: string) {
   if (new Set(ids).size !== ids.length) throw new BackupError(`The backup has two ${what} with the same id.`)
 }
@@ -108,7 +140,7 @@ function assertUnique(ids: string[], what: string) {
 function readBackup(raw: unknown, today: ISODate): BackupData {
   if (!isObj(raw) || raw.app !== 'friend-tracker') throw new BackupError("This isn't a Friend Tracker backup file.")
   const { version } = raw
-  if (version !== 1 && version !== 2 && version !== 3) {
+  if (version !== 1 && version !== 2 && version !== 3 && version !== 4) {
     throw new BackupError('This backup was made by a different version of Friend Tracker.')
   }
 
@@ -142,7 +174,7 @@ function readBackup(raw: unknown, today: ISODate): BackupData {
       // Version 1 backups were made before likes and dislikes existed.
       ...(version === 1 ? { likes: [], dislikes: [] } : preferenceLists(r, where)),
       // Versions 1 and 2 were made before birthdays existed.
-      birthday: version === 3 ? birthdayOf(r, where, today) : null,
+      birthday: version >= 3 ? birthdayOf(r, where, today) : null,
       createdAt: text(r, 'createdAt', where),
     }
   })
@@ -162,16 +194,21 @@ function readBackup(raw: unknown, today: ISODate): BackupData {
       typeId: text(r, 'typeId', where, true),
       friendIds: [...new Set(friendIds as string[])],
       note: text(r, 'note', where),
-      // Backups up to version 3 were made before activities existed.
-      activities: [],
+      // Versions 1 to 3 were made before activities existed.
+      activities: version === 4 ? activityList(r, where) : [],
       createdAt: text(r, 'createdAt', where),
     }
   })
+
+  // Versions 1 to 3 were made before photos existed.
+  const meetupPhotos: MeetupPhoto[] =
+    version === 4 ? list(raw, 'meetupPhotos').map((value, i) => photoOf(value, `Photo ${i + 1}`)) : []
 
   assertUnique(groups.map((g) => g.id), 'groups')
   assertUnique(meetupTypes.map((t) => t.id), 'meetup types')
   assertUnique(friends.map((f) => f.id), 'friends')
   assertUnique(meetups.map((m) => m.id), 'meetups')
+  assertUnique(meetupPhotos.map((p) => p.id), 'photos')
   if (meetupTypes.length === 0) throw new BackupError('The backup has no meetup types.')
 
   const groupIds = new Set(groups.map((g) => g.id))
@@ -190,6 +227,14 @@ function readBackup(raw: unknown, today: ISODate): BackupData {
     }
   })
 
-  // Backups up to version 3 were made before photos existed.
-  return { friends, groups, meetupTypes, meetups, meetupPhotos: [] }
+  // Every photo belongs to a meetup in the backup, and no meetup has more than 20.
+  const meetupIds = new Set(meetups.map((m) => m.id))
+  const photosPerMeetup = new Map<string, number>()
+  meetupPhotos.forEach((p, i) => {
+    const count = (photosPerMeetup.get(p.meetupId) ?? 0) + 1
+    photosPerMeetup.set(p.meetupId, count)
+    if (!meetupIds.has(p.meetupId) || count > MAX_PHOTOS) throw new BackupError(`Photo ${i + 1} is invalid.`)
+  })
+
+  return { friends, groups, meetupTypes, meetups, meetupPhotos }
 }

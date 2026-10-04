@@ -37,14 +37,25 @@ describe('backup storage', () => {
     const sam = await addFriend({ name: 'Sam', groupId: null, photo: null, notes: '', birthday: null })
     await addPreferences(alex.id, 'likes', 'Sushi, Board games')
     await addPreferences(alex.id, 'dislikes', 'Early mornings')
-    await addMeetup({
-      date: '2026-09-01',
-      typeId: 'type-meal',
-      friendIds: [alex.id, sam.id],
-      note: 'Tacos',
-      activities: [],
-    })
+    const tacos = await addMeetup(
+      {
+        date: '2026-09-01',
+        typeId: 'type-meal',
+        friendIds: [alex.id, sam.id],
+        note: 'Tacos',
+        activities: ['Karaoke', 'Walk'],
+      },
+      {
+        add: [
+          { id: 'p1', full: 'data:image/jpeg;base64,FULL1', thumb: 'data:image/jpeg;base64,THUMB1', width: 4, height: 3 },
+          { id: 'p2', full: 'data:image/jpeg;base64,FULL2', thumb: 'data:image/jpeg;base64,THUMB2', width: 3, height: 4 },
+        ],
+        removeIds: [],
+        order: ['p2', 'p1'],
+      },
+    )
     const before = await readAllData()
+    expect(before.meetupPhotos).toHaveLength(2)
     const text = JSON.stringify(createBackup(before, new Date()))
 
     await resetDatabase()
@@ -60,6 +71,9 @@ describe('backup storage', () => {
       birthday: { month: 3, day: 14, year: 1996 },
     })
     expect((await db.friends.get(sam.id))?.birthday).toBeNull()
+    expect((await db.meetups.get(tacos.id))?.activities).toEqual(['Karaoke', 'Walk'])
+    const photos = await db.meetupPhotos.where('meetupId').equals(tacos.id).sortBy('order')
+    expect(photos.map((photo) => photo.id)).toEqual(['p2', 'p1'])
   })
 
   it('keeps the lock settings, which a backup never carries', async () => {

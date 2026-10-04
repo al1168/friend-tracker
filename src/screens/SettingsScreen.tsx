@@ -7,7 +7,7 @@ import { Page } from '../components/Page'
 import { useToast } from '../components/Toast'
 import { useFriends, useGroups, useMeetups, useMeetupTypes, usePhotoCount, useSetting } from '../data/hooks'
 import { useToday } from '../hooks/useToday'
-import { describeLastBackup, plural } from '../lib/text'
+import { describeBackup, plural } from '../lib/text'
 import { AppLockSection } from '../lock/AppLockSection'
 import { usePasskeyAvailable } from '../lock/usePasskeyAvailable'
 import { RemindersSection } from '../reminders/RemindersSection'
@@ -111,7 +111,7 @@ export function SettingsScreen() {
 
       <RemindersSection reminders={birthdayReminders} />
 
-      <InsetGroup title="Backup" footer={describeLastBackup(lastBackupAt, today)}>
+      <InsetGroup title="Backup" footer={describeBackup(lastBackupAt, today, photoCount)}>
         <Row title="Export backup" accent onClick={exportData} />
         <Row title="Import backup" accent onClick={() => fileInput.current?.click()} />
       </InsetGroup>

@@ -58,3 +58,9 @@ export function describeLastBackup(lastBackupAt: string | null, today: ISODate):
   const since = formatSince(daysBetween(toISODate(new Date(lastBackupAt)), today))
   return `Last backup: ${since.charAt(0).toLowerCase()}${since.slice(1)}`
 }
+
+/** The Backup group's footer: the last backup, then how many photos a backup carries (they make it large). */
+export function describeBackup(lastBackupAt: string | null, today: ISODate, photoCount: number): string {
+  const last = describeLastBackup(lastBackupAt, today)
+  return photoCount > 0 ? `${last}. Includes ${plural(photoCount, 'photo')}.` : last
+}
