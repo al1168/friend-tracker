@@ -85,3 +85,15 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* A thumbnail opens the photo viewer. */
+.photo-tile__open {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-field);
+  transition: opacity var(--dur-fast);
+}
+.photo-tile__open:active {
+  opacity: 0.7;
+}

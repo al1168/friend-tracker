@@ -1,8 +1,9 @@
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { Avatar } from '../components/Avatar'
 import { Section } from '../components/InsetGroup'
 import { Page, type NavState } from '../components/Page'
+import { PhotoViewer } from '../components/PhotoViewer'
 import { useFriends, useMeetup, useMeetupPhotos, useMeetupTypes } from '../data/hooks'
 import { useToday } from '../hooks/useToday'
 import { formatDate } from '../lib/dates'
@@ -23,6 +24,9 @@ export function MeetupScreen() {
   const { openMeetupSheet } = useSheets()
   const withId = useId()
   const leftRef = useRef(false)
+  // The photo open in the viewer, by position. Its thumbnail takes focus back when the viewer closes.
+  const [viewing, setViewing] = useState<number | null>(null)
+  const thumbnails = useRef<(HTMLButtonElement | null)[]>([])
 
   // Deleted from the sheet (or never there): go back, like the friend page does for a deleted friend.
   useEffect(() => {
@@ -40,6 +44,13 @@ export function MeetupScreen() {
   const people = meetup.friendIds.map((friendId) => friendById.get(friendId)).filter((f): f is Friend => !!f)
   // A friend opened from here says this meetup on its back button, and keeps the tab this page came from.
   const fromHere: NavState = { backLabel: title, tab: (location.state as NavState | null)?.tab }
+  const describePhoto = (index: number) =>
+    `Photo ${index + 1} of ${photos.length}, ${title}, ${formatDate(meetup.date, today)}`
+
+  function closeViewer() {
+    if (viewing !== null) thumbnails.current[viewing]?.focus()
+    setViewing(null)
+  }
 
   return (
     <Page
@@ -104,15 +115,34 @@ export function MeetupScreen() {
           <ul className="photo-grid">
             {photos.map((photo, index) => (
               <li key={photo.id} className="photo-tile">
-                <img
-                  className="photo-tile__image"
-                  src={photo.thumb}
-                  alt={`Photo ${index + 1} of ${photos.length}`}
-                />
+                <button
+                  ref={(element) => {
+                    thumbnails.current[index] = element
+                  }}
+                  type="button"
+                  className="photo-tile__open"
+                  onClick={() => setViewing(index)}
+                >
+                  <img
+                    className="photo-tile__image"
+                    src={photo.thumb}
+                    alt={`Photo ${index + 1} of ${photos.length}`}
+                  />
+                </button>
               </li>
             ))}
           </ul>
         </Section>
+      )}
+
+      {viewing !== null && (
+        <PhotoViewer
+          photos={photos}
+          index={Math.min(viewing, photos.length - 1)}
+          onIndexChange={setViewing}
+          onClose={closeViewer}
+          describe={describePhoto}
+        />
       )}
     </Page>
   )

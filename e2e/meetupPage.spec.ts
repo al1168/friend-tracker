@@ -65,3 +65,74 @@ test('redirects to Friends for an unknown meetup', async ({ page }) => {
   await page.goto('/#/meetups/nope')
   await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
 })
+
+test('the photo viewer goes through the photos and gives focus back to the thumbnail', async ({ page }) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await logMeetup(page, ['Alex'], { photos: [tinyPhoto('one.png'), tinyPhoto('two.png'), tinyPhoto('three.png')] })
+  await openFriendPage(page, 'Alex')
+  await page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Coffee/ }).click()
+  const thumbnails = page.getByRole('region', { name: 'Photos' }).getByRole('button')
+
+  await thumbnails.first().click()
+  const viewer = page.getByRole('dialog', { name: 'Photo 1 of 3' })
+  await expect(viewer).toBeVisible()
+  await expect(viewer.getByRole('button', { name: 'Close' })).toBeFocused()
+  await expect(viewer.getByRole('img')).toHaveAccessibleName(`Photo 1 of 3, Coffee, ${todayLabel()}`)
+  await expect(viewer.getByRole('img')).toHaveAttribute('src', /^data:image\/jpeg/)
+  await expect(viewer.getByText('1 of 3', { exact: true })).toBeVisible()
+  await expect(viewer.getByRole('button', { name: 'Previous photo' })).toHaveAttribute('aria-disabled', 'true')
+
+  await viewer.getByRole('button', { name: 'Next photo' }).click()
+  const second = page.getByRole('dialog', { name: 'Photo 2 of 3' }).getByRole('img')
+  await expect(second).toBeVisible()
+  // The next photo slides in from the right.
+  expect(await second.evaluate((element) => getComputedStyle(element).animationName)).toBe('viewer-from-next')
+  await page.keyboard.press('ArrowRight')
+  await expect(page.getByRole('dialog', { name: 'Photo 3 of 3' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Next photo' })).toHaveAttribute('aria-disabled', 'true')
+  await page.keyboard.press('ArrowLeft')
+  await expect(page.getByRole('dialog', { name: 'Photo 2 of 3' })).toBeVisible()
+
+  // Focus stays inside: Shift+Tab from Close goes round to Next.
+  await page.getByRole('button', { name: 'Close' }).focus()
+  await page.keyboard.press('Shift+Tab')
+  await expect(page.getByRole('button', { name: 'Next photo' })).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: 'Close' })).toBeFocused()
+
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(thumbnails.nth(1)).toBeFocused()
+
+  await thumbnails.nth(2).click()
+  await page.getByRole('dialog', { name: 'Photo 3 of 3' }).getByRole('button', { name: 'Close' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(thumbnails.nth(2)).toBeFocused()
+})
+
+test('the photo viewer changes photos with a swipe, and only fades with Reduce Motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await logMeetup(page, ['Alex'], { photos: [tinyPhoto('one.png'), tinyPhoto('two.png')] })
+  await openFriendPage(page, 'Alex')
+  await page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Coffee/ }).click()
+  await page.getByRole('region', { name: 'Photos' }).getByRole('button').first().click()
+  await expect(page.getByRole('dialog', { name: 'Photo 1 of 2' })).toBeVisible()
+
+  // A swipe to the left shows the next photo, to the right the previous one.
+  await page.mouse.move(300, 400)
+  await page.mouse.down()
+  await page.mouse.move(120, 410, { steps: 5 })
+  await page.mouse.up()
+  const image = page.getByRole('dialog', { name: 'Photo 2 of 2' }).getByRole('img')
+  await expect(image).toBeVisible()
+  expect(await image.evaluate((element) => getComputedStyle(element).animationName)).toBe('fade-in')
+
+  await page.mouse.move(100, 400)
+  await page.mouse.down()
+  await page.mouse.move(300, 395, { steps: 5 })
+  await page.mouse.up()
+  await expect(page.getByRole('dialog', { name: 'Photo 1 of 2' })).toBeVisible()
+})

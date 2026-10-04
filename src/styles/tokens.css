@@ -59,6 +59,11 @@
   --danger: oklch(55% 0.19 27);
   --scrim: oklch(22% 0.02 45 / 0.32);
   --shadow-float: 0 10px 30px oklch(35% 0.04 45 / 0.16), 0 2px 6px oklch(35% 0.04 45 / 0.1);
+
+  /* The photo viewer, the one near-black ground, the same in both themes so photos look true. */
+  --viewer-bg: oklch(13% 0.006 55);
+  --viewer-ink: oklch(96% 0.006 70);
+  --viewer-pressed: oklch(100% 0 0 / 0.14);
 }
 
 @media (prefers-color-scheme: dark) {

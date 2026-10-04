@@ -1,0 +1,94 @@
+/* The one near-black ground in the app (see --viewer-bg in tokens.css), in both themes. */
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  background: var(--viewer-bg);
+  color: var(--viewer-ink);
+  animation: fade-in var(--dur) var(--ease-out-quart);
+}
+.viewer :focus-visible {
+  outline-color: var(--viewer-ink);
+}
+.viewer__bar {
+  display: flex;
+  align-items: center;
+  padding: calc(var(--safe-top) + var(--space-1)) var(--space-2) var(--space-1);
+}
+/* The photo fills the space between the bars, letterboxed. No zoom, so the browser's gestures are off here. */
+.viewer__stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: none;
+}
+.viewer__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  animation: fade-in var(--dur) var(--ease-out-quart);
+}
+.viewer__image--next {
+  animation-name: viewer-from-next;
+}
+.viewer__image--previous {
+  animation-name: viewer-from-previous;
+}
+@keyframes viewer-from-next {
+  from {
+    transform: translateX(32px);
+    opacity: 0;
+  }
+}
+@keyframes viewer-from-previous {
+  from {
+    transform: translateX(-32px);
+    opacity: 0;
+  }
+}
+.viewer__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4) calc(var(--safe-bottom) + var(--space-3));
+}
+.viewer__button {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border-radius: 50%;
+  color: var(--viewer-ink);
+  transition:
+    background-color var(--dur-fast),
+    opacity var(--dur-fast);
+}
+.viewer__button:active:not([aria-disabled='true']) {
+  background: var(--viewer-pressed);
+}
+.viewer__button[aria-disabled='true'] {
+  opacity: 0.35;
+  cursor: default;
+}
+.viewer__count {
+  margin: 0;
+  font-size: var(--text-subhead);
+  font-weight: 600;
+}
+
+/* Reduce Motion: no slide, just the fade. */
+@media (prefers-reduced-motion: reduce) {
+  .viewer__image--next,
+  .viewer__image--previous {
+    animation-name: fade-in;
+  }
+}
