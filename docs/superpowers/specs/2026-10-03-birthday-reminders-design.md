@@ -113,7 +113,7 @@ It adds:
 **Settings screen, a new "Reminders" group** with a "Birthday reminders" switch row (`role="switch"`, like the Face ID row). Its footer depends on the state:
 - **Off, and push is available:** "A notification at 11:55 PM the night before each birthday."
 - **Push unavailable** (not the installed Home Screen app, or no `PushManager`): the switch is disabled and the footer says "Open Friend Tracker from your Home Screen to turn on reminders.".
-- **Notifications denied:** the switch is disabled and the footer says "Notifications are off for Friend Tracker. Turn them on in the iPhone's Settings app, under Notifications.".
+- **Notifications denied:** the switch is disabled and the footer says "Notifications are off for Friend Tracker. Turn them on in the iPhone's Settings app, under Notifications → Friends.".
 - **On:** "On. You'll get a note at 11:55 PM the night before each birthday.", plus a **"Send a test notification"** row below the switch.
 - **On, but the last sync failed:** the footer adds "Couldn't update reminders just now. The app will try again next time it opens.".
 
@@ -123,7 +123,7 @@ It adds:
 3. Sync.
 4. Toast "Birthday reminders are on".
 
-If any step fails, the switch stays off with a plain toast: "Couldn't turn on reminders. Please try again." A denial shows the denied footer instead.
+If any step fails, the switch stays off with a plain toast: "Couldn't turn on reminders. Please try again.", or "Birthday reminders aren't set up yet." when the server answers 503 (no Worker bound yet). A denial shows the denied footer, and a plain toast with the same words so VoiceOver announces the change. Turning off that can't be saved shows "Couldn't turn off reminders. Please try again.". A switch that can't be used points at its footer with `aria-describedby`.
 
 **Turning reminders off:** `subscription.unsubscribe()`, then `DELETE /__reminders`, then `enabled: false`. The local switch turns off even if the DELETE fails; it's retried on the next sync.
 
@@ -193,5 +193,7 @@ Recorded in [the plan](../plans/2026-10-03-birthday-reminders.md):
 - **Settings.** The Reminders group sits right after Organize. A switch that can't be used is disabled and dimmed. A dismissed permission prompt counts as a failure. Turning off shows "Birthday reminders are off". Each row ignores taps while it works and for 300 ms after.
 - **Honest copy.** "About your data" now says the times for birthday reminders are sent when they're on (never names). The README adds a "One iPhone" limit and notes that each time gives away a date, but not whose birthday it is.
 - **Build.** The service worker stays one classic script, type-checked by `tsconfig.sw.json` with the WebWorker library. The Worker's tests run in the root `npm test`. Wrangler isn't a dependency: the rollout runs the pinned `npx --yes wrangler@4.147.0`.
+- **Push calls time out.** Each call into the service worker (ready, getSubscription, subscribe, unsubscribe) gets 10 seconds, so a hang can't hold the app's one-at-a-time queue. A friend whose id is empty or over 64 characters gets no reminder, so one bad entry can't make the server refuse the whole schedule.
+- **Hardening.** `p256dh` must start with the 0x04 byte of an uncompressed point; the endpoint is stored in its normalized form and checked again by the sender; failures are logged without the endpoint or any key.
 - **Keys.** The committed public key starts as a marked placeholder that the rollout replaces. `scripts/make-vapid-keys.ts` writes the private key only to a new file outside the repo, or into a pipe.
 - **verify-live** checks a signed-out `PUT /__reminders` (401) and, signed in, that an empty schedule gets 400, which proves the binding without changing the schedule.

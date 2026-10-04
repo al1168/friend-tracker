@@ -23,6 +23,8 @@ export interface PushSubscriptionData {
 
 /** The server keeps at most this many reminders. */
 export const MAX_REMINDERS = 1000
+/** The longest friend id the server takes (see server/reminders.ts). */
+export const MAX_FRIEND_ID_LENGTH = 64
 
 /** Each friend gets a reminder for this many of their next birthdays. */
 export const BIRTHDAYS_AHEAD = 2
@@ -59,6 +61,8 @@ export function buildReminders(friends: readonly Friend[], now: number): Reminde
   const reminders: Reminder[] = []
   for (const friend of friends) {
     if (!friend.birthday) continue
+    // The server refuses the whole schedule over one bad id (a hand-edited backup could have one).
+    if (friend.id.length === 0 || friend.id.length > MAX_FRIEND_ID_LENGTH) continue
     for (const at of reminderTimes(friend.birthday, now)) reminders.push({ at, friendId: friend.id })
   }
   reminders.sort((a, b) => a.at - b.at || (a.friendId < b.friendId ? -1 : a.friendId > b.friendId ? 1 : 0))

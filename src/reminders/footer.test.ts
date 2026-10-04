@@ -23,7 +23,7 @@ describe('reminderFooter', () => {
   it('explains how to allow notifications once they were denied', () => {
     for (const reminders of [REMINDERS_OFF, ON]) {
       expect(reminderFooter('denied', reminders)).toBe(
-        "Notifications are off for Friend Tracker. Turn them on in the iPhone's Settings app, under Notifications.",
+        "Notifications are off for Friend Tracker. Turn them on in the iPhone's Settings app, under Notifications → Friends.",
       )
     }
   })

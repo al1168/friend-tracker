@@ -144,6 +144,16 @@ describe('buildReminders', () => {
     expect(reminders[600]).toEqual({ at: local(2028, 3, 13, 23, 55), friendId: 'f000' })
   })
 
+  it('skips friends whose id the server would refuse', () => {
+    const friends = [
+      withBirthday('', 'No id', bday(10, 14)),
+      withBirthday('x'.repeat(65), 'Long id', bday(10, 14)),
+      withBirthday('x'.repeat(64), 'Longest id', bday(10, 14)),
+      withBirthday('ok', 'Fine', bday(10, 15)),
+    ]
+    expect(buildReminders(friends, now).map((reminder) => reminder.friendId)).toEqual(['x'.repeat(64), 'ok', 'x'.repeat(64), 'ok'])
+  })
+
   it('gives nothing without birthdays', () => {
     expect(buildReminders([withBirthday('lee', 'Lee', null)], now)).toEqual([])
   })

@@ -8,7 +8,7 @@ import { browserReminderDeps } from './browserPush'
 import { syncReminders } from './reminderStore'
 
 /** Sends this long after the last change, so a burst of edits sends once. */
-export const SYNC_DEBOUNCE_MS = 2000
+const SYNC_DEBOUNCE_MS = 2000
 
 export function useReminderSync(): void {
   const settings = useSetting('birthdayReminders')

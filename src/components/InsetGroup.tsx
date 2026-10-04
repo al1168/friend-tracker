@@ -9,12 +9,14 @@ interface InsetGroupProps {
   /** Heading level for the title (3 when nested inside a Section). */
   level?: 2 | 3
   footer?: ReactNode
+  /** An id for the footer, so a row can point at it with `describedBy`. */
+  footerId?: string
   /** Makes the title focusable from code (not by tab), for moving focus here after a control is replaced. */
   titleRef?: Ref<HTMLHeadingElement>
   children: ReactNode
 }
 
-export function InsetGroup({ title, level = 2, footer, titleRef, children }: InsetGroupProps) {
+export function InsetGroup({ title, level = 2, footer, footerId, titleRef, children }: InsetGroupProps) {
   const titleId = useId()
   const Heading = level === 3 ? 'h3' : 'h2'
   return (
@@ -25,7 +27,11 @@ export function InsetGroup({ title, level = 2, footer, titleRef, children }: Ins
         </Heading>
       )}
       <div className="inset-group__body">{children}</div>
-      {footer && <p className="inset-group__footer">{footer}</p>}
+      {footer && (
+        <p id={footerId} className="inset-group__footer">
+          {footer}
+        </p>
+      )}
     </section>
   )
 }
@@ -55,6 +61,8 @@ interface RowProps {
   switchOn?: boolean
   /** Dims a button row and makes it unpressable (the group's footer says why). */
   disabled?: boolean
+  /** The id of text that describes this button row (for a disabled one: why it is). */
+  describedBy?: string
   chevron?: boolean
   accent?: boolean
   destructive?: boolean
@@ -70,6 +78,7 @@ export function Row({
   onClick,
   switchOn,
   disabled,
+  describedBy,
   chevron,
   accent,
   destructive,
@@ -114,6 +123,7 @@ export function Row({
         className={className}
         onClick={onClick}
         disabled={disabled}
+        aria-describedby={describedBy}
         role={switchOn === undefined ? undefined : 'switch'}
         aria-checked={switchOn}
       >

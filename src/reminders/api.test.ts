@@ -33,9 +33,13 @@ describe('putSchedule', () => {
       cache: 'no-store',
       redirect: 'manual',
     })
-    for (const answer of [status(200), status(400), status(503), null]) {
+    for (const answer of [status(200), status(400), status(500), null]) {
       expect(await scheduleApi(fakeFetch(answer).fetcher).putSchedule(BODY)).toBe(false)
     }
+  })
+
+  it('says when the server is not set up for reminders (503)', async () => {
+    expect(await scheduleApi(fakeFetch(status(503)).fetcher).putSchedule(BODY)).toBe('not-set-up')
   })
 
   it('never trusts a redirect', async () => {

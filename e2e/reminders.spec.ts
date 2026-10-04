@@ -52,6 +52,7 @@ test('asks for the Home Screen app in a Safari tab', async ({ page }) => {
   await expect(
     remindersGroup(page).getByText('Open Friend Tracker from your Home Screen to turn on reminders.'),
   ).toBeVisible()
+  await expect(reminderSwitch(page)).toHaveAccessibleDescription('Open Friend Tracker from your Home Screen to turn on reminders.')
   await expect(page.getByRole('button', { name: 'Send a test notification' })).toHaveCount(0)
 })
 
@@ -119,17 +120,29 @@ test('explains how to allow notifications after a denial', async ({ page }) => {
   await reminderSwitch(page).click()
   await expect(
     remindersGroup(page).getByText(
-      "Notifications are off for Friend Tracker. Turn them on in the iPhone's Settings app, under Notifications.",
+      "Notifications are off for Friend Tracker. Turn them on in the iPhone's Settings app, under Notifications → Friends.",
     ),
   ).toBeVisible()
+  await expect(page.getByRole('status')).toContainText('Notifications are off for Friend Tracker.')
   await expect(reminderSwitch(page)).toBeDisabled()
   await expect(reminderSwitch(page)).toHaveAttribute('aria-checked', 'false')
+  await expect(reminderSwitch(page)).toHaveAccessibleDescription(/Notifications → Friends\./)
   expect(server.requests).toEqual([])
+})
+
+test('says so when reminders are not set up on the server', async ({ page }) => {
+  await stubPush(page)
+  await fakeServer(page, 503)
+  await page.goto('/#/settings')
+  await reminderSwitch(page).click()
+  await expect(page.getByRole('status')).toContainText("Birthday reminders aren't set up yet.")
+  await expect(reminderSwitch(page)).toHaveAttribute('aria-checked', 'false')
+  expect(await storedSubscription(page)).toBeNull()
 })
 
 test('stays off when the schedule cannot be saved', async ({ page }) => {
   await stubPush(page)
-  await fakeServer(page, 503)
+  await fakeServer(page, 500)
   await page.goto('/#/settings')
   await reminderSwitch(page).click()
   await expect(page.getByRole('status')).toContainText("Couldn't turn on reminders. Please try again.")

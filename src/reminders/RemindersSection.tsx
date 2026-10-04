@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useId, useRef } from 'react'
 import { InsetGroup, Row } from '../components/InsetGroup'
 import { useToast } from '../components/Toast'
 import { browserReminderDeps } from './browserPush'
@@ -33,18 +33,27 @@ export function RemindersSection({ reminders }: { reminders: BirthdayReminders }
   const [support, recheckSupport] = usePushSupport(browserReminderDeps.push)
   const switchTap = useOneAtATime()
   const testTap = useOneAtATime()
+  const footerId = useId()
   const usable = support === 'available'
 
   const toggle = switchTap(async () => {
     if (reminders.enabled) {
-      await turnOffReminders(browserReminderDeps)
-      toast({ message: 'Birthday reminders are off', tone: 'plain' })
+      try {
+        await turnOffReminders(browserReminderDeps)
+        toast({ message: 'Birthday reminders are off', tone: 'plain' })
+      } catch {
+        // The browser's database refused the write.
+        toast({ message: "Couldn't turn off reminders. Please try again.", tone: 'plain' })
+      }
       return
     }
     const result = await turnOnReminders(browserReminderDeps)
     if (result === 'on') toast({ message: 'Birthday reminders are on' })
-    // The footer now says how to allow notifications.
-    else if (result === 'denied') recheckSupport()
+    else if (result === 'denied') {
+      // The footer now says how to allow notifications; the toast announces it.
+      recheckSupport()
+      toast({ message: reminderFooter('denied', reminders), tone: 'plain' })
+    } else if (result === 'not-set-up') toast({ message: "Birthday reminders aren't set up yet.", tone: 'plain' })
     else toast({ message: "Couldn't turn on reminders. Please try again.", tone: 'plain' })
   })
 
@@ -55,8 +64,14 @@ export function RemindersSection({ reminders }: { reminders: BirthdayReminders }
   })
 
   return (
-    <InsetGroup title="Reminders" footer={reminderFooter(support, reminders)}>
-      <Row title="Birthday reminders" switchOn={reminders.enabled} disabled={!usable} onClick={toggle} />
+    <InsetGroup title="Reminders" footer={reminderFooter(support, reminders)} footerId={footerId}>
+      <Row
+        title="Birthday reminders"
+        switchOn={reminders.enabled}
+        disabled={!usable}
+        describedBy={usable ? undefined : footerId}
+        onClick={toggle}
+      />
       {reminders.enabled && usable && <Row title="Send a test notification" accent onClick={sendTest} />}
     </InsetGroup>
   )

@@ -43,7 +43,7 @@ Setup (once):
 
 1. `node scripts/make-vapid-keys.ts --out <a new file outside this folder>` makes the VAPID key pair. It writes the public key into `src/reminders/vapidKey.ts` and `reminders/wrangler.jsonc` (commit both) and the private key (a JWK) into that file only. Never commit or print the private key.
 2. `npx --yes wrangler@4.147.0 login`, then `npx --yes wrangler@4.147.0 deploy --config reminders/wrangler.jsonc`.
-3. `npx --yes wrangler@4.147.0 secret put VAPID_PRIVATE_KEY --config reminders/wrangler.jsonc < <that file>`, then delete the file.
+3. In Git Bash: `npx --yes wrangler@4.147.0 secret put VAPID_PRIVATE_KEY --config reminders/wrangler.jsonc < <that file>`. In PowerShell: `Get-Content -Raw <that file> | npx --yes wrangler@4.147.0 secret put VAPID_PRIVATE_KEY --config reminders/wrangler.jsonc`. Then delete the file.
 4. In the Pages project: **Settings → Bindings → Add → Service binding**, `REMINDERS` → `friend-tracker-reminders`, for Production. Then redeploy.
 5. `node scripts/verify-live.ts https://friend.aldenlu.com/` (with `FT_PASSWORD` set it also checks that the binding works).
 

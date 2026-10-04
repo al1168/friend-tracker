@@ -3233,7 +3233,7 @@ describe('reminderFooter', () => {
   it('explains how to allow notifications once they were denied', () => {
     for (const reminders of [REMINDERS_OFF, ON]) {
       expect(reminderFooter('denied', reminders)).toBe(
-        "Notifications are off for Friend Tracker. Turn them on in the iPhone's Settings app, under Notifications.",
+        "Notifications are off for Friend Tracker. Turn them on in the iPhone's Settings app, under Notifications → Friends.",
       )
     }
   })
@@ -3269,7 +3269,7 @@ import type { BirthdayReminders, PushSupport } from './types'
 export function reminderFooter(support: PushSupport, reminders: BirthdayReminders): string {
   if (support === 'unavailable') return 'Open Friend Tracker from your Home Screen to turn on reminders.'
   if (support === 'denied') {
-    return "Notifications are off for Friend Tracker. Turn them on in the iPhone's Settings app, under Notifications."
+    return "Notifications are off for Friend Tracker. Turn them on in the iPhone's Settings app, under Notifications → Friends."
   }
   if (reminders.enabled) {
     const on = "On. You'll get a note at 11:55 PM the night before each birthday."
@@ -4074,7 +4074,7 @@ test('explains how to allow notifications after a denial', async ({ page }) => {
   await reminderSwitch(page).click()
   await expect(
     remindersGroup(page).getByText(
-      "Notifications are off for Friend Tracker. Turn them on in the iPhone's Settings app, under Notifications.",
+      "Notifications are off for Friend Tracker. Turn them on in the iPhone's Settings app, under Notifications → Friends.",
     ),
   ).toBeVisible()
   await expect(reminderSwitch(page)).toBeDisabled()
@@ -4597,13 +4597,13 @@ If something is off, fix the markup or CSS from Steps 8 and 9, then run `npx pla
 - [ ] **Step 12: Run everything**
 
 Run: `npm test`
-Expected: `Test Files  42 passed (42)` and `Tests  443 passed (443)`.
+Expected: `Test Files  43 passed (43)` and `Tests  461 passed (461)` (the totals after the review fixes; the counts in the task steps above are the plan's own, before them).
 
 Run: `npm run build`
 Expected: `tsc -b` passes and Vite prints `✓ built in ...`.
 
 Run: `npm run e2e`
-Expected: `93 passed`.
+Expected: `94 passed`.
 
 Run: `git status --short`
 Expected: only the files listed for this task (the PNGs are ignored by git).
@@ -4783,7 +4783,7 @@ Setup (once):
 
 1. `node scripts/make-vapid-keys.ts --out <a new file outside this folder>` makes the VAPID key pair. It writes the public key into `src/reminders/vapidKey.ts` and `reminders/wrangler.jsonc` (commit both) and the private key (a JWK) into that file only. Never commit or print the private key.
 2. `npx --yes wrangler@4.147.0 login`, then `npx --yes wrangler@4.147.0 deploy --config reminders/wrangler.jsonc`.
-3. `npx --yes wrangler@4.147.0 secret put VAPID_PRIVATE_KEY --config reminders/wrangler.jsonc < <that file>`, then delete the file.
+3. In Git Bash: `npx --yes wrangler@4.147.0 secret put VAPID_PRIVATE_KEY --config reminders/wrangler.jsonc < <that file>`. In PowerShell: `Get-Content -Raw <that file> | npx --yes wrangler@4.147.0 secret put VAPID_PRIVATE_KEY --config reminders/wrangler.jsonc`. Then delete the file.
 4. In the Pages project: **Settings → Bindings → Add → Service binding**, `REMINDERS` → `friend-tracker-reminders`, for Production. Then redeploy.
 5. `node scripts/verify-live.ts https://friend.aldenlu.com/` (with `FT_PASSWORD` set it also checks that the binding works).
 
@@ -4851,7 +4851,7 @@ with:
 
 ```markdown
 ### Reminders group
-The "Reminders" inset group in Settings, right after Organize: a "Birthday reminders" switch row and, while it's on, a "Send a test notification" accent row. The footer says in plain words what the switch does, that it's on, or why it can't be used: "A notification at 11:55 PM the night before each birthday.", "On. You'll get a note at 11:55 PM the night before each birthday." (plus "Couldn't update reminders just now. The app will try again next time it opens." after a failed update), "Open Friend Tracker from your Home Screen to turn on reminders.", "Notifications are off for Friend Tracker. Turn them on in the iPhone's Settings app, under Notifications.", or "Reminders stopped. Turn them on again.". Toasts: "Birthday reminders are on" and "Test notification sent" with the check; "Birthday reminders are off", "Couldn't turn on reminders. Please try again." and "Couldn't send a test notification. Please try again." plain.
+The "Reminders" inset group in Settings, right after Organize: a "Birthday reminders" switch row and, while it's on, a "Send a test notification" accent row. The footer says in plain words what the switch does, that it's on, or why it can't be used: "A notification at 11:55 PM the night before each birthday.", "On. You'll get a note at 11:55 PM the night before each birthday." (plus "Couldn't update reminders just now. The app will try again next time it opens." after a failed update), "Open Friend Tracker from your Home Screen to turn on reminders.", "Notifications are off for Friend Tracker. Turn them on in the iPhone's Settings app, under Notifications → Friends.", or "Reminders stopped. Turn them on again.". Toasts: "Birthday reminders are on" and "Test notification sent" with the check; "Birthday reminders are off", "Couldn't turn on reminders. Please try again.", "Birthday reminders aren't set up yet.", "Couldn't turn off reminders. Please try again." and "Couldn't send a test notification. Please try again." plain, and the denied footer's words as a plain toast when notifications are refused.
 - **The notification** is drawn by iOS: "🎂 Alex's birthday starts in 5 minutes" over "Send them a message.", one per night, naming everyone whose birthday it is ("🎂 Alex and Sam: birthdays at midnight"). Tapping it opens that friend, or the Friends tab for several. When the app can't tell who, it says "🎂 A birthday is coming up" and "Open Friend Tracker to see who.".
 
 ### Stat row
@@ -4899,13 +4899,13 @@ Recorded in [the plan](../plans/2026-10-03-birthday-reminders.md):
 - [ ] **Step 6: Run every check**
 
 Run: `npm test`
-Expected: `Test Files  42 passed (42)` and `Tests  443 passed (443)`.
+Expected: `Test Files  43 passed (43)` and `Tests  461 passed (461)` (the totals after the review fixes; the counts in the task steps above are the plan's own, before them).
 
 Run: `npm run build`
 Expected: `tsc -b` passes (it type-checks `scripts/make-vapid-keys.ts` with `tsconfig.node.json`) and Vite prints `✓ built in ...`.
 
 Run: `npm run e2e`
-Expected: `93 passed`.
+Expected: `94 passed`.
 
 Run: `grep -n '—' README.md DESIGN.md docs/superpowers/specs/2026-10-03-birthday-reminders-design.md scripts/make-vapid-keys.ts src/reminders/*.ts src/reminders/*.tsx src/sw/*.ts src/lib/reminders.ts server/reminders.ts reminders/src/*.ts`
 Expected: no output (no em dashes in anything this plan added; the pre-existing docs have none either).
@@ -4945,7 +4945,7 @@ npm run e2e
 grep -c PLACEHOLDER src/reminders/vapidKey.ts
 ```
 
-Expected: `git status` prints nothing. The log shows the design and plan commits and the seven task commits (plus any review fixes). `npm test` shows `Test Files  42 passed (42)` and `Tests  443 passed (443)`, the build passes, `npm run e2e` shows `93 passed`, and the placeholder is still there (`1`).
+Expected: `git status` shows only `?? docs/superpowers/specs/2026-10-03-meetup-memories-design.md` (an untracked spec from another feature: expected, and never committed). The log shows the design and plan commits and the task commits (plus the review fixes). `npm test` shows `Test Files  43 passed (43)` and `Tests  461 passed (461)`, the build passes, `npm run e2e` shows `94 passed`, and the placeholder is still there (`1`).
 
 - [ ] **Step 2: Make the real VAPID keys and commit the public key**
 
@@ -5013,7 +5013,13 @@ Expected: `✨ Success! Uploaded secret VAPID_PRIVATE_KEY` (Wrangler reads the v
 
 - [ ] **Step 6: Merge and push**
 
-Ask the owner first, then:
+Ask the owner first. First a guard: the real key must be committed before anything ships.
+
+```bash
+grep -c PLACEHOLDER src/reminders/vapidKey.ts reminders/wrangler.jsonc
+```
+
+Expected: `src/reminders/vapidKey.ts:0` and `reminders/wrangler.jsonc:0`. Anything else means Step 2's key was never committed: stop and go back to Step 2. Then:
 
 ```bash
 git checkout main

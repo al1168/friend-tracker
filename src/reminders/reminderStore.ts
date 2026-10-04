@@ -83,7 +83,7 @@ async function buildSchedule(subscription: SubscriptionLike, now: number) {
   return { body: { subscription: data, reminders }, hash: await scheduleHash(data, reminders) }
 }
 
-export type TurnOnResult = 'on' | 'denied' | 'failed'
+export type TurnOnResult = 'on' | 'denied' | 'not-set-up' | 'failed'
 
 /**
  * Turns reminders on, from a tap: asks for permission (right away, while iOS still counts the tap),
@@ -98,6 +98,7 @@ export function turnOnReminders(deps: ReminderDeps): Promise<TurnOnResult> {
   }
   return exclusive(async () => {
     let subscription: SubscriptionLike | null = null
+    let notSetUp = false
     try {
       const permission = await asked
       if (permission === 'denied') return 'denied'
@@ -105,13 +106,15 @@ export function turnOnReminders(deps: ReminderDeps): Promise<TurnOnResult> {
       subscription = await subscribeWithAppKey(deps.push)
       const now = deps.now()
       const { body, hash } = await buildSchedule(subscription, now)
-      if (!(await deps.api.putSchedule(body))) throw new Error('The server did not save the schedule.')
+      const saved = await deps.api.putSchedule(body)
+      notSetUp = saved === 'not-set-up'
+      if (saved !== true) throw new Error('The server did not save the schedule.')
       await setSetting('birthdayReminders', synced(hash, now))
       return 'on'
     } catch {
       // Leave nothing behind.
       await subscription?.unsubscribe().catch(() => false)
-      return 'failed'
+      return notSetUp ? 'not-set-up' : 'failed'
     }
   })
 }
@@ -158,7 +161,7 @@ async function syncNow(deps: ReminderDeps, force: boolean): Promise<void> {
   const syncedAt = settings.lastSyncedAt === null ? Number.NaN : Date.parse(settings.lastSyncedAt)
   const upToDate = hash === settings.lastSyncedHash && settings.lastError === null && now - syncedAt < REFRESH_MS
   if (upToDate && !force) return
-  const saved = await deps.api.putSchedule(body)
+  const saved = (await deps.api.putSchedule(body)) === true
   // Turned off meanwhile: leave it off.
   await updateReminders((current) =>
     !current.enabled ? null : saved ? synced(hash, now) : { ...current, lastError: 'sync' },

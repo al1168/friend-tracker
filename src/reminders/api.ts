@@ -3,8 +3,8 @@
 
 import type { PushSubscriptionData, Reminder } from '../lib/reminders'
 
-export const REMINDERS_URL = '/__reminders'
-export const REMINDERS_TEST_URL = '/__reminders/test'
+const REMINDERS_URL = '/__reminders'
+const REMINDERS_TEST_URL = '/__reminders/test'
 
 const TIMEOUT_MS = 15_000
 
@@ -18,8 +18,8 @@ export interface ScheduleBody {
 export type TestAnswer = 'sent' | 'no-subscription' | 'gone' | 'error'
 
 export interface ScheduleApi {
-  /** True when the server saved the schedule. */
-  putSchedule(body: ScheduleBody): Promise<boolean>
+  /** True when the server saved the schedule, or 'not-set-up' (503) when it has no reminders Worker yet. */
+  putSchedule(body: ScheduleBody): Promise<boolean | 'not-set-up'>
   /** True when the server deleted the schedule. */
   deleteSchedule(): Promise<boolean>
   sendTest(): Promise<TestAnswer>
@@ -45,12 +45,14 @@ async function statusOf(fetcher: typeof fetch, url: string, init: RequestInit): 
 
 export function scheduleApi(fetcher: typeof fetch = fetch): ScheduleApi {
   return {
-    putSchedule: async (body) =>
-      (await statusOf(fetcher, REMINDERS_URL, {
+    putSchedule: async (body) => {
+      const status = await statusOf(fetcher, REMINDERS_URL, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      })) === 204,
+      })
+      return status === 503 ? 'not-set-up' : status === 204
+    },
     deleteSchedule: async () => (await statusOf(fetcher, REMINDERS_URL, { method: 'DELETE' })) === 204,
     sendTest: async () => {
       switch (await statusOf(fetcher, REMINDERS_TEST_URL, { method: 'POST' })) {

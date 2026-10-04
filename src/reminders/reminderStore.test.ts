@@ -70,7 +70,7 @@ function fakePush({ support = 'available', answer = 'granted', existing = null }
 }
 
 /** The server: records each call and answers as told. */
-function fakeApi(answers: { put?: boolean[]; remove?: boolean[]; test?: TestAnswer[] } = {}) {
+function fakeApi(answers: { put?: (boolean | 'not-set-up')[]; remove?: boolean[]; test?: TestAnswer[] } = {}) {
   const calls: { method: string; body?: ScheduleBody }[] = []
   const api: ScheduleApi = {
     putSchedule: async (body) => {
@@ -175,6 +175,14 @@ describe('turnOnReminders', () => {
   it('stays off, and drops the subscription, when the server does not save the schedule', async () => {
     const { push, state } = fakePush()
     expect(await turnOnReminders(deps(push, fakeApi({ put: [false] }).api))).toBe('failed')
+    expect(state.made?.state.unsubscribed).toBe(true)
+    expect(await getSetting('birthdayReminders')).toEqual(REMINDERS_OFF)
+  })
+
+  it('says so when the server is not set up for reminders', async () => {
+    const { push, state } = fakePush()
+    const server = fakeApi({ put: ['not-set-up'] })
+    expect(await turnOnReminders(deps(push, server.api))).toBe('not-set-up')
     expect(state.made?.state.unsubscribed).toBe(true)
     expect(await getSetting('birthdayReminders')).toEqual(REMINDERS_OFF)
   })
