@@ -1,4 +1,4 @@
-import { useId, type ReactNode, type RefObject } from 'react'
+import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react'
 import { IconChevronDown } from '../components/icons'
 import { EMPTY_BIRTHDAY_FIELDS, maxDay, MIN_BIRTH_YEAR, type BirthdayFields } from '../lib/birthdays'
 import { MONTH_NAMES, yearOf, type ISODate } from '../lib/dates'
@@ -22,7 +22,13 @@ export function BirthdayField({ value, error, today, rowRef, onChange }: Birthda
   const days = Array.from({ length: maxDay(value.month) }, (_, i) => i + 1)
   const thisYear = yearOf(today)
   const years = Array.from({ length: thisYear - MIN_BIRTH_YEAR + 1 }, (_, i) => thisYear - i)
+  const errorRef = useRef<HTMLParagraphElement>(null)
   const isSet = value.month !== null || value.day !== null || value.year !== null
+
+  // At large text sizes the error can sit under the sheet's Save footer; bring it into view.
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [error])
 
   function changeMonth(month: number | null) {
     // A day the new month doesn't have (Jan 31, then February) goes back to empty.
@@ -93,7 +99,7 @@ export function BirthdayField({ value, error, today, rowRef, onChange }: Birthda
         </BirthdaySelect>
       </div>
       {error && (
-        <p className="field-error" id={errorId}>
+        <p ref={errorRef} className="field-error" id={errorId}>
           {error}
         </p>
       )}

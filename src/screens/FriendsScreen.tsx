@@ -26,7 +26,7 @@ import './FriendsScreen.css'
 const SORT_KEY = 'friend-tracker:sort'
 const SORTS = Object.keys(FRIEND_SORT_LABELS) as FriendSort[]
 /** The most rows Birthdays soon shows. Its footer counts the rest. */
-const MAX_BIRTHDAYS_SOON = 5
+const MAX_BIRTHDAYS_SOON = 3
 
 function readStoredSort(): FriendSort {
   try {

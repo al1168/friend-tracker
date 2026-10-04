@@ -200,7 +200,7 @@ test('lists the birthdays in the next two weeks on the Friends tab', async ({ pa
   await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
 })
 
-test('shows at most five birthdays soon, then how many more', async ({ page }) => {
+test('shows at most three birthdays soon, then how many more', async ({ page }) => {
   await page.goto('/')
   for (const [days, name] of ['Ana', 'Ben', 'Cal', 'Dee', 'Eve', 'Fay'].entries()) {
     const { month, day } = dayFromToday(days)
@@ -208,9 +208,9 @@ test('shows at most five birthdays soon, then how many more', async ({ page }) =
   }
 
   const soon = page.getByRole('region', { name: 'Birthdays soon' })
-  await expect(soon.getByRole('link')).toHaveCount(5)
-  await expect(soon.getByRole('link').last()).toContainText('Eve')
-  await expect(soon).toContainText('And 1 more in the next two weeks.')
+  await expect(soon.getByRole('link')).toHaveCount(3)
+  await expect(soon.getByRole('link').last()).toContainText('Cal')
+  await expect(soon).toContainText('And 3 more in the next two weeks.')
 })
 
 test('keeps birthdays through a backup', async ({ page }) => {

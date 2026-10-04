@@ -113,7 +113,11 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
       }
       onClose()
     } catch (error) {
-      if (error instanceof ValidationError) setNameError(error.message)
+      if (error instanceof ValidationError) {
+        // The data layer's birthday message belongs under the Birthday row, not under Name.
+        if (/birthday/i.test(error.message)) setBirthdayError(error.message)
+        else setNameError(error.message)
+      }
       else toast({ message: "Couldn't save. Please try again.", tone: 'plain' })
     } finally {
       savingRef.current = false

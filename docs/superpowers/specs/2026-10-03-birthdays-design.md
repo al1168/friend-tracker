@@ -89,13 +89,13 @@ Above the search field, an inset group titled **Birthdays soon** lists `upcoming
 - **When it shows:**
   - Hidden when the list is empty, while searching (the query isn't empty), and while a group filter is active, so the list stays a plain filtered list.
   - Hidden when the owner has no friends yet (the empty state shows).
-- **Size:** at most 5 rows. If more are due, the group's footer says "And 3 more in the next two weeks."
+- **Size:** at most 3 rows. If more are due, the group's footer says "And 3 more in the next two weeks."
 
 ## DESIGN.md
 
 - In **Friend detail column**, add the Birthday section.
 - In **Inputs and fields**, add the select row.
-- In **Components**, add a short **Birthdays soon** subsection: an inset group above the search field on the Friends tab, with at most 5 rows and its footer.
+- In **Components**, add a short **Birthdays soon** subsection: an inset group above the search field on the Friends tab, with at most 3 rows and its footer.
 
 ## Testing
 

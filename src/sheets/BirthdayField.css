@@ -20,7 +20,7 @@
 .birthday-select .field {
   -webkit-appearance: none;
   appearance: none;
-  padding-inline: 0.75rem 1.75rem;
+  padding-inline: 0.9rem 1.75rem;
 }
 /* The empty choice ("Month", "Day", "No year") reads like a placeholder. */
 .birthday-select .field[data-empty='true'] {
