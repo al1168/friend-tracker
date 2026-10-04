@@ -1,13 +1,14 @@
 import { isValidBirthday } from '../lib/birthdays'
 import { addDays, isISODate, todayISO, type ISODate } from '../lib/dates'
 import { cleanItems, indexOfItem, MAX_ITEM_LENGTH, MAX_ITEMS, type PreferenceKind } from '../lib/preferences'
-import type { Birthday, Friend, Group, Meetup, MeetupType } from '../types'
+import type { Birthday, Friend, Group, Meetup, MeetupPhoto, MeetupType } from '../types'
 
 export interface BackupData {
   friends: Friend[]
   groups: Group[]
   meetupTypes: MeetupType[]
   meetups: Meetup[]
+  meetupPhotos: MeetupPhoto[]
 }
 
 export interface BackupFile extends BackupData {
@@ -189,5 +190,6 @@ function readBackup(raw: unknown, today: ISODate): BackupData {
     }
   })
 
-  return { friends, groups, meetupTypes, meetups }
+  // Backups up to version 3 were made before photos existed.
+  return { friends, groups, meetupTypes, meetups, meetupPhotos: [] }
 }

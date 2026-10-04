@@ -43,14 +43,18 @@ export async function updateFriend(id: string, input: FriendInput): Promise<void
   })
 }
 
-/** Deletes a friend, removes them from meetups, and deletes meetups left with nobody. */
+/** Deletes a friend, removes them from meetups, and deletes meetups left with nobody (and their photos). */
 export async function deleteFriend(id: string): Promise<void> {
-  await db.transaction('rw', db.friends, db.meetups, async () => {
+  await db.transaction('rw', db.friends, db.meetups, db.meetupPhotos, async () => {
     const affected = await db.meetups.where('friendIds').equals(id).toArray()
     for (const meetup of affected) {
       const remaining = meetup.friendIds.filter((friendId) => friendId !== id)
-      if (remaining.length === 0) await db.meetups.delete(meetup.id)
-      else await db.meetups.update(meetup.id, { friendIds: remaining })
+      if (remaining.length === 0) {
+        await db.meetups.delete(meetup.id)
+        await db.meetupPhotos.where('meetupId').equals(meetup.id).delete()
+      } else {
+        await db.meetups.update(meetup.id, { friendIds: remaining })
+      }
     }
     await db.friends.delete(id)
   })

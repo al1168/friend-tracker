@@ -2,7 +2,15 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { db, resetDatabase } from './db'
 import { ValidationError } from './errors'
 import { addFriend, deleteFriend } from './friends'
-import { addMeetup, deleteMeetup, restoreMeetup, updateMeetup, type MeetupInput } from './meetups'
+import {
+  addMeetup,
+  deleteMeetup,
+  photoCount,
+  restoreMeetup,
+  updateMeetup,
+  type MeetupInput,
+  type NewPhoto,
+} from './meetups'
 
 const base: MeetupInput = { date: '2026-09-01', typeId: 'type-coffee', friendIds: ['alex'], note: '', activities: [] }
 
@@ -71,6 +79,105 @@ describe('updateMeetup on a missing meetup', () => {
 
 const friendInput = (name: string) => ({ name, groupId: null, photo: null, notes: '', birthday: null })
 
+/** A resized photo as the sheet hands it over (tiny stand-in images). */
+function newPhoto(id: string): NewPhoto {
+  return { id, full: `data:image/jpeg;base64,FULL${id}`, thumb: `data:image/jpeg;base64,THUMB${id}`, width: 4, height: 3 }
+}
+
+/** A meetup's photo ids, in order. */
+async function photoIds(meetupId: string): Promise<string[]> {
+  return (await db.meetupPhotos.where('meetupId').equals(meetupId).sortBy('order')).map((photo) => photo.id)
+}
+
+describe('photos saved with a meetup', () => {
+  it('adds new photos with the meetup, numbered in order', async () => {
+    const meetup = await addMeetup(base, { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: ['a', 'b'] })
+    expect(await db.meetupPhotos.get('b')).toEqual({
+      ...newPhoto('b'),
+      meetupId: meetup.id,
+      order: 1,
+      createdAt: meetup.createdAt,
+    })
+    expect(await photoIds(meetup.id)).toEqual(['a', 'b'])
+    // Photos are never stored inside the meetup.
+    expect(await db.meetups.get(meetup.id)).toEqual(meetup)
+  })
+
+  it('adds, removes and reorders in one update', async () => {
+    const meetup = await addMeetup(base, {
+      add: [newPhoto('a'), newPhoto('b'), newPhoto('c')],
+      removeIds: [],
+      order: [],
+    })
+    await updateMeetup(
+      meetup.id,
+      { ...base, note: 'Pizza' },
+      { add: [newPhoto('d')], removeIds: ['b'], order: ['d', 'c', 'a'] },
+    )
+    expect(await photoIds(meetup.id)).toEqual(['d', 'c', 'a'])
+    const orders = (await db.meetupPhotos.where('meetupId').equals(meetup.id).sortBy('order')).map((p) => p.order)
+    expect(orders).toEqual([0, 1, 2])
+    expect(await db.meetupPhotos.get('b')).toBeUndefined()
+    expect(await db.meetups.get(meetup.id)).toMatchObject({ note: 'Pizza' })
+  })
+
+  it('keeps photos left out of the order after the listed ones, and ignores other meetups photos', async () => {
+    const meetup = await addMeetup(base, { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: [] })
+    const other = await addMeetup(base, { add: [newPhoto('x')], removeIds: [], order: [] })
+    await updateMeetup(meetup.id, base, { add: [newPhoto('c')], removeIds: ['x'], order: ['b'] })
+    expect(await photoIds(meetup.id)).toEqual(['b', 'a', 'c'])
+    expect(await photoIds(other.id)).toEqual(['x'])
+  })
+
+  it('leaves the photos alone when nothing about them changes', async () => {
+    const meetup = await addMeetup(base, { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: [] })
+    await updateMeetup(meetup.id, { ...base, note: 'Pizza' })
+    expect(await photoIds(meetup.id)).toEqual(['a', 'b'])
+  })
+
+  it('rolls the meetup back when a photo write fails', async () => {
+    const meetup = await addMeetup(base, { add: [newPhoto('a')], removeIds: [], order: [] })
+    // Adding a photo id that is already stored fails inside the transaction.
+    const sameIdAgain = { add: [newPhoto('a')], removeIds: [], order: [] }
+    await expect(updateMeetup(meetup.id, { ...base, note: 'Pizza' }, sameIdAgain)).rejects.toThrow()
+    expect(await db.meetups.get(meetup.id)).toMatchObject({ note: '' })
+    expect(await photoIds(meetup.id)).toEqual(['a'])
+
+    await expect(addMeetup(base, sameIdAgain)).rejects.toThrow()
+    expect(await db.meetups.count()).toBe(1)
+  })
+
+  it('refuses more than 20 photos and changes nothing', async () => {
+    const twenty = Array.from({ length: 20 }, (_, i) => newPhoto(`p${i}`))
+    const meetup = await addMeetup(base, { add: twenty, removeIds: [], order: [] })
+    const oneMore = { add: [newPhoto('one-more')], removeIds: [], order: [] }
+    await expect(updateMeetup(meetup.id, { ...base, note: 'Pizza' }, oneMore)).rejects.toThrow(
+      'A meetup can have up to 20 photos.',
+    )
+    expect(await db.meetups.get(meetup.id)).toMatchObject({ note: '' })
+    expect(await db.meetupPhotos.count()).toBe(20)
+
+    // Removing one makes room for another in the same update.
+    await updateMeetup(meetup.id, base, { ...oneMore, removeIds: ['p0'] })
+    expect(await db.meetupPhotos.count()).toBe(20)
+    expect(await db.meetupPhotos.get('one-more')).toMatchObject({ order: 19 })
+  })
+
+  it('refuses a photo that is not a JPEG or PNG data URL, and saves nothing', async () => {
+    const bad = { ...newPhoto('a'), full: 'https://example.com/a.jpg' }
+    await expect(addMeetup(base, { add: [bad], removeIds: [], order: [] })).rejects.toThrow("A photo couldn't be saved.")
+    expect(await db.meetups.count()).toBe(0)
+    expect(await db.meetupPhotos.count()).toBe(0)
+  })
+
+  it('counts every stored photo', async () => {
+    expect(await photoCount()).toBe(0)
+    await addMeetup(base, { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: [] })
+    await addMeetup(base, { add: [newPhoto('c')], removeIds: [], order: [] })
+    expect(await photoCount()).toBe(3)
+  })
+})
+
 describe('deleteMeetup and restoreMeetup', () => {
   it('deletes a meetup and restores it exactly', async () => {
     const alex = await addFriend(friendInput('Alex'))
@@ -111,5 +218,30 @@ describe('deleteMeetup and restoreMeetup', () => {
 
   it('returns undefined for a missing meetup', async () => {
     expect(await deleteMeetup('nope')).toBeUndefined()
+  })
+
+  it('deletes the photos with the meetup, and Undo puts them back', async () => {
+    const alex = await addFriend(friendInput('Alex'))
+    const meetup = await addMeetup(
+      { ...base, friendIds: [alex.id] },
+      { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: ['b', 'a'] },
+    )
+    const before = await db.meetupPhotos.where('meetupId').equals(meetup.id).sortBy('order')
+    const deleted = await deleteMeetup(meetup.id)
+    expect(deleted).toEqual({ meetup, photos: before })
+    expect(await db.meetupPhotos.count()).toBe(0)
+
+    expect(await restoreMeetup(deleted!)).toBe(true)
+    expect(await db.meetups.get(meetup.id)).toEqual(meetup)
+    expect(await db.meetupPhotos.where('meetupId').equals(meetup.id).sortBy('order')).toEqual(before)
+  })
+
+  it('puts no photos back when the meetup cannot be restored', async () => {
+    const alex = await addFriend(friendInput('Alex'))
+    const meetup = await addMeetup({ ...base, friendIds: [alex.id] }, { add: [newPhoto('a')], removeIds: [], order: [] })
+    const deleted = await deleteMeetup(meetup.id)
+    await deleteFriend(alex.id)
+    expect(await restoreMeetup(deleted!)).toBe(false)
+    expect(await db.meetupPhotos.count()).toBe(0)
   })
 })

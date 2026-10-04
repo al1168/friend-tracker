@@ -27,6 +27,11 @@ export function useMeetups(): Meetup[] | undefined {
   return useLiveQuery(() => db.meetups.toArray())
 }
 
+/** How many meetup photos are stored. A cheap live count: it never reads an image. */
+export function usePhotoCount(): number | undefined {
+  return useLiveQuery(() => db.meetupPhotos.count())
+}
+
 export function useSetting<K extends keyof Settings>(key: K): Settings[K] | undefined {
   return useLiveQuery(() => getSetting(key), [key])
 }

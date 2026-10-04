@@ -1,11 +1,11 @@
 import { useRef, useState, type ChangeEvent } from 'react'
-import { exportBackup } from '../backup/exportBackup'
-import { parseBackupFile, replaceAllData } from '../backup/storage'
+import { exportBackup, shareBackupFile } from '../backup/exportBackup'
+import { parseBackupFile, readAllPhotos, replaceAllData } from '../backup/storage'
 import { useConfirm } from '../components/ActionSheet'
 import { InsetGroup, Row } from '../components/InsetGroup'
 import { Page } from '../components/Page'
 import { useToast } from '../components/Toast'
-import { useFriends, useGroups, useMeetups, useMeetupTypes, useSetting } from '../data/hooks'
+import { useFriends, useGroups, useMeetups, useMeetupTypes, usePhotoCount, useSetting } from '../data/hooks'
 import { useToday } from '../hooks/useToday'
 import { describeLastBackup, plural } from '../lib/text'
 import { AppLockSection } from '../lock/AppLockSection'
@@ -18,6 +18,8 @@ export function SettingsScreen() {
   const groups = useGroups()
   const meetupTypes = useMeetupTypes()
   const meetups = useMeetups()
+  // Settings never holds the photos themselves: only how many there are.
+  const photoCount = usePhotoCount()
   const lastBackupAt = useSetting('lastBackupAt')
   const appLock = useSetting('appLock')
   const birthdayReminders = useSetting('birthdayReminders')
@@ -31,14 +33,34 @@ export function SettingsScreen() {
 
   if (!friends || !groups || !meetupTypes || !meetups || lastBackupAt === undefined) return null
   if (appLock === undefined || passkeyAvailable === undefined || birthdayReminders === undefined) return null
+  if (photoCount === undefined) return null
 
-  // Uses data that's already loaded, so the iOS share sheet opens straight from the tap.
+  // Shares a backup made earlier, from the fresh tap on the toast's Share action.
+  const shareReadyBackup = async (file: File) => {
+    try {
+      const { outcome } = await shareBackupFile(file)
+      if (outcome !== 'cancelled') toast({ message: 'Backup saved' })
+    } catch {
+      toast({ message: "Couldn't create the backup.", tone: 'plain' })
+    }
+  }
+
+  // With no photos the backup is built from data that's already loaded, with no await before share(), so the
+  // iOS share sheet opens straight from the tap. Photos are read only now, at tap time (Settings never keeps them
+  // in memory); that await can use up the tap, so a refused share offers a "Share" action to tap again.
   const exportData = async () => {
     if (exportingRef.current) return
     exportingRef.current = true
     try {
-      const outcome = await exportBackup({ friends, groups, meetupTypes, meetups })
-      if (outcome !== 'cancelled') toast({ message: 'Backup saved' })
+      const hasPhotos = photoCount > 0
+      const meetupPhotos = hasPhotos ? await readAllPhotos() : []
+      const result = await exportBackup({ friends, groups, meetupTypes, meetups, meetupPhotos }, hasPhotos)
+      if (result.outcome === 'needs-tap') {
+        const { file } = result
+        toast({ message: 'Backup ready', actionLabel: 'Share', onAction: () => void shareReadyBackup(file) })
+      } else if (result.outcome !== 'cancelled') {
+        toast({ message: 'Backup saved' })
+      }
     } catch {
       toast({ message: "Couldn't create the backup.", tone: 'plain' })
     } finally {

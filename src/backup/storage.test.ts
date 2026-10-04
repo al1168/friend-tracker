@@ -7,9 +7,9 @@ import { addMeetup } from '../db/meetups'
 import { addPreferences } from '../db/preferences'
 import type { AppLock, LockFailures } from '../lock/types'
 import type { BirthdayReminders } from '../reminders/types'
-import { friend, meetupType } from '../test/fixtures'
+import { friend, meetup, meetupPhoto, meetupType } from '../test/fixtures'
 import { createBackup, type BackupData } from './format'
-import { parseBackupFile, readAllData, replaceAllData } from './storage'
+import { parseBackupFile, readAllData, readAllPhotos, replaceAllData } from './storage'
 
 beforeEach(resetDatabase)
 
@@ -20,6 +20,7 @@ function sortById(data: BackupData): BackupData {
     groups: byId(data.groups),
     meetupTypes: byId(data.meetupTypes),
     meetups: byId(data.meetups),
+    meetupPhotos: byId(data.meetupPhotos),
   }
 }
 
@@ -71,7 +72,7 @@ describe('backup storage', () => {
     await setSetting('appLock', appLock)
     await setSetting('appLockFailures', appLockFailures)
 
-    await replaceAllData({ friends: [friend('f1', 'Alex')], groups: [], meetupTypes: [], meetups: [] })
+    await replaceAllData({ friends: [friend('f1', 'Alex')], groups: [], meetupTypes: [], meetups: [], meetupPhotos: [] })
 
     expect(await getSetting('appLock')).toEqual(appLock)
     expect(await getSetting('appLockFailures')).toEqual(appLockFailures)
@@ -88,7 +89,7 @@ describe('backup storage', () => {
 
     const file = createBackup(await readAllData(), new Date('2026-10-03T12:00:00.000Z'))
     expect(JSON.stringify(file)).not.toContain('birthdayReminders')
-    await replaceAllData({ friends: [friend('f1', 'Alex')], groups: [], meetupTypes: [], meetups: [] })
+    await replaceAllData({ friends: [friend('f1', 'Alex')], groups: [], meetupTypes: [], meetups: [], meetupPhotos: [] })
 
     expect(await getSetting('birthdayReminders')).toEqual(birthdayReminders)
   })
@@ -100,15 +101,32 @@ describe('backup storage', () => {
     })
   })
 
+  it('replaces and reads meetup photos with everything else', async () => {
+    await db.meetupPhotos.add(meetupPhoto('old', 'gone', 0))
+    const data: BackupData = {
+      friends: [friend('f1', 'Alex')],
+      groups: [],
+      meetupTypes: [meetupType('t1', 'Coffee', 0)],
+      meetups: [meetup('m1', '2026-09-01', ['f1'], 't1')],
+      meetupPhotos: [meetupPhoto('p1', 'm1', 0), meetupPhoto('p2', 'm1', 1)],
+    }
+    await replaceAllData(data)
+    expect(sortById(await readAllData())).toEqual(sortById(data))
+    expect((await readAllPhotos()).map((photo) => photo.id).sort()).toEqual(['p1', 'p2'])
+  })
+
   it('leaves existing data untouched if writing fails', async () => {
     const alex = await addFriend({ name: 'Alex', groupId: null, photo: null, notes: '', birthday: null })
+    await db.meetupPhotos.add(meetupPhoto('p1', 'm1', 0))
     const bad: BackupData = {
       friends: [friend('x', 'X'), friend('x', 'X again')],
       groups: [],
       meetupTypes: [meetupType('t', 'T', 0)],
       meetups: [],
+      meetupPhotos: [],
     }
     await expect(replaceAllData(bad)).rejects.toThrow()
     expect((await db.friends.toArray()).map((f) => f.id)).toEqual([alex.id])
+    expect((await db.meetupPhotos.toArray()).map((p) => p.id)).toEqual(['p1'])
   })
 })

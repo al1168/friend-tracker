@@ -121,7 +121,7 @@ describe('lock store', () => {
   it('is never part of a backup and survives a restore', async () => {
     await turnOnLock('123456')
     const data = await readAllData()
-    expect(Object.keys(data).sort()).toEqual(['friends', 'groups', 'meetupTypes', 'meetups'])
+    expect(Object.keys(data).sort()).toEqual(['friends', 'groups', 'meetupPhotos', 'meetupTypes', 'meetups'])
     expect(JSON.stringify(data)).not.toContain('appLock')
     await replaceAllData(data)
     expect((await getSetting('appLock')).enabled).toBe(true)

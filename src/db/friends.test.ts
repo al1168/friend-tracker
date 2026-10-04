@@ -3,7 +3,7 @@ import type { Birthday } from '../types'
 import { db, resetDatabase } from './db'
 import { ValidationError } from './errors'
 import { addFriend, deleteFriend, updateFriend, type FriendInput } from './friends'
-import { addMeetup } from './meetups'
+import { addMeetup, type NewPhoto } from './meetups'
 
 const input = (overrides: Partial<FriendInput> = {}): FriendInput => ({
   name: 'Alex',
@@ -124,6 +124,32 @@ describe('deleteFriend', () => {
     expect(await db.friends.get(alex.id)).toBeUndefined()
     expect(await db.meetups.get(solo.id)).toBeUndefined()
     expect((await db.meetups.get(shared.id))?.friendIds).toEqual([sam.id])
+  })
+
+  it('deletes the photos of the meetups it deletes, and keeps the others', async () => {
+    const alex = await addFriend(input({ name: 'Alex' }))
+    const sam = await addFriend(input({ name: 'Sam' }))
+    const photo = (id: string): NewPhoto => ({
+      id,
+      full: 'data:image/jpeg;base64,FULL',
+      thumb: 'data:image/jpeg;base64,THUMB',
+      width: 4,
+      height: 3,
+    })
+    const meetup = { date: '2026-09-01', typeId: 'type-coffee', note: '', activities: [] }
+    const solo = await addMeetup(
+      { ...meetup, friendIds: [alex.id] },
+      { add: [photo('a'), photo('b')], removeIds: [], order: [] },
+    )
+    const shared = await addMeetup(
+      { ...meetup, friendIds: [alex.id, sam.id] },
+      { add: [photo('c')], removeIds: [], order: [] },
+    )
+
+    await deleteFriend(alex.id)
+
+    expect(await db.meetupPhotos.where('meetupId').equals(solo.id).count()).toBe(0)
+    expect((await db.meetupPhotos.where('meetupId').equals(shared.id).toArray()).map((p) => p.id)).toEqual(['c'])
   })
 })
 

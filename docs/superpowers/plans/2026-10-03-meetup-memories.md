@@ -46,7 +46,7 @@ The spec leaves these open. Task 8 records them at the end of the spec.
 8. **Adding photos in the sheet.** One file at a time; the tile reads "Adding 2 of 5…"; Save is disabled meanwhile, and closing the sheet stops the rest. With 20 photos already, tapping the tile shows "A meetup can have up to 20 photos." instead of opening the picker. When both happen, the two messages show together ("A meetup can have up to 20 photos. 1 photo couldn't be added."). A polite announcement says "Added 2 photos.". Removing a photo moves focus to the remove button that took its place, else the one before, else the tile.
 9. **Storage.** After a save that adds photos, `askToKeepData()` calls `navigator.storage.persist()` unless `persisted()` already says yes, and ignores every failure. (`main.tsx` already asks once at launch; this asks again once photos make the data worth more.)
 10. **Backups.** Version 4. Versions 1 to 3 import with `activities: []` and no photos (anything else in them is ignored). In version 4, any problem with a photo, including a `meetupId` that isn't in the file or a 21st photo for one meetup, gives `Photo N is invalid.` (N counts photos in the file). Sizes are the data URL's length in characters (4,194,304 for `full`, 524,288 for `thumb`); `order` must be a whole number from 0; `width` and `height` whole numbers from 1. Duplicate photo ids give "The backup has two photos with the same id.", and a version 4 file without the list gives 'The backup is missing its "meetupPhotos" list.'. Version 4 friends keep their birthdays (the parser's `version === 3` check becomes `version >= 3`).
-11. **Export memory and the share gesture.** The backup is turned into text once (not twice). Settings loads every photo in the background (`useAllMeetupPhotos`) without waiting for it, so the share sheet still opens straight from the tap; if they haven't loaded yet, Export reads them first (the share may then fall back to a download).
+11. **Export memory and the share gesture.** The backup is turned into text once (not twice). Settings never keeps photos in memory and never live-queries them: it only watches a cheap count (`usePhotoCount`, a live `count()`). With no photos, Export builds the backup synchronously from the data already loaded, so the share sheet opens straight from the tap exactly as before. With photos, Export reads them at tap time (`readAllPhotos()`), and that await can use up the tap: if `navigator.share` then rejects with `NotAllowedError`, `exportBackup(data, afterAsyncRead)` returns `{ outcome: 'needs-tap', file }` instead of downloading, and Settings shows a "Backup ready" toast whose "Share" action calls `shareBackupFile(file)` from a fresh tap (it marks the backup done on success; `AbortError` is a cancel). Without an async read, `NotAllowedError` still means "not allowed for this file" and falls back to a download, as does `canShare` false or a `TypeError`.
 12. **Backup footer.** "Last backup: today. Includes 12 photos." or "Never backed up. Includes 1 photo."; unchanged with no photos (`describeBackup`). It counts with `count()`, never reading images.
 13. **The Meetup page.** Back says "Back", or the friend's name when opened from their history (`{ backLabel, tab }` state, keeping the tab the friend page came from); the fallback is `/`. `/meetups/...` belongs to the Friends tab. Friend chips link to the friend with the meetup's type as their back label. No "+ Log meetup" pill here. When the meetup disappears (deleted from the sheet), the page goes back one step, or to `/` when it was opened directly; an unknown id does the same.
 14. **The viewer.** The dialog is named "Photo 2 of 5"; the visible "2 of 5" is a polite live region; the image's alt is "Photo 2 of 5, Coffee, Sat, Sep 12" (the type name and the page's date); grid thumbnails are "Photo 2 of 5". No wrap-around: Previous and Next are `aria-disabled` at the ends (not `disabled`, which would drop focus). Arrow keys, Escape and the Tab trap listen on `document`. Focus returns to the thumbnail of the photo showing when it closes. A swipe is 50px or more, mostly sideways. The ground is near-black in both themes; the iOS status bar keeps the app's theme color.
@@ -71,10 +71,10 @@ The spec leaves these open. Task 8 records them at the end of the spec.
 | `src/test/fixtures.ts` | Modify | `meetup()` gets `activities: []`; `meetupPhoto()` |
 | `src/backup/format.ts` / `.test.ts` | Modify | `BackupData.meetupPhotos`; version 4; activities and photo validation |
 | `src/backup/storage.ts` / `.test.ts` | Modify | `readAllData`, `replaceAllData` and `readAllPhotos` with photos |
-| `src/backup/exportBackup.ts` | Modify | Stringify the backup once |
+| `src/backup/exportBackup.ts` / `.test.ts` | Modify / Create | `ExportOutcome` objects with `needs-tap`, the `afterAsyncRead` parameter, `shareBackupFile`; stringify the backup once (Task 4) |
 | `src/lock/lockStore.test.ts` | Modify | A backup's keys include `meetupPhotos` |
-| `src/data/hooks.ts` | Modify | `useAllMeetupPhotos`, `usePhotoCount`, `useMeetupPhotoThumbs`, `useMeetup`, `useMeetupPhotos`, `useFirstPhotoThumb` |
-| `src/screens/SettingsScreen.tsx` | Modify | Export with photos; the footer's photo count |
+| `src/data/hooks.ts` | Modify | `usePhotoCount` (a live count, never the images), `useMeetupPhotoThumbs`, `useMeetup`, `useMeetupPhotos`, `useFirstPhotoThumb` |
+| `src/screens/SettingsScreen.tsx` | Modify | Export reads photos at tap time ("Backup ready" / "Share" when the tap expired); the footer's photo count |
 | `src/components/icons.tsx` | Modify | `IconCameraPlus` |
 | `src/sheets/MeetupActivities.tsx` | Create | The sheet's Activities section |
 | `src/sheets/MeetupPhotos.tsx` | Create | The sheet's Photos section and resizing loop; `DraftPhoto` |
@@ -815,7 +815,8 @@ EOF
 
 **Files:**
 - Create: `src/lib/photos.ts`, `src/lib/photos.test.ts`
-- Modify: `src/db/meetups.ts` (whole file: the change set, delete and restore with photos, `photoCount`), `src/db/friends.ts` (`deleteFriend`), `src/backup/format.ts` (`BackupData.meetupPhotos`), `src/backup/storage.ts` (`readAllData`, `replaceAllData`, `readAllPhotos`), `src/data/hooks.ts` (`useAllMeetupPhotos`), `src/screens/SettingsScreen.tsx` (Export passes the photos), `src/test/fixtures.ts` (`meetupPhoto()`)
+- Modify: `src/db/meetups.ts` (whole file: the change set, delete and restore with photos, `photoCount`), `src/db/friends.ts` (`deleteFriend`), `src/backup/format.ts` (`BackupData.meetupPhotos`), `src/backup/storage.ts` (`readAllData`, `replaceAllData`, `readAllPhotos`), `src/backup/exportBackup.ts` (`needs-tap`, `afterAsyncRead`, `shareBackupFile`), `src/data/hooks.ts` (`usePhotoCount`), `src/screens/SettingsScreen.tsx` (Export reads photos at tap time), `src/test/fixtures.ts` (`meetupPhoto()`)
+- Create: `src/backup/exportBackup.test.ts`
 - Test: `src/db/meetups.test.ts`, `src/db/friends.test.ts`, `src/backup/storage.test.ts`, `src/backup/format.test.ts`, `src/lock/lockStore.test.ts`
 
 `src/sheets/MeetupSheet.tsx` needs no change: its Undo passes whatever `deleteMeetup` returned straight to `restoreMeetup`, and both now carry the photos.
@@ -1650,23 +1651,210 @@ export async function parseBackupFile(file: Blob): Promise<ParseResult> {
 }
 ```
 
-- [ ] **Step 9: Export the photos from Settings**
+- [ ] **Step 9: Export the photos from Settings, without keeping them in memory**
 
-Settings builds the backup from data that's already loaded, so the iOS share sheet opens straight from the tap. The photos load in the background the same way, without holding up the screen.
+Settings never holds the photos: it watches only how many there are. With no photos, Export builds the backup synchronously from the data already loaded (no await before `share()`), so it keeps the tap's user gesture. With photos, it reads them at tap time; that await can expire the gesture, so a refused share (`NotAllowedError`) returns `needs-tap` and Settings offers a toast action to share again from a fresh tap.
+
+Create `src/backup/exportBackup.test.ts` (stubs `navigator.share`, `navigator.canShare` and the download link):
+
+```ts
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { meetupType } from '../test/fixtures'
+import { resetDatabase } from '../db/db'
+import { getSetting } from '../db/settings'
+import type { BackupData } from './format'
+import { exportBackup, shareBackupFile } from './exportBackup'
+
+const data: BackupData = { friends: [], groups: [], meetupTypes: [meetupType('t1', 'Coffee', 0)], meetups: [], meetupPhotos: [] }
+
+const click = vi.fn()
+const share = vi.fn()
+const canShare = vi.fn()
+
+function domError(name: string) {
+  return new DOMException('nope', name)
+}
+
+beforeEach(async () => {
+  await resetDatabase()
+  click.mockReset()
+  share.mockReset().mockResolvedValue(undefined)
+  canShare.mockReset().mockReturnValue(true)
+  vi.stubGlobal('navigator', { canShare, share })
+  // A download needs a page; count the clicks on the link instead.
+  vi.stubGlobal('document', {
+    createElement: () => ({ click, remove: vi.fn() }),
+    body: { append: vi.fn() },
+  })
+  vi.stubGlobal('window', { setTimeout: vi.fn() })
+  vi.stubGlobal('URL', { createObjectURL: () => 'blob:backup', revokeObjectURL: vi.fn() })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+describe('exportBackup', () => {
+  it('shares the file and marks the backup done', async () => {
+    expect(await exportBackup(data)).toEqual({ outcome: 'shared' })
+    expect(share).toHaveBeenCalledOnce()
+    expect(await getSetting('lastBackupAt')).toEqual(expect.any(String))
+  })
+
+  it('is cancelled, and not marked done, when the share sheet is dismissed', async () => {
+    share.mockRejectedValue(domError('AbortError'))
+    expect(await exportBackup(data)).toEqual({ outcome: 'cancelled' })
+    expect(await getSetting('lastBackupAt')).toBeNull()
+  })
+
+  it('downloads when files cannot be shared', async () => {
+    canShare.mockReturnValue(false)
+    expect(await exportBackup(data, true)).toEqual({ outcome: 'downloaded' })
+    expect(share).not.toHaveBeenCalled()
+    expect(click).toHaveBeenCalledOnce()
+    expect(await getSetting('lastBackupAt')).toEqual(expect.any(String))
+  })
+
+  it('downloads on a TypeError, with or without an async read', async () => {
+    share.mockRejectedValue(new TypeError('bad file'))
+    expect(await exportBackup(data)).toEqual({ outcome: 'downloaded' })
+    expect(await exportBackup(data, true)).toEqual({ outcome: 'downloaded' })
+    expect(click).toHaveBeenCalledTimes(2)
+  })
+
+  it('downloads on NotAllowedError when nothing was read first (the file is refused)', async () => {
+    share.mockRejectedValue(domError('NotAllowedError'))
+    expect(await exportBackup(data)).toEqual({ outcome: 'downloaded' })
+    expect(click).toHaveBeenCalledOnce()
+  })
+
+  it('asks for a new tap on NotAllowedError after an async read (the tap expired)', async () => {
+    share.mockRejectedValue(domError('NotAllowedError'))
+    const result = await exportBackup(data, true)
+    expect(result.outcome).toBe('needs-tap')
+    if (result.outcome !== 'needs-tap') throw new Error('unreachable')
+    expect(result.file).toBeInstanceOf(File)
+    expect(result.file.type).toBe('application/json')
+    expect(click).not.toHaveBeenCalled()
+    expect(await getSetting('lastBackupAt')).toBeNull()
+  })
+
+  it('rethrows other errors', async () => {
+    share.mockRejectedValue(new Error('boom'))
+    await expect(exportBackup(data, true)).rejects.toThrow('boom')
+  })
+})
+
+describe('shareBackupFile', () => {
+  const file = () => new File(['{}'], 'backup.json', { type: 'application/json' })
+
+  it('shares the file and marks the backup done', async () => {
+    expect(await shareBackupFile(file())).toEqual({ outcome: 'shared' })
+    expect(share).toHaveBeenCalledOnce()
+    expect(await getSetting('lastBackupAt')).toEqual(expect.any(String))
+  })
+
+  it('is cancelled, and not marked done, when the share sheet is dismissed', async () => {
+    share.mockRejectedValue(domError('AbortError'))
+    expect(await shareBackupFile(file())).toEqual({ outcome: 'cancelled' })
+    expect(await getSetting('lastBackupAt')).toBeNull()
+  })
+
+  it('downloads when the share is refused even with a fresh tap', async () => {
+    share.mockRejectedValue(domError('NotAllowedError'))
+    expect(await shareBackupFile(file())).toEqual({ outcome: 'downloaded' })
+    expect(click).toHaveBeenCalledOnce()
+  })
+})
+```
+
+Replace the whole of `src/backup/exportBackup.ts`:
+
+```ts
+import { setSetting } from '../db/settings'
+import { todayISO } from '../lib/dates'
+import { backupFileName, createBackup, parseBackup, type BackupData } from './format'
+
+export type ExportOutcome =
+  | { outcome: 'shared' | 'downloaded' | 'cancelled' }
+  /** The share sheet refused because the tap's activation expired while the photos were read. Share `file` from a fresh tap with shareBackupFile. */
+  | { outcome: 'needs-tap'; file: File }
+
+type ShareAttempt = 'shared' | 'cancelled' | 'unavailable' | 'expired'
+
+/**
+ * Tries the iOS share sheet. 'unavailable' means a download is the way to go (sharing files isn't supported,
+ * or isn't allowed for this file). After an async read, NotAllowedError means the tap's activation expired,
+ * not that the file is refused, so it is 'expired' instead.
+ */
+async function attemptShare(file: File, afterAsyncRead: boolean): Promise<ShareAttempt> {
+  if (typeof navigator.canShare !== 'function' || !navigator.canShare({ files: [file] })) return 'unavailable'
+  try {
+    await navigator.share({ files: [file] })
+    return 'shared'
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return 'cancelled'
+    if (error instanceof DOMException && error.name === 'NotAllowedError') return afterAsyncRead ? 'expired' : 'unavailable'
+    if (error instanceof TypeError) return 'unavailable'
+    throw error
+  }
+}
+
+function download(file: File) {
+  const url = URL.createObjectURL(file)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = file.name
+  document.body.append(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+}
+
+async function markBackedUp() {
+  await setSetting('lastBackupAt', new Date().toISOString())
+}
+
+/**
+ * Opens the iOS share sheet with the backup file (falls back to a download).
+ * Pass `afterAsyncRead` when the caller awaited something (like reading photos) after the tap: the share sheet
+ * may then refuse because the tap's activation expired, which gives 'needs-tap' instead of a download.
+ */
+export async function exportBackup(data: BackupData, afterAsyncRead = false): Promise<ExportOutcome> {
+  const backup = createBackup(data, new Date())
+  // Self-check before sharing: never hand out a file our own importer would reject. Synchronous, so share() keeps its user gesture.
+  const check = parseBackup(JSON.parse(JSON.stringify(backup)))
+  if (!check.ok) throw new Error(`Backup failed validation: ${check.error}`)
+  const file = new File([JSON.stringify(backup)], backupFileName(todayISO()), { type: 'application/json' })
+
+  const attempt = await attemptShare(file, afterAsyncRead)
+  if (attempt === 'cancelled') return { outcome: 'cancelled' }
+  if (attempt === 'expired') return { outcome: 'needs-tap', file }
+  if (attempt === 'shared') {
+    await markBackedUp()
+    return { outcome: 'shared' }
+  }
+
+  download(file)
+  await markBackedUp()
+  return { outcome: 'downloaded' }
+}
+
+/** Shares a backup file made earlier by exportBackup ('needs-tap'), from a fresh tap. Call it straight from the tap handler. */
+export async function shareBackupFile(file: File): Promise<{ outcome: 'shared' | 'downloaded' | 'cancelled' }> {
+  const attempt = await attemptShare(file, false)
+  if (attempt === 'cancelled') return { outcome: 'cancelled' }
+  if (attempt === 'shared') {
+    await markBackedUp()
+    return { outcome: 'shared' }
+  }
+  download(file)
+  await markBackedUp()
+  return { outcome: 'downloaded' }
+}
+```
 
 In `src/data/hooks.ts`, replace:
-
-```ts
-import type { Friend, Group, Meetup, MeetupType } from '../types'
-```
-
-with:
-
-```ts
-import type { Friend, Group, Meetup, MeetupPhoto, MeetupType } from '../types'
-```
-
-Replace:
 
 ```ts
 export function useSetting<K extends keyof Settings>(key: K): Settings[K] | undefined {
@@ -1675,18 +1863,29 @@ export function useSetting<K extends keyof Settings>(key: K): Settings[K] | unde
 with:
 
 ```ts
-/**
- * Every meetup photo, full images included. Only Settings uses it: a backup has to be ready the
- * moment Export is tapped, so the iOS share sheet opens straight from the tap.
- */
-export function useAllMeetupPhotos(): MeetupPhoto[] | undefined {
-  return useLiveQuery(() => db.meetupPhotos.toArray())
+/** How many meetup photos are stored. A cheap live count: it never reads an image. */
+export function usePhotoCount(): number | undefined {
+  return useLiveQuery(() => db.meetupPhotos.count())
 }
 
 export function useSetting<K extends keyof Settings>(key: K): Settings[K] | undefined {
 ```
 
-In `src/screens/SettingsScreen.tsx`, replace:
+In `src/screens/SettingsScreen.tsx`, make these replacements.
+
+Replace:
+
+```ts
+import { exportBackup } from '../backup/exportBackup'
+```
+
+with:
+
+```ts
+import { exportBackup, shareBackupFile } from '../backup/exportBackup'
+```
+
+Replace:
 
 ```ts
 import { parseBackupFile, replaceAllData } from '../backup/storage'
@@ -1707,7 +1906,7 @@ import { useFriends, useGroups, useMeetups, useMeetupTypes, useSetting } from '.
 with:
 
 ```ts
-import { useAllMeetupPhotos, useFriends, useGroups, useMeetups, useMeetupTypes, useSetting } from '../data/hooks'
+import { useFriends, useGroups, useMeetups, useMeetupTypes, usePhotoCount, useSetting } from '../data/hooks'
 ```
 
 Replace:
@@ -1721,29 +1920,83 @@ with:
 
 ```ts
   const meetups = useMeetups()
-  // Loads in the background; Settings doesn't wait for it.
-  const meetupPhotos = useAllMeetupPhotos()
+  // Settings never holds the photos themselves: only how many there are.
+  const photoCount = usePhotoCount()
   const lastBackupAt = useSetting('lastBackupAt')
 ```
 
 Replace:
 
 ```ts
+  if (appLock === undefined || passkeyAvailable === undefined || birthdayReminders === undefined) return null
+```
+
+with:
+
+```ts
+  if (appLock === undefined || passkeyAvailable === undefined || birthdayReminders === undefined) return null
+  if (photoCount === undefined) return null
+```
+
+Replace:
+
+```ts
+  // Uses data that's already loaded, so the iOS share sheet opens straight from the tap.
+  const exportData = async () => {
+    if (exportingRef.current) return
+    exportingRef.current = true
+    try {
       const outcome = await exportBackup({ friends, groups, meetupTypes, meetups })
+      if (outcome !== 'cancelled') toast({ message: 'Backup saved' })
+    } catch {
+      toast({ message: "Couldn't create the backup.", tone: 'plain' })
+    } finally {
+      exportingRef.current = false
+    }
+  }
 ```
 
 with:
 
 ```ts
-      // If the photos haven't loaded yet, read them now (the share sheet may then fall back to a download).
-      const photos = meetupPhotos ?? (await readAllPhotos())
-      const outcome = await exportBackup({ friends, groups, meetupTypes, meetups, meetupPhotos: photos })
+  // Shares a backup made earlier, from the fresh tap on the toast's Share action.
+  const shareReadyBackup = async (file: File) => {
+    try {
+      const { outcome } = await shareBackupFile(file)
+      if (outcome !== 'cancelled') toast({ message: 'Backup saved' })
+    } catch {
+      toast({ message: "Couldn't create the backup.", tone: 'plain' })
+    }
+  }
+
+  // With no photos the backup is built from data that's already loaded, with no await before share(), so the
+  // iOS share sheet opens straight from the tap. Photos are read only now, at tap time (Settings never keeps them
+  // in memory); that await can use up the tap, so a refused share offers a "Share" action to tap again.
+  const exportData = async () => {
+    if (exportingRef.current) return
+    exportingRef.current = true
+    try {
+      const hasPhotos = photoCount > 0
+      const meetupPhotos = hasPhotos ? await readAllPhotos() : []
+      const result = await exportBackup({ friends, groups, meetupTypes, meetups, meetupPhotos }, hasPhotos)
+      if (result.outcome === 'needs-tap') {
+        const { file } = result
+        toast({ message: 'Backup ready', actionLabel: 'Share', onAction: () => void shareReadyBackup(file) })
+      } else if (result.outcome !== 'cancelled') {
+        toast({ message: 'Backup saved' })
+      }
+    } catch {
+      toast({ message: "Couldn't create the backup.", tone: 'plain' })
+    } finally {
+      exportingRef.current = false
+    }
+  }
 ```
 
 - [ ] **Step 10: Run everything**
 
 Run: `npm test`
-Expected: `Test Files  45 passed (45)` and `Tests  493 passed (493)`.
+Expected: `Test Files  46 passed (46)` and `Tests  503 passed (503)`.
 
 Run: `npm run build`
 Expected: `tsc -b` passes and Vite prints `✓ built in ...`.
@@ -1754,7 +2007,7 @@ Expected: `94 passed`.
 - [ ] **Step 11: Commit**
 
 ```bash
-git add src/lib/photos.ts src/lib/photos.test.ts src/db/meetups.ts src/db/meetups.test.ts src/db/friends.ts src/db/friends.test.ts src/backup/format.ts src/backup/format.test.ts src/backup/storage.ts src/backup/storage.test.ts src/lock/lockStore.test.ts src/data/hooks.ts src/screens/SettingsScreen.tsx src/test/fixtures.ts
+git add src/lib/photos.ts src/lib/photos.test.ts src/db/meetups.ts src/db/meetups.test.ts src/db/friends.ts src/db/friends.test.ts src/backup/format.ts src/backup/format.test.ts src/backup/storage.ts src/backup/storage.test.ts src/lock/lockStore.test.ts src/data/hooks.ts src/screens/SettingsScreen.tsx src/test/fixtures.ts src/backup/exportBackup.ts src/backup/exportBackup.test.ts
 git commit -F - <<'EOF'
 feat: meetup photos saved with the meetup in one transaction, kept by Undo, deleted with their meetup
 
@@ -1986,7 +2239,7 @@ Expected: PASS, `Tests  5 passed (5)`.
 - [ ] **Step 5: Run everything**
 
 Run: `npm test`
-Expected: `Test Files  46 passed (46)` and `Tests  498 passed (498)`.
+Expected: `Test Files  47 passed (47)` and `Tests  508 passed (508)`.
 
 Run: `npm run build`
 Expected: `tsc -b` passes (TypeScript 6's DOM types accept `imageOrientation: 'from-image'`) and Vite prints `✓ built in ...`.
@@ -2010,7 +2263,7 @@ EOF
 ### Task 4: Backups at version 4
 
 **Files:**
-- Modify: `src/backup/format.ts` (version 4, activities, photos, validation), `src/backup/exportBackup.ts` (stringify once), `src/lib/text.ts` (`describeBackup`), `src/data/hooks.ts` (`usePhotoCount`), `src/screens/SettingsScreen.tsx` (footer)
+- Modify: `src/backup/format.ts` (version 4, activities, photos, validation), `src/backup/exportBackup.ts` (stringify once), `src/lib/text.ts` (`describeBackup`), `src/screens/SettingsScreen.tsx` (footer)
 - Test: `src/backup/format.test.ts`, `src/backup/storage.test.ts`, `src/lib/text.test.ts`, `e2e/preferences.spec.ts`, `e2e/birthdays.spec.ts` (their backups are version 4)
 
 - [ ] **Step 1: Write the failing backup tests**
@@ -2549,86 +2802,16 @@ export function describeBackup(lastBackupAt: string | null, today: ISODate, phot
 }
 ```
 
-In `src/data/hooks.ts`, replace:
+`usePhotoCount` and the `photoCount` guard in Settings already exist (Task 2). In `src/screens/SettingsScreen.tsx`, replace:
 
 ```ts
-import { getSetting, type Settings } from '../db/settings'
-```
-
-with:
-
-```ts
-import { photoCount } from '../db/meetups'
-import { getSetting, type Settings } from '../db/settings'
-```
-
-Replace:
-
-```ts
-/**
- * Every meetup photo, full images included.
-```
-
-with:
-
-```ts
-/** How many meetup photos are stored. Counts without reading any image. */
-export function usePhotoCount(): number | undefined {
-  return useLiveQuery(() => photoCount())
-}
-
-/**
- * Every meetup photo, full images included.
-```
-
-In `src/screens/SettingsScreen.tsx`, replace:
-
-```ts
-import { useAllMeetupPhotos, useFriends, useGroups, useMeetups, useMeetupTypes, useSetting } from '../data/hooks'
-import { useToday } from '../hooks/useToday'
 import { describeLastBackup, plural } from '../lib/text'
 ```
 
 with:
 
 ```ts
-import {
-  useAllMeetupPhotos,
-  useFriends,
-  useGroups,
-  useMeetups,
-  useMeetupTypes,
-  usePhotoCount,
-  useSetting,
-} from '../data/hooks'
-import { useToday } from '../hooks/useToday'
 import { describeBackup, plural } from '../lib/text'
-```
-
-Replace:
-
-```ts
-  const meetupPhotos = useAllMeetupPhotos()
-```
-
-with:
-
-```ts
-  const meetupPhotos = useAllMeetupPhotos()
-  const photoCount = usePhotoCount()
-```
-
-Replace:
-
-```ts
-  if (appLock === undefined || passkeyAvailable === undefined || birthdayReminders === undefined) return null
-```
-
-with:
-
-```ts
-  if (appLock === undefined || passkeyAvailable === undefined || birthdayReminders === undefined) return null
-  if (photoCount === undefined) return null
 ```
 
 Replace:
@@ -2674,7 +2857,7 @@ with:
 - [ ] **Step 7: Run everything**
 
 Run: `npm test`
-Expected: `Test Files  46 passed (46)` and `Tests  506 passed (506)`.
+Expected: `Test Files  47 passed (47)` and `Tests  516 passed (516)`.
 
 Run: `npm run build`
 Expected: `tsc -b` passes and Vite prints `✓ built in ...`.
@@ -2685,7 +2868,7 @@ Expected: `94 passed`.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/backup/format.ts src/backup/format.test.ts src/backup/storage.test.ts src/backup/exportBackup.ts src/lib/text.ts src/lib/text.test.ts src/data/hooks.ts src/screens/SettingsScreen.tsx e2e/preferences.spec.ts e2e/birthdays.spec.ts
+git add src/backup/format.ts src/backup/format.test.ts src/backup/storage.test.ts src/backup/exportBackup.ts src/lib/text.ts src/lib/text.test.ts src/screens/SettingsScreen.tsx e2e/preferences.spec.ts e2e/birthdays.spec.ts
 git commit -F - <<'EOF'
 feat: backups at version 4 with activities and photos, and the photo count in the Backup footer
 
@@ -3966,7 +4149,7 @@ Expected: `7 passed`.
 - [ ] **Step 14: Run everything**
 
 Run: `npm test`
-Expected: `Test Files  47 passed (47)` and `Tests  510 passed (510)`.
+Expected: `Test Files  48 passed (48)` and `Tests  520 passed (520)`.
 
 Run: `npm run build`
 Expected: `tsc -b` passes and Vite prints `✓ built in ...`.
@@ -4628,7 +4811,7 @@ Expected: `16 passed`.
 - [ ] **Step 9: Run everything**
 
 Run: `npm test`
-Expected: `Test Files  47 passed (47)` and `Tests  510 passed (510)`.
+Expected: `Test Files  48 passed (48)` and `Tests  520 passed (520)`.
 
 Run: `npm run build`
 Expected: `tsc -b` passes and Vite prints `✓ built in ...`.
@@ -5158,7 +5341,7 @@ Expected: `5 passed`.
 - [ ] **Step 7: Run everything**
 
 Run: `npm test`
-Expected: `Test Files  47 passed (47)` and `Tests  510 passed (510)`.
+Expected: `Test Files  48 passed (48)` and `Tests  520 passed (520)`.
 
 Run: `npm run build`
 Expected: `tsc -b` passes and Vite prints `✓ built in ...`.
@@ -5707,7 +5890,7 @@ Recorded in [the plan](../plans/2026-10-03-meetup-memories.md):
 - **Adding.** One file at a time with "Adding 2 of 5…"; Save waits; closing the sheet stops the rest; with 20 photos already, the tile shows the limit message instead of opening the picker; both messages can show together; "Added 2 photos." is announced; after a remove, focus goes to the next remove button.
 - **Storage.** After a save that adds photos, `navigator.storage.persist()` is asked unless the data is already kept; failures are ignored.
 - **Backups.** Any problem with a version 4 photo, including an unknown `meetupId` or a 21st photo for a meetup, gives `Photo N is invalid.`. Sizes are data URL lengths in characters. Duplicate photo ids and a missing `meetupPhotos` list have their own messages. Version 4 friends keep birthdays.
-- **Export.** The backup is stringified once. Settings loads photos in the background so the share sheet still opens from the tap; Export reads them first if they haven't loaded.
+- **Export.** The backup is stringified once. Settings never holds photos in memory: it watches only a live photo count. With no photos, Export is synchronous and keeps the tap's share gesture. With photos, Export reads them at tap time; if the share sheet then refuses because the tap expired, a "Backup ready" toast with a "Share" action shares the file from a fresh tap.
 - **Footer.** "Last backup: today. Includes 12 photos." or "Never backed up. Includes 1 photo.", unchanged with no photos.
 - **Meetup page.** It belongs to the Friends tab (or keeps Stats when the friend page came from there). Friend chips open the friend with the meetup type as their back label. There is no "+ Log meetup" pill. An unknown or deleted meetup goes back one step (or to Friends when opened directly).
 - **Viewer.** The dialog is named "Photo 2 of 5", the counter is a polite live region, the image alt is "Photo 2 of 5, Coffee, Sat, Sep 12" (type and date), and grid thumbnails are "Photo 2 of 5". No wrap-around; Previous and Next are `aria-disabled` at the ends. Keys are heard on the whole document, since Safari doesn't focus tapped buttons. Focus returns to the thumbnail of the photo showing at close. The iOS status bar keeps the app's theme color.
@@ -5718,7 +5901,7 @@ Recorded in [the plan](../plans/2026-10-03-meetup-memories.md):
 - [ ] **Step 10: Run every check**
 
 Run: `npm test`
-Expected: `Test Files  47 passed (47)` and `Tests  511 passed (511)`.
+Expected: `Test Files  48 passed (48)` and `Tests  521 passed (521)`.
 
 Run: `npm run build`
 Expected: `tsc -b` passes and Vite prints `✓ built in ...`.

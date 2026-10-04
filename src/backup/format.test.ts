@@ -17,6 +17,7 @@ const sample: BackupData = {
     },
   ],
   meetups: [{ ...meetup('m1', '2026-09-01', ['f1', 'f2'], 't1'), note: 'Tacos' }],
+  meetupPhotos: [],
 }
 
 function jsonCopy(value: unknown): Record<string, unknown> {
