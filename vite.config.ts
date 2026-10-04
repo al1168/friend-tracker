@@ -7,14 +7,13 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      // New versions install in the background and take over right away; the app shows them the next time it's opened or reloaded.
+      // The service worker is src/sw.ts; the build adds the list of files to keep offline.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      // New versions install in the background and take over right away (src/sw.ts calls skipWaiting and
+      // clientsClaim); the app shows them the next time it's opened or reloaded.
       registerType: 'autoUpdate',
-      workbox: {
-        skipWaiting: true,
-        clientsClaim: true,
-        // The website's sign-in page and password check (/__login, /__verify-password) always go to the network.
-        navigateFallbackDenylist: [/^\/__/],
-      },
       injectRegister: 'script',
       // Send the sign-in cookie with the manifest request, or the website gate redirects it and installing breaks.
       useCredentials: true,

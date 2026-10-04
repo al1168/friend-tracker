@@ -20,3 +20,35 @@ test('never answers the website sign-in pages from the offline cache', async ({ 
   const serviceWorker = await (await request.get('sw.js')).text()
   expect(serviceWorker).toContain('denylist:[/^\\/__/]')
 })
+
+test('lists the app files for offline use in one classic script', async ({ request }) => {
+  const serviceWorker = await (await request.get('sw.js')).text()
+  // The build put the list of offline files in place of self.__WB_MANIFEST.
+  expect(serviceWorker).not.toContain('__WB_MANIFEST')
+  expect(serviceWorker).toMatch(/"?url"?:"index\.html"/)
+  expect(serviceWorker).toMatch(/"?url"?:"assets\/index-[\w-]+\.js"/)
+  expect(serviceWorker).toMatch(/"?url"?:"manifest\.webmanifest"/)
+  expect(serviceWorker).toContain('self.skipWaiting()')
+  // registerSW.js registers it as a classic script, so it must not use module syntax.
+  expect(serviceWorker).not.toMatch(/\bimport\s*[{*("'`]|\bexport\s*[{*]|import\.meta/)
+})
+
+test.describe('with the service worker running', () => {
+  test.use({ serviceWorkers: 'allow' })
+
+  test('installs, saves the app for offline use, and takes control without a reload', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
+    // Installing fails if any listed file is missing, so "ready" means every file was saved.
+    await page.evaluate(() => navigator.serviceWorker.ready)
+    // clientsClaim: the worker takes over the page that installed it.
+    await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? null)).toMatch(/\/sw\.js$/)
+    const saved = await page.evaluate(async () => {
+      const names = await caches.keys()
+      const cache = await caches.open(names.find((name) => name.includes('precache'))!)
+      return (await cache.keys()).map((request) => new URL(request.url).pathname)
+    })
+    expect(saved).toEqual(expect.arrayContaining(['/index.html', '/manifest.webmanifest', '/registerSW.js']))
+    expect(saved.some((path) => /^\/assets\/index-[\w-]+\.js$/.test(path))).toBe(true)
+  })
+})
