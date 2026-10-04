@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useKeyboardInset } from '../hooks/useKeyboardInset'
+import { useRevealFocusedField } from '../hooks/useRevealFocusedField'
 import { useScrollLock } from '../hooks/useScrollLock'
 import './Sheet.css'
 
@@ -25,10 +26,12 @@ export function Sheet({ open, title, onRequestClose, footer, children }: SheetPr
   const [dragging, setDragging] = useState(false)
   const dragStart = useRef<{ y: number; time: number } | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
 
   useScrollLock(mounted)
   useKeyboardInset(mounted)
+  useRevealFocusedField(open, bodyRef)
 
   useEffect(() => {
     if (!closing) return
@@ -121,7 +124,9 @@ export function Sheet({ open, title, onRequestClose, footer, children }: SheetPr
             </span>
           </div>
         </div>
-        <div className="sheet__body">{children}</div>
+        <div ref={bodyRef} className="sheet__body">
+          {children}
+        </div>
         {footer && <div className="sheet__footer">{footer}</div>}
       </div>
     </div>,

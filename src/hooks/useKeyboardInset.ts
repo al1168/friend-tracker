@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { keyboardInset } from '../lib/viewport'
 
 /** Publishes the on-screen keyboard height as --keyboard-inset so sheets stay above it. */
 export function useKeyboardInset(active: boolean) {
@@ -7,8 +8,7 @@ export function useKeyboardInset(active: boolean) {
     if (!active || !viewport) return
     const root = document.documentElement
     const update = () => {
-      const inset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
-      root.style.setProperty('--keyboard-inset', `${Math.round(inset)}px`)
+      root.style.setProperty('--keyboard-inset', `${keyboardInset(window.innerHeight, viewport)}px`)
       root.style.setProperty('--viewport-height', `${Math.round(viewport.height)}px`)
     }
     update()
