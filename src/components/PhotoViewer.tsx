@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
+import { usePhoto } from '../data/hooks'
 import { useScrollLock } from '../hooks/useScrollLock'
 import type { MeetupPhoto } from '../types'
 import { IconChevronLeft, IconChevronRight, IconClose } from './icons'
@@ -9,7 +10,8 @@ import './PhotoViewer.css'
 const SWIPE_DISTANCE = 50
 
 interface PhotoViewerProps {
-  photos: MeetupPhoto[]
+  /** Ids and thumbnails: the full image of the photo showing is read here, one at a time. */
+  photos: Pick<MeetupPhoto, 'id' | 'thumb'>[]
   index: number
   onIndexChange: (index: number) => void
   /** Called on Close or Escape. The caller puts focus back on the photo's thumbnail. */
@@ -31,6 +33,7 @@ export function PhotoViewer({ photos, index, onIndexChange, onClose, describe }:
   }, [])
 
   const photo = photos[index]
+  const full = usePhoto(photo?.id)
   const count = photos.length
 
   function go(step: 1 | -1) {
@@ -112,9 +115,9 @@ export function PhotoViewer({ photos, index, onIndexChange, onClose, describe }:
         <img
           key={photo.id}
           className={direction ? `viewer__image viewer__image--${direction}` : 'viewer__image'}
-          src={photo.full}
-          width={photo.width}
-          height={photo.height}
+          src={full?.full ?? photo.thumb}
+          width={full?.width}
+          height={full?.height}
           alt={describe(index)}
           draggable={false}
         />

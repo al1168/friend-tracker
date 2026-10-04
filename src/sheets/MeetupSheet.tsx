@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useConfirmDiscard } from '../components/ActionSheet'
 import { Avatar } from '../components/Avatar'
 import { Chip } from '../components/Chip'
@@ -82,6 +82,14 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
     setPhotos(storedPhotos)
     setStartPhotoIds(storedPhotos.map((photo) => photo.id))
   }
+  // Once the sheet closes, drop the full images of photos added in it: they were only waiting for Save.
+  useEffect(() => {
+    if (request === null) {
+      setPhotos((current) =>
+        current?.some((photo) => photo.added) ? current.map(({ id, thumb }) => ({ id, thumb })) : current,
+      )
+    }
+  }, [request])
   const suggestions = useMemo(() => activitySuggestions(meetups ?? []), [meetups])
 
   const effectiveTypeId = typeId ?? types?.[0]?.id ?? null
@@ -137,7 +145,12 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
       // An activity typed into "+ New" but not added yet is saved too.
       const typed = activityDraft?.trim() ? [...activities, activityDraft] : activities
       const input = { date, typeId: effectiveTypeId, friendIds, note, activities: typed }
-      const photoChanges: PhotoChanges = photos
+      const unchanged =
+        !photos ||
+        (photos.every((photo) => !photo.added) &&
+          photos.length === startPhotoIds.length &&
+          photos.every((photo, i) => photo.id === startPhotoIds[i]))
+      const photoChanges: PhotoChanges = !unchanged && photos
         ? {
             add: photos.flatMap((photo) => (photo.added ? [photo.added] : [])),
             removeIds: startPhotoIds.filter((id) => !photos.some((photo) => photo.id === id)),

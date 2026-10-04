@@ -40,6 +40,13 @@ export function MeetupPhotos({ photos, setPhotos, onBusyChange, open }: MeetupPh
   useEffect(() => {
     openRef.current = open
   }, [open])
+  // A full unmount (a relock, say) stops the decode loop too.
+  useEffect(
+    () => () => {
+      openRef.current = false
+    },
+    [],
+  )
 
   useEffect(() => {
     const index = pendingFocus.current

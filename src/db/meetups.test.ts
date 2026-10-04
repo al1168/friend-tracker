@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { liveQuery } from 'dexie'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db, resetDatabase } from './db'
 import { ValidationError } from './errors'
 import { addFriend, deleteFriend } from './friends'
@@ -7,6 +8,7 @@ import {
   deleteMeetup,
   firstPhotoThumb,
   photoCount,
+  photoThumbs,
   restoreMeetup,
   updateMeetup,
   type MeetupInput,
@@ -192,6 +194,19 @@ describe('photos saved with a meetup', () => {
     await updateMeetup(meetup.id, base, { add: [], removeIds: ['b'], order: ['a'] })
     expect(await firstPhotoThumb(meetup.id)).toBe('data:image/jpeg;base64,THUMBa')
     expect(await firstPhotoThumb(other.id)).toBeNull()
+  })
+
+  it('keeps thumbnail queries live without returning full images', async () => {
+    const meetup = await addMeetup(base, { add: [newPhoto('a')], removeIds: [], order: ['a'] })
+    const seen: Awaited<ReturnType<typeof photoThumbs>>[] = []
+    const subscription = liveQuery(() => photoThumbs(meetup.id)).subscribe((value) => seen.push(value))
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual([{ id: 'a', thumb: 'data:image/jpeg;base64,THUMBa' }]))
+    await updateMeetup(meetup.id, base, { add: [newPhoto('b')], removeIds: [], order: ['b', 'a'] })
+    await vi.waitFor(() => expect(seen.at(-1)?.map((photo) => photo.id)).toEqual(['b', 'a']))
+    await updateMeetup(meetup.id, base, { add: [], removeIds: ['b'], order: ['a'] })
+    await vi.waitFor(() => expect(seen.at(-1)?.map((photo) => photo.id)).toEqual(['a']))
+    subscription.unsubscribe()
+    expect(Object.keys(seen.at(-1)?.[0] ?? {}).sort()).toEqual(['id', 'thumb'])
   })
 
   it('counts every stored photo', async () => {

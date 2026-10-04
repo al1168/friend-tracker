@@ -34,7 +34,7 @@ export const NO_PHOTO_CHANGES: PhotoChanges = Object.freeze({
   order: Object.freeze([]),
 })
 
-export const PHOTO_NOT_SAVED = "A photo couldn't be saved."
+const PHOTO_NOT_SAVED = "A photo couldn't be saved."
 
 /** A deleted meetup and its photos, kept so Undo can put both back. */
 export interface DeletedMeetup {
@@ -150,11 +150,28 @@ export async function restoreMeetup({ meetup, photos }: DeletedMeetup): Promise<
  * through the [meetupId+order] index, and keeps only its thumbnail.
  */
 export async function firstPhotoThumb(meetupId: string): Promise<string | null> {
-  const first = await db.meetupPhotos
+  // Key-only, then get: Dexie's live-query cache keeps whole rows of record queries, full images included.
+  const [id] = await db.meetupPhotos
     .where('[meetupId+order]')
     .between([meetupId, -Infinity], [meetupId, Infinity])
-    .first()
-  return first?.thumb ?? null
+    .limit(1)
+    .primaryKeys()
+  return id ? ((await db.meetupPhotos.get(id))?.thumb ?? null) : null
+}
+
+/** A meetup's photos as ids and thumbnails, in order. Never returns a full image (see firstPhotoThumb). */
+export async function photoThumbs(meetupId: string): Promise<Pick<MeetupPhoto, 'id' | 'thumb'>[]> {
+  const ids = await db.meetupPhotos.where('meetupId').equals(meetupId).primaryKeys()
+  const rows = await db.meetupPhotos.bulkGet(ids)
+  return rows
+    .filter((row): row is MeetupPhoto => !!row)
+    .sort((a, b) => a.order - b.order)
+    .map(({ id, thumb }) => ({ id, thumb }))
+}
+
+/** One photo with its full image, or null: the viewer reads only the photo it shows. */
+export async function photoById(id: string): Promise<MeetupPhoto | null> {
+  return (await db.meetupPhotos.get(id)) ?? null
 }
 
 /** How many meetup photos are stored, across all meetups. */

@@ -4,7 +4,7 @@ import { Avatar } from '../components/Avatar'
 import { Section } from '../components/InsetGroup'
 import { Page, type NavState } from '../components/Page'
 import { PhotoViewer } from '../components/PhotoViewer'
-import { useFriends, useMeetup, useMeetupPhotos, useMeetupTypes } from '../data/hooks'
+import { useFriends, useMeetup, useMeetupPhotoThumbs, useMeetupTypes } from '../data/hooks'
 import { useToday } from '../hooks/useToday'
 import { formatDate } from '../lib/dates'
 import { useSheets } from '../sheets/sheetsContext'
@@ -15,7 +15,7 @@ import './MeetupScreen.css'
 export function MeetupScreen() {
   const { id } = useParams()
   const meetup = useMeetup(id)
-  const photos = useMeetupPhotos(id)
+  const photos = useMeetupPhotoThumbs(id)
   const friends = useFriends()
   const types = useMeetupTypes()
   const today = useToday()

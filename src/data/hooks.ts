@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
-import { firstPhotoThumb, photoCount } from '../db/meetups'
+import { firstPhotoThumb, photoById, photoCount, photoThumbs } from '../db/meetups'
 import { getSetting, type Settings } from '../db/settings'
 import { compareNames } from '../lib/text'
 import type { Friend, Group, Meetup, MeetupPhoto, MeetupType } from '../types'
@@ -33,24 +33,17 @@ export function useMeetup(id: string | undefined): Meetup | null | undefined {
   return useLiveQuery(async () => (id ? ((await db.meetups.get(id)) ?? null) : null), [id])
 }
 
-/** A meetup's photos in order, full images included: the Meetup page and its viewer. */
-export function useMeetupPhotos(meetupId: string | undefined): MeetupPhoto[] | undefined {
-  return useLiveQuery(
-    async () => (meetupId ? db.meetupPhotos.where('meetupId').equals(meetupId).sortBy('order') : []),
-    [meetupId],
-  )
+/** One photo with its full image: the viewer reads only the photo it shows. `null` when it's gone. */
+export function usePhoto(id: string | undefined): MeetupPhoto | null | undefined {
+  return useLiveQuery(async () => (id ? photoById(id) : null), [id])
 }
 
 /**
- * A meetup's photos as ids and thumbnails, in order: what the meetup sheet shows. The full images
- * are dropped as soon as they're read. Empty when there's no meetup yet.
+ * A meetup's photos as ids and thumbnails, in order: what the meetup sheet and the Meetup page show.
+ * Full images are never read here: Dexie's live-query cache would keep them. Empty when there's no meetup yet.
  */
 export function useMeetupPhotoThumbs(meetupId: string | undefined): Pick<MeetupPhoto, 'id' | 'thumb'>[] | undefined {
-  return useLiveQuery(async () => {
-    if (!meetupId) return []
-    const photos = await db.meetupPhotos.where('meetupId').equals(meetupId).sortBy('order')
-    return photos.map(({ id, thumb }) => ({ id, thumb }))
-  }, [meetupId])
+  return useLiveQuery(async () => (meetupId ? photoThumbs(meetupId) : []), [meetupId])
 }
 
 /** The thumbnail of a meetup's first photo, or null when it has none: a history row's picture. */

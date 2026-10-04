@@ -95,6 +95,9 @@
   color: var(--ink-2);
   overflow-wrap: anywhere;
 }
+.row__trailing:empty {
+  display: none;
+}
 .row__trailing {
   flex: none;
   color: var(--ink-2);
