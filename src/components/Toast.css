@@ -2,7 +2,7 @@
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(var(--tabbar-height) + var(--safe-bottom) + 84px);
+  bottom: calc(var(--tabbar-height) + var(--safe-bottom) + var(--toast-lift));
   /* Above sheets (50), below action sheets (60 in ActionSheet.css), so an action sheet's scrim covers the toast and
      its rows can't be tapped through an Undo button. */
   z-index: 55;
@@ -17,7 +17,7 @@
   align-items: center;
   gap: var(--space-3);
   max-width: 100%;
-  min-height: 52px;
+  min-height: var(--toast-height);
   padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
   /* Half the minimum height: a pill on one line, a soft box when a long message wraps. */
   border-radius: 26px;

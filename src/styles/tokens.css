@@ -30,6 +30,9 @@
   --tap: 44px;
   --navbar-height: 44px;
   --tabbar-height: 50px;
+  /* The toast floats this far above the tab bar, 16px over the Log pill (52px tall, 16px up), and is this tall. */
+  --toast-lift: 84px;
+  --toast-height: 52px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --keyboard-inset: 0px;

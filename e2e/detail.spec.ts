@@ -48,6 +48,31 @@ test('logs from the friend page with them preselected', async ({ page }) => {
   await expect(page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Coffee/ })).toBeVisible()
 })
 
+test('the meetup just logged scrolls clear of its toast and opens with one tap', async ({ page }) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await page.getByRole('link', { name: /Alex/ }).click()
+  await page.getByRole('button', { name: 'Log meetup' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
+  await sheet.getByRole('button', { name: 'Save' }).click()
+  await expect(sheet).toBeHidden()
+  const toast = page.getByRole('status')
+  await expect(toast).toContainText('Logged with Alex')
+
+  // Scrolled to the end of the page, the last row is all above the toast.
+  const row = page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Coffee/ })
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  const rowBox = await row.boundingBox()
+  const toastBox = await toast.boundingBox()
+  if (!rowBox || !toastBox) throw new Error('The row or the toast is not on screen')
+  expect(rowBox.y + rowBox.height, 'The row ends above the toast').toBeLessThanOrEqual(toastBox.y)
+
+  // So a tap opens it right away, with no waiting for the toast to go.
+  await row.click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
+  await expect(toast).toContainText('Logged with Alex')
+})
+
 test('edits a meetup from its page, then deletes it with undo', async ({ page }) => {
   await page.goto('/')
   await addFriend(page, 'Alex')

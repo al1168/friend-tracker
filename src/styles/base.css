@@ -84,11 +84,13 @@ img {
   font-variant-numeric: tabular-nums;
 }
 
-/* The phone layout, centered on wider screens. Bottom padding clears the tab bar and Log button. */
+/* The phone layout, centered on wider screens. Bottom padding lets the end of a page scroll clear of the
+   tab bar, the Log button and a toast above it: a toast stays 5 to 8 seconds and pauses while touched,
+   so a last row left under it can't be tapped until it goes. */
 .app {
   max-width: 600px;
   margin: 0 auto;
-  padding-bottom: calc(var(--tabbar-height) + var(--safe-bottom) + 96px);
+  padding-bottom: calc(var(--tabbar-height) + var(--safe-bottom) + var(--toast-lift) + var(--toast-height) + var(--space-4));
 }
 
 /* Buttons */
