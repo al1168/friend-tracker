@@ -131,7 +131,7 @@ async function captureAll(page: Page, prefix: string) {
   await day.press('End')
   await openKeyboard(page)
   const helpers = page.getByRole('group', { name: 'Writing helpers' })
-  await helpers.getByRole('button', { name: 'Add a place' }).click()
+  await helpers.getByRole('button', { name: 'Place', exact: true }).click()
   await helpers.getByRole('textbox', { name: 'Place and time' }).fill('Blue willow 3:30')
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${DIR}/${prefix}-17-day-place.png` })
@@ -139,7 +139,7 @@ async function captureAll(page: Page, prefix: string) {
   await helpers.getByRole('button', { name: 'Paid' }).click()
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${DIR}/${prefix}-18-day-paid.png` })
-  await helpers.getByRole('group', { name: 'Who paid?' }).getByRole('button', { name: 'Close' }).click()
+  await helpers.getByRole('button', { name: 'Close' }).click()
   await helpers.getByRole('button', { name: 'Hide keyboard' }).click()
   await closeKeyboard(page)
 

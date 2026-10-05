@@ -7,11 +7,10 @@ import type { Friend } from '../types'
 /** Which row the helper bar shows. */
 export type HelperRow = 'helpers' | 'place' | 'paid'
 
-/** One "Who paid?" chip: what it shows, its name for VoiceOver, and the line it writes. */
+/** One "Who paid?" chip: what it shows (also its name), and the line it writes. */
 export interface Payer {
   key: string
   label: string
-  name: string
   line: string
   friend?: Friend
 }
@@ -24,6 +23,7 @@ interface DayHelperBarProps {
   now: string | null
   payers: Payer[]
   placeRef: Ref<HTMLInputElement>
+  paidRef: Ref<HTMLButtonElement>
   placeDraft: string
   onPlaceDraftChange: (text: string) => void
   onOpenPlace: () => void
@@ -46,11 +46,18 @@ const keepFocusProps = { onPointerDown: keepFocus, onMouseDown: keepFocus }
 
 /**
  * The day page's helper bar, riding on the keyboard: "@ Place", "Now" (today only) and "Paid", or the Place field,
- * or the "Who paid?" chips, with "Hide keyboard" pinned at the end while the keyboard is up (see DayScreen.css).
+ * or the "Who paid?" chips. Close (for the Place and Who paid rows) and "Hide keyboard" (while the keyboard is up,
+ * see DayScreen.css) are pinned at its end, outside the part that scrolls, so they're always on screen.
+ *
+ * Every control's name starts with the word it shows, so Voice Control's "Tap Now" works: "Now" is named
+ * "Now, 9:52 PM", and the "@" in "@ Place" is hidden from VoiceOver.
  */
 export function DayHelperBar(props: DayHelperBarProps) {
-  const { row, feelingsFocused, now, payers, placeRef, placeDraft } = props
+  const { row, feelingsFocused, now, payers, placeRef, paidRef, placeDraft } = props
   const paidLabelId = useId()
+  // How it felt's words are its own: no helper shows for it, and an open row waits until you're back.
+  const shown: HelperRow | null = feelingsFocused ? null : row
+  const empty = placeDraft.trim() === ''
 
   function onPlaceKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (isPlainEnter(event)) {
@@ -63,25 +70,25 @@ export function DayHelperBar(props: DayHelperBarProps) {
   }
 
   return (
-    <div className="day-helpers" role="group" aria-label="Writing helpers">
+    <div className="day-helpers" role="group" aria-label="Writing helpers" data-row={shown ?? 'none'}>
       <div className="day-helpers__row">
-        {row === 'helpers' && !feelingsFocused && (
+        {shown === 'helpers' && (
           <>
-            <button type="button" className="chip" aria-label="Add a place" {...keepFocusProps} onClick={props.onOpenPlace}>
-              @ Place
+            <button type="button" className="chip" {...keepFocusProps} onClick={props.onOpenPlace}>
+              <span aria-hidden="true">@ </span>Place
             </button>
             {now !== null && (
-              <button type="button" className="chip" aria-label={`Add the time, ${now}`} {...keepFocusProps} onClick={props.onNow}>
+              <button type="button" className="chip" aria-label={`Now, ${now}`} {...keepFocusProps} onClick={props.onNow}>
                 Now
               </button>
             )}
-            <button type="button" className="chip" aria-expanded={false} {...keepFocusProps} onClick={props.onOpenPaid}>
+            <button ref={paidRef} type="button" className="chip" {...keepFocusProps} onClick={props.onOpenPaid}>
               Paid
             </button>
           </>
         )}
 
-        {row === 'place' && (
+        {shown === 'place' && (
           <>
             <input
               ref={placeRef}
@@ -97,47 +104,59 @@ export function DayHelperBar(props: DayHelperBarProps) {
               onKeyDown={onPlaceKeyDown}
             />
             {now !== null && (
-              <button type="button" className="chip" aria-label={`Add the time, ${now}`} {...keepFocusProps} onClick={props.onNowInPlace}>
+              <button
+                type="button"
+                className="chip"
+                aria-label={`Now, ${now}`}
+                {...keepFocusProps}
+                onClick={props.onNowInPlace}
+              >
                 Now
               </button>
             )}
-            {placeDraft.trim() !== '' && (
-              <button type="button" className="text-button day-helpers__add" {...keepFocusProps} onClick={props.onAddPlace}>
-                Add
-              </button>
-            )}
-            <button type="button" className="icon-button" aria-label="Close" {...keepFocusProps} onClick={props.onClosePlace}>
-              <IconClose size={20} />
+            {/* Always there, dimmed until there's a place to add, so nothing moves on the first letter. It's
+                aria-disabled rather than disabled, so a tap on it still keeps focus (and the keyboard) where it is. */}
+            <button
+              type="button"
+              className="text-button day-helpers__add"
+              aria-disabled={empty}
+              {...keepFocusProps}
+              onClick={empty ? undefined : props.onAddPlace}
+            >
+              Add
             </button>
           </>
         )}
 
-        {row === 'paid' && (
+        {shown === 'paid' && (
           <div className="day-helpers__paid" role="group" aria-labelledby={paidLabelId}>
             <span id={paidLabelId} className="day-helpers__label">
               Who paid?
             </span>
-            {payers.map((payer) => (
-              <button
-                key={payer.key}
-                type="button"
-                className="chip"
-                aria-label={payer.name === payer.label ? undefined : payer.name}
-                {...keepFocusProps}
-                onClick={() => props.onPaid(payer.line)}
-              >
-                {payer.friend && (
-                  <Avatar name={payer.friend.name} photo={payer.friend.photo} seed={payer.friend.id} size={24} />
-                )}
-                {payer.label}
-              </button>
-            ))}
-            <button type="button" className="icon-button" aria-label="Close" {...keepFocusProps} onClick={props.onClosePaid}>
-              <IconClose size={20} />
-            </button>
+            <div className="day-helpers__payers">
+              {payers.map((payer) => (
+                <button key={payer.key} type="button" className="chip" {...keepFocusProps} onClick={() => props.onPaid(payer.line)}>
+                  {payer.friend && (
+                    <Avatar name={payer.friend.name} photo={payer.friend.photo} seed={payer.friend.id} size={24} />
+                  )}
+                  {payer.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
+      {(shown === 'place' || shown === 'paid') && (
+        <button
+          type="button"
+          className="icon-button day-helpers__close"
+          aria-label="Close"
+          {...keepFocusProps}
+          onClick={shown === 'place' ? props.onClosePlace : props.onClosePaid}
+        >
+          <IconClose size={20} />
+        </button>
+      )}
       <button
         type="button"
         className="icon-button day-helpers__hide"

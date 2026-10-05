@@ -232,7 +232,7 @@ test('"@ Place" adds a place line where the caret is, and Close goes back to The
   await openMealDay(page)
   const place = helpers(page).getByRole('textbox', { name: 'Place and time' })
 
-  await helpers(page).getByRole('button', { name: 'Add a place' }).click()
+  await helpers(page).getByRole('button', { name: 'Place', exact: true }).click()
   await expect(place).toBeFocused()
   await expect(place).toHaveAttribute('autocorrect', 'off')
   await place.fill('@Blue willow 3:30')
@@ -243,17 +243,17 @@ test('"@ Place" adds a place line where the caret is, and Close goes back to The
   await page.keyboard.type('Walked to mariya')
   await expect(dayBox(page)).toHaveValue('@Blue willow 3:30\nWalked to mariya')
 
-  await helpers(page).getByRole('button', { name: 'Add a place' }).click()
+  await helpers(page).getByRole('button', { name: 'Place', exact: true }).click()
   await place.fill('Somewhere')
   await helpers(page).getByRole('button', { name: 'Close' }).click()
   await expect(dayBox(page)).toBeFocused()
   await expect(place).toHaveCount(0)
   await expect(dayBox(page)).toHaveValue('@Blue willow 3:30\nWalked to mariya')
 
-  await helpers(page).getByRole('button', { name: 'Add a place' }).click()
+  await helpers(page).getByRole('button', { name: 'Place', exact: true }).click()
   await expect(place).toHaveValue('')
   await place.fill('hey tea')
-  await helpers(page).getByRole('button', { name: 'Add the time, 9:52 PM' }).click()
+  await helpers(page).getByRole('button', { name: 'Now, 9:52 PM' }).click()
   await expect(place).toHaveValue('hey tea 9:52 PM')
   await helpers(page).getByRole('button', { name: 'Add', exact: true }).click()
   await expect(dayBox(page)).toHaveValue('@Blue willow 3:30\nWalked to mariya\n@hey tea 9:52 PM\n')
@@ -265,7 +265,7 @@ test('a place still in the Place field joins the day when you go back', async ({
   await logMeal(page)
   await openMealDay(page)
   await dayBox(page).fill('Rainy')
-  await helpers(page).getByRole('button', { name: 'Add a place' }).click()
+  await helpers(page).getByRole('button', { name: 'Place', exact: true }).click()
   await helpers(page).getByRole('textbox', { name: 'Place and time' }).fill('Blue willow 3:30')
 
   await page.getByRole('button', { name: 'Meal' }).click()
@@ -281,24 +281,76 @@ test('"Now" writes the time on today’s meetup, and "Paid" writes who paid', as
   await openMealDay(page)
 
   await dayBox(page).fill('Left at')
-  await helpers(page).getByRole('button', { name: 'Add the time, 9:52 PM' }).click()
+  await helpers(page).getByRole('button', { name: 'Now, 9:52 PM' }).click()
   await expect(dayBox(page)).toHaveValue('Left at 9:52 PM')
   await expect(announcement(page)).toHaveText('Added 9:52 PM.')
 
   await helpers(page).getByRole('button', { name: 'Paid' }).click()
   await expect(announcement(page)).toHaveText('Pick who paid.')
   const whoPaid = helpers(page).getByRole('group', { name: 'Who paid?' })
-  const names = ['I paid', 'Mariya', 'Jessie', 'Brandon', 'We split it', 'Close']
+  const names = ['Me', 'Mariya', 'Jessie', 'Brandon', 'Split']
   await expect(whoPaid.getByRole('button')).toHaveCount(names.length)
   for (const [index, name] of names.entries()) {
     await expect(whoPaid.getByRole('button').nth(index)).toHaveAccessibleName(name)
   }
-  await expect(whoPaid.getByRole('button')).toHaveText(['Me', /Mariya$/, /Jessie$/, /Brandon$/, 'Split', ''])
+  await expect(whoPaid.getByRole('button')).toHaveText(['Me', /Mariya$/, /Jessie$/, /Brandon$/, 'Split'])
+  // The owner's three friends all show at the standard text size, with Close, without scrolling sideways.
+  for (const button of await whoPaid.getByRole('button').all()) await expect(button).toBeInViewport({ ratio: 1 })
+  await expect(helpers(page).getByRole('button', { name: 'Close' })).toBeInViewport({ ratio: 1 })
   await whoPaid.getByRole('button', { name: 'Jessie' }).click()
   await expect(dayBox(page)).toHaveValue('Left at 9:52 PM\nJessie paid')
   await expect(announcement(page)).toHaveText('Added Jessie paid.')
   await expect(whoPaid).toHaveCount(0)
   await expect.poll(async () => (await readMeetups(page))[0].note).toBe('Left at 9:52 PM\nJessie paid')
+
+  // Close keeps The day's focus when it had it; otherwise focus goes back to "Paid".
+  await helpers(page).getByRole('button', { name: 'Paid' }).click()
+  await helpers(page).getByRole('button', { name: 'Close' }).click()
+  await expect(whoPaid).toHaveCount(0)
+  await expect(dayBox(page)).toBeFocused()
+  await dayBox(page).blur()
+  await helpers(page).getByRole('button', { name: 'Paid' }).click()
+  await helpers(page).getByRole('button', { name: 'Close' }).click()
+  await expect(helpers(page).getByRole('button', { name: 'Paid' })).toBeFocused()
+  await expect(dayBox(page)).toHaveValue('Left at 9:52 PM\nJessie paid')
+})
+
+test('every helper is named by the word it shows, for Voice Control', async ({ page }) => {
+  await page.clock.setFixedTime(SATURDAY_NIGHT)
+  await page.goto('/')
+  await logMeal(page)
+  await openMealDay(page)
+  /** Checks each visible helper's name starts with the word it shows, and returns those words. */
+  const startsWithItsWord = async () => {
+    const words: string[] = []
+    for (const button of await helpers(page).getByRole('button').all()) {
+      if (!(await button.isVisible())) continue
+      // The words on screen: not a visually hidden part, nor a decoration such as the "@" or an avatar's initial.
+      const shown = await button.evaluate((element) => {
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+        let text = ''
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          if (!node.parentElement?.closest('.visually-hidden, [aria-hidden="true"]')) text += node.textContent
+        }
+        return text.trim()
+      })
+      if (shown === '') continue // An icon button: "Close" or "Hide keyboard".
+      words.push(shown)
+      await expect(button).toHaveAccessibleName(new RegExp(`^${shown}`))
+    }
+    return words
+  }
+  expect(await startsWithItsWord()).toEqual(['Place', 'Now', 'Paid'])
+  await expect(helpers(page).getByRole('button', { name: 'Now, 9:52 PM' })).toBeVisible()
+  await helpers(page).getByRole('button', { name: 'Place', exact: true }).click()
+  // "Add" waits, dimmed, until there's a place to add, so nothing moves on the first letter.
+  await expect(helpers(page).getByRole('button', { name: 'Add', exact: true })).toBeDisabled()
+  expect(await startsWithItsWord()).toEqual(['Now', 'Add'])
+  await helpers(page).getByRole('textbox', { name: 'Place and time' }).fill('Cafe')
+  await expect(helpers(page).getByRole('button', { name: 'Add', exact: true })).toBeEnabled()
+  await helpers(page).getByRole('button', { name: 'Close' }).click()
+  await helpers(page).getByRole('button', { name: 'Paid' }).click()
+  expect(await startsWithItsWord()).toEqual(['Me', 'Mariya', 'Jessie', 'Brandon', 'Split'])
 })
 
 /** Focuses The day and selects `from` to `to`, as a double-tap or a drag of the handles does. */
@@ -324,7 +376,7 @@ test('a place or paid line never removes the words you have selected', async ({ 
   // Everything selected: "@ Place", a place, Return.
   await dayBox(page).fill(note)
   await selectInDay(page, 0, note.length)
-  await helpers(page).getByRole('button', { name: 'Add a place' }).click()
+  await helpers(page).getByRole('button', { name: 'Place', exact: true }).click()
   await helpers(page).getByRole('textbox', { name: 'Place and time' }).fill('Cafe')
   await helpers(page).getByRole('textbox', { name: 'Place and time' }).press('Enter')
   await expect(dayBox(page)).toHaveValue(`${note}\n@Cafe\n`)
@@ -332,7 +384,7 @@ test('a place or paid line never removes the words you have selected', async ({ 
   // "dyno" selected again, a place typed and left in the field, then Back: the place joins, and "dyno" stays.
   await dayBox(page).fill(note)
   await selectInDay(page, ...dyno)
-  await helpers(page).getByRole('button', { name: 'Add a place' }).click()
+  await helpers(page).getByRole('button', { name: 'Place', exact: true }).click()
   await helpers(page).getByRole('textbox', { name: 'Place and time' }).fill('Blue willow 3:30')
   await page.getByRole('button', { name: 'Meal' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
@@ -344,7 +396,7 @@ test('"Now" types over a selection you can see, and goes after one you can’t',
   await page.goto('/')
   await logMeal(page)
   await openMealDay(page)
-  const now = helpers(page).getByRole('button', { name: 'Add the time, 9:52 PM' })
+  const now = helpers(page).getByRole('button', { name: 'Now, 9:52 PM' })
 
   // With The day focused, the selection shows, and "Now" replaces it as typing would.
   await dayBox(page).fill('Left at noon')
@@ -364,8 +416,8 @@ test('a day that is not today has no "Now", and an upcoming one has no How it fe
   await page.goto('/')
   await logMeal(page, { date: '2099-01-01' })
   await openMealDay(page)
-  await expect(helpers(page).getByRole('button', { name: 'Add a place' })).toBeVisible()
-  await expect(helpers(page).getByRole('button', { name: /Add the time/ })).toHaveCount(0)
+  await expect(helpers(page).getByRole('button', { name: 'Place', exact: true })).toBeVisible()
+  await expect(helpers(page).getByRole('button', { name: /^Now/ })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'How it felt' })).toHaveCount(0)
   await expect(page.getByRole('group', { name: 'Mood' })).toHaveCount(0)
 })
@@ -476,7 +528,7 @@ test('the owner’s example, written on the walk home, reads back as their day',
 
   // 4. "Locations:" and the story, one place at a time.
   const place = async (text: string) => {
-    await helpers(page).getByRole('button', { name: 'Add a place' }).click()
+    await helpers(page).getByRole('button', { name: 'Place', exact: true }).click()
     await helpers(page).getByRole('textbox', { name: 'Place and time' }).fill(text)
     await helpers(page).getByRole('textbox', { name: 'Place and time' }).press('Enter')
     await expect(dayBox(page)).toBeFocused()

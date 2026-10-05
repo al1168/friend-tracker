@@ -184,3 +184,69 @@ test('moving to How it felt with the keyboard up shows it above the helper bar, 
   await expect(helpers.getByRole('button')).toHaveCount(1)
   await expect(helpers.getByRole('button', { name: 'Hide keyboard' })).toBeVisible()
 })
+
+test('with three friends, every "Who paid?" chip, Close and "Hide keyboard" show on the keyboard', async ({ page }) => {
+  for (const name of ['Mariya', 'Jessie', 'Brandon']) await addFriend(page, name)
+  await logMeetup(page, ['Mariya', 'Jessie', 'Brandon'], { type: 'Meal' })
+  await openFriendPage(page, 'Mariya')
+  await page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Meal/ }).click()
+  await openDay(page)
+  await tapFocus(dayBox(page))
+  const { height } = await openKeyboard(page)
+  const helpers = page.getByRole('group', { name: 'Writing helpers' })
+
+  await helpers.getByRole('button', { name: 'Paid' }).click()
+
+  const whoPaid = helpers.getByRole('group', { name: 'Who paid?' })
+  await expect(whoPaid.getByRole('button')).toHaveCount(5)
+  for (const button of await whoPaid.getByRole('button').all()) await expect(button).toBeInViewport({ ratio: 1 })
+  await expect(helpers.getByRole('button', { name: 'Close' })).toBeInViewport({ ratio: 1 })
+  await expect(helpers.getByRole('button', { name: 'Hide keyboard' })).toBeInViewport({ ratio: 1 })
+  const at = await layout(page)
+  expect(at.footerBottom, 'The bar still sits on the keyboard').toBeCloseTo(height, 0)
+
+  // "Hide keyboard" puts the bar back to its helpers.
+  await helpers.getByRole('button', { name: 'Hide keyboard' }).click()
+  await expect(whoPaid).toHaveCount(0)
+  await expect(helpers.getByRole('button', { name: 'Paid' })).toBeVisible()
+})
+
+test('How it felt shows only "Hide keyboard": an open Place row waits with its text, and Who paid closes', async ({
+  page,
+}) => {
+  await openDayPage(page)
+  await tapFocus(dayBox(page))
+  await openKeyboard(page)
+  const helpers = page.getByRole('group', { name: 'Writing helpers' })
+  const feelings = page.getByRole('textbox', { name: 'How it felt, in your words' })
+  const place = helpers.getByRole('textbox', { name: 'Place and time' })
+
+  await helpers.getByRole('button', { name: 'Place', exact: true }).click()
+  await place.fill('Blue willow')
+  await feelings.focus()
+  await expect(helpers.getByRole('button')).toHaveCount(1)
+  await expect(place).toHaveCount(0)
+  await dayBox(page).focus()
+  await expect(place).toHaveValue('Blue willow')
+  await helpers.getByRole('button', { name: 'Close' }).click()
+
+  await helpers.getByRole('button', { name: 'Paid' }).click()
+  await feelings.focus()
+  await expect(helpers.getByRole('button')).toHaveCount(1)
+  await dayBox(page).focus()
+  await expect(helpers.getByRole('group', { name: 'Who paid?' })).toHaveCount(0)
+  await expect(helpers.getByRole('button', { name: 'Paid' })).toBeVisible()
+})
+
+test('with How it felt focused and no keyboard on screen, the empty helper bar goes away', async ({ page }) => {
+  await openDayPage(page)
+  const feelings = page.getByRole('textbox', { name: 'How it felt, in your words' })
+  const footer = page.locator('.day-page__footer')
+
+  await tapFocus(feelings)
+  await expect(footer).toBeHidden()
+
+  await openKeyboard(page)
+  await expect(footer).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Hide keyboard' })).toBeVisible()
+})

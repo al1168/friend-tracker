@@ -107,6 +107,11 @@
 .day-page__footer .field-error {
   margin: 0;
 }
+/* With How it felt focused the bar holds only "Hide keyboard", which shows once the keyboard is up: until then
+   (a hardware keyboard, or the software one still rising) there's no bar, rather than an empty band. */
+html:not(.keyboard-open) .day-page__footer[data-bare='true'] {
+  display: none;
+}
 
 .day-helpers {
   display: flex;
@@ -114,25 +119,41 @@
   gap: var(--space-2);
   min-height: var(--tap);
 }
-/* One row that scrolls sideways at large text sizes; "Hide keyboard" stays pinned at its end. */
+/* One row that scrolls sideways at large text sizes; Close and "Hide keyboard" stay pinned at its end. */
 .day-helpers__row {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  /* Room inside the scroller for the focus ring and the chips' taller hit areas, which it would clip. */
-  margin: calc(-1 * var(--space-1)) -3px;
-  padding: var(--space-1) 3px;
+  /* Room inside the scroller for the focus ring (2px at a 2px offset, base.css) and the chips' taller hit areas,
+     which it would clip. */
+  margin: calc(-1 * var(--space-1)) -4px;
+  padding: var(--space-1) 4px;
   overflow-x: auto;
   scrollbar-width: none;
 }
 .day-helpers__row::-webkit-scrollbar {
   display: none;
 }
+/* Who paid: the label over the chips, which wrap, so every payer shows without scrolling sideways. The bar
+   grows upward, and Close and "Hide keyboard" stay beside the chips' last line, where they sit in every row. */
+.day-helpers[data-row='paid'] {
+  align-items: flex-end;
+}
 .day-helpers__paid {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  /* Centers the last line of 36px chips on the 44px buttons beside it. */
+  padding-bottom: 4px;
+}
+.day-helpers__payers {
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }
 .day-helpers__label {
@@ -154,6 +175,11 @@
 .day-helpers__add {
   flex: none;
   font-weight: 600;
+}
+/* Names the bar too, so a press doesn't brighten it (base.css's .text-button:active comes later). */
+.day-helpers .day-helpers__add[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
 }
 .day-place.field {
   flex: 1;

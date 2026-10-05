@@ -62,12 +62,12 @@ function useMinutesNow(): number {
 /** The "Who paid?" chips: Me, each friend on the meetup in the meetup's order, and Split. */
 function payersFor(people: Friend[]): Payer[] {
   return [
-    { key: 'me', label: 'Me', name: 'I paid', line: 'I paid' },
+    { key: 'me', label: 'Me', line: 'I paid' },
     ...people.map((friend) => {
       const label = payerLabel(friend, people)
-      return { key: friend.id, label, name: label, line: `${label} paid`, friend }
+      return { key: friend.id, label, line: `${label} paid`, friend }
     }),
-    { key: 'split', label: 'Split', name: 'We split it', line: 'We split it' },
+    { key: 'split', label: 'Split', line: 'We split it' },
   ]
 }
 
@@ -120,6 +120,7 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const dayRef = useRef<HTMLTextAreaElement>(null)
   const placeRef = useRef<HTMLInputElement>(null)
+  const paidRef = useRef<HTMLButtonElement>(null)
   const footerRef = useRef<HTMLDivElement>(null)
   const weatherId = useId()
   const dayId = useId()
@@ -315,15 +316,24 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
     announce('Pick who paid.')
   }
 
+  /** Closes Who paid. The day keeps its focus if it had it; otherwise focus goes back to "Paid", so VoiceOver isn't lost. */
+  function closePaid() {
+    const dayFocused = document.activeElement === dayRef.current
+    flushSync(() => setRow('helpers'))
+    if (!dayFocused) paidRef.current?.focus()
+  }
+
   function addPaid(line: string) {
     editDay('line', (value, caret) => insertPaidLine(value, caret, line))
     setRow('helpers')
     announce(`Added ${line}.`)
   }
 
+  /** Blurs the focused box. An open Who paid row closes with it; the Place row stays, holding its text. */
   function hideKeyboard() {
     const active = document.activeElement
     if (active instanceof HTMLElement) active.blur()
+    if (row === 'paid') setRow('helpers')
   }
 
   function toggleWeather(key: Weather) {
@@ -430,7 +440,11 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
               autoCapitalize="sentences"
               maxLength={FEELINGS_MAX}
               onChange={(event) => setField('feelings', event.target.value, false)}
-              onFocus={() => setFocus('feelings')}
+              onFocus={() => {
+                setFocus('feelings')
+                // The helpers write into The day, so they step aside here (DayHelperBar); Who paid closes.
+                setRow((current) => (current === 'paid' ? 'helpers' : current))
+              }}
               onBlur={() => {
                 setFocus(null)
                 void saver.flush()
@@ -447,7 +461,9 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
         <p className="day-page__footnote">Saves as you type, and stays on this iPhone.</p>
       </div>
 
-      <div ref={footerRef} className="day-page__footer">
+      {/* With How it felt focused there's nothing to show until the keyboard is up ("Hide keyboard"), so the bar
+          goes away rather than leave an empty band (DayScreen.css). */}
+      <div ref={footerRef} className="day-page__footer" data-bare={focused === 'feelings' && !status.failed}>
         {status.failed && (
           <p className="field-error" role="alert">
             {SAVE_FAILED}
@@ -459,6 +475,7 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
           now={now}
           payers={payersFor(people)}
           placeRef={placeRef}
+          paidRef={paidRef}
           placeDraft={placeDraft}
           onPlaceDraftChange={updatePlaceDraft}
           onOpenPlace={openPlace}
@@ -468,7 +485,7 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
           onNowInPlace={addNowInPlace}
           onOpenPaid={openPaid}
           onPaid={addPaid}
-          onClosePaid={() => setRow('helpers')}
+          onClosePaid={closePaid}
           onHideKeyboard={hideKeyboard}
         />
       </div>
