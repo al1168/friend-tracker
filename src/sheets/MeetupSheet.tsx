@@ -1,9 +1,11 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 import { useConfirmDiscard } from '../components/ActionSheet'
 import { Avatar } from '../components/Avatar'
 import { Chip } from '../components/Chip'
 import { IconCalendar, IconCheck, IconClose, IconSearch } from '../components/icons'
 import { InsetGroup, Row } from '../components/InsetGroup'
+import type { NavState } from '../components/Page'
 import { Sheet } from '../components/Sheet'
 import { useToast } from '../components/Toast'
 import { useFriends, useMeetupPhotoThumbs, useMeetups, useMeetupTypes } from '../data/hooks'
@@ -13,7 +15,6 @@ import {
   deleteMeetup,
   NO_PHOTO_CHANGES,
   restoreMeetup,
-  updateDay,
   updateMeetup,
   type PhotoChanges,
 } from '../db/meetups'
@@ -50,22 +51,21 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
   const today = useToday()
   const confirmDiscard = useConfirmDiscard()
   const toast = useToast()
+  const location = useLocation()
+  const navigate = useNavigate()
   const whoId = useId()
   const whatId = useId()
   const whenId = useId()
-  const noteId = useId()
 
   const [start] = useState(() => ({
     friendIds: editing?.friendIds ?? (initial?.presetFriendId ? [initial.presetFriendId] : []),
     typeId: editing?.typeId ?? null,
     date: editing?.date ?? todayISO(),
-    note: editing?.note ?? '',
     activities: editing?.activities ?? [],
   }))
   const [friendIds, setFriendIds] = useState<string[]>(start.friendIds)
   const [typeId, setTypeId] = useState<string | null>(start.typeId)
   const [date, setDate] = useState(start.date)
-  const [note, setNote] = useState(start.note)
   const [activities, setActivities] = useState<string[]>(start.activities)
   const [activityDraft, setActivityDraft] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -118,7 +118,6 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
     !sameFriends ||
     effectiveTypeId !== startTypeId ||
     date !== start.date ||
-    note !== start.note ||
     activities.join('\n') !== start.activities.join('\n') ||
     !!activityDraft?.trim() ||
     (photos !== null && photos.map((photo) => photo.id).join() !== startPhotoIds.join())
@@ -137,7 +136,8 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
     if (await confirmDiscard(dirty)) onClose()
   }
 
-  async function save() {
+  /** Saves the sheet; with `writeDay`, a new meetup then opens its day page, over its Meetup page. */
+  async function save(writeDay = false) {
     if (savingRef.current || addingPhotos) return
     if (friendIds.length === 0 || !effectiveTypeId) return
     savingRef.current = true
@@ -158,14 +158,13 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
             order: photos.map((photo) => photo.id),
           }
         : NO_PHOTO_CHANGES
+      let added: string | null = null
       if (editing) {
         await updateMeetup(editing.id, input, photoChanges)
-        // The one-line Note is the start of the day, saved with the day's fields.
-        if (note.trim() !== editing.note) await updateDay(editing.id, { note: note.trim() })
         toast({ message: 'Saved' })
       } else {
         const meetup = await addMeetup(input, photoChanges)
-        if (note.trim()) await updateDay(meetup.id, { note: note.trim() })
+        added = meetup.id
         toast({
           message: `Logged with ${formatNameList(selected.map((f) => f.name))}`,
           actionLabel: 'Undo',
@@ -177,6 +176,14 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
       // Photos take real space, so ask Safari to keep the data when the phone runs low (best effort).
       if (photoChanges.add.length > 0) void askToKeepData()
       onClose()
+      if (writeDay && added) {
+        // Back from the day lands on the new memory, whose back button says the friend's name when the sheet
+        // was opened from their page.
+        const presetFriend = initial?.presetFriendId ? friendById.get(initial.presetFriendId) : undefined
+        const fromHere: NavState = { backLabel: presetFriend?.name, tab: (location.state as NavState | null)?.tab }
+        navigate(`/meetups/${added}`, { state: fromHere })
+        navigate(`/meetups/${added}/day`)
+      }
     } catch (caught) {
       setError(caught instanceof ValidationError ? caught.message : "Couldn't save. Please try again.")
     } finally {
@@ -184,6 +191,8 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
       setSaving(false)
     }
   }
+
+  const saveDisabled = saving || addingPhotos || friendIds.length === 0 || effectiveTypeId === null
 
   async function remove() {
     if (!editing) return
@@ -223,11 +232,22 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
               {error}
             </p>
           )}
+          {/* Never hidden for a missing friend (only while the keyboard is up), so Save never moves. */}
+          {!editing && (
+            <button
+              type="button"
+              className="text-button meetup-sheet__write"
+              onClick={() => void save(true)}
+              disabled={saveDisabled}
+            >
+              Save and write about the day
+            </button>
+          )}
           <button
             type="button"
             className="button button--primary button--block"
-            onClick={save}
-            disabled={saving || addingPhotos || friendIds.length === 0 || effectiveTypeId === null}
+            onClick={() => void save()}
+            disabled={saveDisabled}
           >
             {friendIds.length === 0 ? 'Pick a friend' : 'Save'}
           </button>
@@ -397,24 +417,6 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
           open={request !== null}
         />
       )}
-
-      <div className="form-section">
-        <label htmlFor={noteId} className="form-section__label">
-          Note
-        </label>
-        <input
-          id={noteId}
-          className="field"
-          value={note}
-          placeholder="Optional"
-          enterKeyHint="done"
-          onChange={(event) => {
-            setNote(event.target.value)
-            setError(null)
-          }}
-          onKeyDown={blurOnEnter}
-        />
-      </div>
 
       {editing && (
         <InsetGroup>

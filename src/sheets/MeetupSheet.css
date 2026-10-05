@@ -83,6 +83,20 @@
   cursor: pointer;
 }
 
+/* "Save and write about the day": a centered text button above Save, in Log meetup only. It's dimmed whenever
+   Save is, and hidden only while the keyboard is up, so the friend search keeps its room and Save stays put. */
+.meetup-sheet__write {
+  align-self: center;
+  font-weight: 600;
+}
+.meetup-sheet__write:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.keyboard-open .meetup-sheet__write {
+  display: none;
+}
+
 /* "+ New" activity: the field and its Add button on their own line under the chips. */
 .activity-new {
   display: flex;

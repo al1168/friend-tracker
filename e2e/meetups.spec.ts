@@ -28,7 +28,7 @@ test('Save waits for a friend to be picked', async ({ page }) => {
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
   await expect(sheet.getByRole('button', { name: 'Pick a friend' })).toBeDisabled()
   await sheet.getByRole('group', { name: 'Recent friends' }).getByRole('button', { name: 'Alex' }).click()
-  await expect(sheet.getByRole('button', { name: 'Save' })).toBeEnabled()
+  await expect(sheet.getByRole('button', { name: 'Save', exact: true })).toBeEnabled()
 })
 
 test('logs a meetup on another date', async ({ page }) => {

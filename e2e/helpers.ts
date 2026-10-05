@@ -47,9 +47,19 @@ export async function logMeetup(
   if (options.date) await sheet.getByLabel('Pick date').fill(options.date)
   for (const activity of options.activities ?? []) await pickActivity(sheet, activity)
   if (options.photos) await addPhotos(sheet, options.photos)
-  if (options.note) await sheet.getByLabel('Note').fill(options.note)
-  await sheet.getByRole('button', { name: 'Save' }).click()
+  if (!options.note) {
+    await sheet.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(sheet).toBeHidden()
+    return
+  }
+  // A note is the day: write it on the day page, then come back to where the sheet was opened.
+  await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
   await expect(sheet).toBeHidden()
+  await page.getByRole('textbox', { name: 'The day' }).fill(options.note)
+  await page.locator('.day-page__bar').getByRole('button').click()
+  await expect(page.getByRole('heading', { level: 1, name: options.type ?? 'Coffee' })).toBeVisible()
+  await page.locator('header.navbar .navbar__back').click()
+  await expect(page.getByRole('heading', { level: 1, name: options.type ?? 'Coffee' })).toHaveCount(0)
 }
 
 /** A file for the photo picker (`setInputFiles`). */

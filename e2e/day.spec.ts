@@ -54,6 +54,75 @@ async function hideApp(page: Page) {
   })
 }
 
+test('the quick log is unchanged: no Note, and Save stays put while "Save and write about the day" waits for a friend', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await page.getByRole('button', { name: 'Log meetup' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
+  await expect(sheet.getByLabel('Note')).toHaveCount(0)
+  const write = sheet.getByRole('button', { name: 'Save and write about the day' })
+  const save = sheet.locator('.sheet__footer .button--block')
+  await expect(write).toBeDisabled()
+  await expect(save).toHaveText('Pick a friend')
+  // Measure once the sheet has finished rising.
+  await sheet.evaluate((element) => Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)))
+  const before = await save.boundingBox()
+
+  await sheet.getByLabel('Search all friends').fill('Alex')
+  await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name: 'Alex', exact: true }).click()
+
+  await expect(write).toBeEnabled()
+  await expect(save).toHaveText('Save')
+  expect(await save.boundingBox(), 'Save did not move').toEqual(before)
+  await save.click()
+  await expect(sheet).toBeHidden()
+  await expect(page.getByRole('status')).toContainText('Logged with Alex')
+  await openFriendPage(page, 'Alex')
+  await page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Coffee/ }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
+})
+
+test('"Save and write about the day" logs the meetup and opens its day; Back lands on the new memory', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await addFriend(page, 'Mariya')
+  await openFriendPage(page, 'Mariya')
+  await page.getByRole('button', { name: 'Log meetup' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
+  await sheet.getByRole('button', { name: 'Meal', exact: true }).click()
+  await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
+
+  await expect(sheet).toBeHidden()
+  await expect(page.getByRole('status')).toContainText('Logged with Mariya')
+  await expect(page.getByRole('heading', { level: 1, name: 'The day' })).toBeFocused()
+  await dayBox(page).fill('Tacos')
+  await page.getByRole('button', { name: 'Meal' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
+  expect((await readMeetups(page))[0].note).toBe('Tacos')
+  // Opened from Mariya's page, the memory says her name on its back button.
+  await page.getByRole('button', { name: 'Mariya' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Mariya' })).toBeVisible()
+})
+
+test('Undo on the "Logged" toast takes the day with it, back to Friends', async ({ page }) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await page.getByRole('button', { name: 'Log meetup' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
+  await sheet.getByLabel('Search all friends').fill('Alex')
+  await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name: 'Alex', exact: true }).click()
+  await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
+  await dayBox(page).fill('A line I meant to keep')
+
+  await page.getByRole('status').getByRole('button', { name: 'Undo' }).click()
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
+  await expect.poll(async () => (await readMeetups(page)).length).toBe(0)
+})
+
 test('opens on its title, with the meetup on Back and who was there', async ({ page }) => {
   await page.clock.setFixedTime(SATURDAY_NIGHT)
   await page.goto('/')

@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { addFriend, logMeetup, openDay, openFriendPage } from './helpers.ts'
-import { closeKeyboard, fakeVisualViewport, nextFrames, openKeyboard, tapFocus } from './keyboard.ts'
+import { closeKeyboard, fakeVisualViewport, KEYBOARD, nextFrames, openKeyboard, rootProperty, tapFocus } from './keyboard.ts'
 
 /** The room the app keeps between the caret's line and the edges of the day page's visible body. */
 const MARGIN = 12
@@ -67,6 +67,25 @@ async function expectLineShown(page: Page, line: { top: number; bottom: number }
   expect(line.top, `${what} is below the nav bar`).toBeGreaterThanOrEqual(at.visibleTop)
   expect(line.bottom, `${what} is above the helper bar with ${room}px to spare`).toBeLessThanOrEqual(at.footerTop - room)
 }
+
+test('the Log sheet closing under the day page leaves the keyboard to the day page', async ({ page }) => {
+  await addFriend(page, 'Alex')
+  await page.getByRole('button', { name: 'Log meetup' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
+  await sheet.getByLabel('Search all friends').fill('Alex')
+  await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name: 'Alex', exact: true }).click()
+  await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
+  // The sheet is still sliding away (260ms) when the keyboard comes up on the day page.
+  await expect(page.locator('.sheet-layer--closing')).toHaveCount(1)
+  await openKeyboard(page)
+
+  await page.waitForTimeout(400)
+
+  await expect(page.locator('.sheet-layer')).toHaveCount(0)
+  expect(await rootProperty(page, '--keyboard-inset')).toBe(`${KEYBOARD}px`)
+  expect(await rootProperty(page, '--viewport-height')).not.toBe('')
+  await expect(page.locator('html')).toHaveClass(/\bkeyboard-open\b/)
+})
 
 test('the page sits on the keyboard, with "Hide keyboard" on the helper bar', async ({ page }) => {
   await openDayPage(page)

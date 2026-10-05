@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { addFriend, editMeetup, LARGE_TEXT, logMeetup, openFriendPage } from './helpers.ts'
+import { addFriend, LARGE_TEXT } from './helpers.ts'
 import { closeKeyboard, fakeVisualViewport, KEYBOARD, nextFrames, openKeyboard, setVisualViewport, tapFocus } from './keyboard.ts'
 
 /** Where a field inside a sheet is, against the part of the sheet's body you can see and its Save bar. */
@@ -64,31 +64,6 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/')
 })
 
-test('the meetup Note comes into view when the keyboard opens, before any typing', async ({ page }) => {
-  const sheet = await openLogMeetup(page)
-  const note = sheet.getByLabel('Note')
-  await scrollToTap(note, 'Note')
-  await tapFocus(note)
-
-  await openKeyboard(page)
-
-  await expectRevealed(note, 'Note')
-})
-
-test('the Note in Edit meetup comes into view when the keyboard opens, before any typing', async ({ page }) => {
-  await addFriend(page, 'Alex')
-  await logMeetup(page, ['Alex'])
-  await openFriendPage(page, 'Alex')
-  const sheet = await editMeetup(page, /Coffee/)
-  const note = sheet.getByLabel('Note')
-  await scrollToTap(note, 'Note')
-  await tapFocus(note)
-
-  await openKeyboard(page)
-
-  await expectRevealed(note, 'Note')
-})
-
 test('the friend Notes field stays in view when the keyboard opens, before any typing', async ({ page }) => {
   const sheet = await openNewFriend(page)
   const notes = sheet.getByLabel('Notes')
@@ -99,37 +74,6 @@ test('the friend Notes field stays in view when the keyboard opens, before any t
   await openKeyboard(page)
 
   await expectRevealed(notes, 'Notes')
-})
-
-test('the Note comes into view when iOS also pans the visual viewport for the keyboard', async ({ page }) => {
-  const sheet = await openLogMeetup(page)
-  const note = sheet.getByLabel('Note')
-  await scrollToTap(note, 'Note')
-  await tapFocus(note)
-
-  const { height, offsetTop } = await openKeyboard(page, { offsetTop: 150 })
-
-  await expectRevealed(note, 'Note')
-  // What you see of the page runs from offsetTop to offsetTop + height in layout viewport terms.
-  const at = await placement(note)
-  expect(at.top, 'The top of Note is on screen').toBeGreaterThanOrEqual(offsetTop)
-  expect(at.bottom, 'The bottom of Note is on screen, above the keyboard').toBeLessThanOrEqual(offsetTop + height)
-})
-
-test('moving to the meetup Note while the keyboard is up shows all of it above the Save bar', async ({ page }) => {
-  const sheet = await openLogMeetup(page)
-  await tapFocus(sheet.getByLabel('Search all friends'))
-  await openKeyboard(page)
-  const note = sheet.getByLabel('Note')
-  // So the browser has scrolling to do: if it ever starts with the Note in view, this test checks nothing.
-  const before = await placement(note)
-  expect(before.bottom, 'The Note starts out of the visible part of the sheet').toBeGreaterThan(before.visibleBottom)
-
-  // As the keyboard's next-field arrow does: a plain focus, with the browser's own scrolling.
-  await note.focus()
-  await nextFrames(page)
-
-  await expectRevealed(note, 'Note', { room: MARGIN })
 })
 
 test('moving to Notes while the keyboard is up brings it into view, before any typing', async ({ page }) => {
@@ -235,15 +179,15 @@ test('scrolling the sheet while the keyboard is up is left alone', async ({ page
 })
 
 test('closing the keyboard leaves the sheet where it was scrolled', async ({ page }) => {
-  const sheet = await openLogMeetup(page)
+  const sheet = await openNewFriend(page)
   const body = sheet.locator('.sheet__body')
-  const note = sheet.getByLabel('Note')
-  await scrollToTap(note, 'Note')
-  await tapFocus(note)
+  const notes = sheet.getByLabel('Notes')
+  await scrollToTap(notes, 'Notes')
+  await tapFocus(notes)
   await openKeyboard(page)
-  await expectRevealed(note, 'Note')
+  await expectRevealed(notes, 'Notes')
 
-  // Back up to Who with the Note still focused, then the keyboard goes down: the sheet grows.
+  // Back up to the photo with Notes still focused, then the keyboard goes down: the sheet grows.
   await body.evaluate((element) => {
     element.scrollTop = 0
   })
@@ -251,16 +195,14 @@ test('closing the keyboard leaves the sheet where it was scrolled', async ({ pag
   await closeKeyboard(page)
   await nextFrames(page)
 
-  expect(await scrollTop(body), 'Nothing pulls the sheet back to the Note').toBe(0)
-  await expect(note).toBeFocused()
+  expect(await scrollTop(body), 'Nothing pulls the sheet back to Notes').toBe(0)
+  await expect(notes).toBeFocused()
 })
 
 test('focusing a chip with the keyboard up leaves the scrolled sheet alone', async ({ page }) => {
   const sheet = await openLogMeetup(page)
   const body = sheet.locator('.sheet__body')
-  const note = sheet.getByLabel('Note')
-  await scrollToTap(note, 'Note')
-  await tapFocus(note)
+  await tapFocus(sheet.getByLabel('Search all friends'))
   await openKeyboard(page)
   await body.evaluate((element) => {
     element.scrollTop = 0
@@ -281,6 +223,24 @@ test('focusing a chip with the keyboard up leaves the scrolled sheet alone', asy
 
   await expect(chip).toBeFocused()
   expect(await scrollTop(body)).toBe(0)
+})
+
+test('"Save and write about the day" steps aside while the keyboard is up, and Save stays put', async ({ page }) => {
+  const sheet = await openLogMeetup(page)
+  const write = sheet.getByRole('button', { name: 'Save and write about the day' })
+  const save = sheet.locator('.sheet__footer .button--block')
+  await expect(write).toBeVisible()
+  await tapFocus(sheet.getByLabel('Search all friends'))
+  const before = await save.boundingBox()
+
+  await openKeyboard(page)
+
+  await expect(write).toBeHidden()
+  const after = await save.boundingBox()
+  if (!before || !after) throw new Error('Save is not on screen')
+  expect(after.y + after.height, 'Save sits on the keyboard').toBeCloseTo(before.y + before.height - KEYBOARD, 0)
+  await closeKeyboard(page)
+  await expect(write).toBeVisible()
 })
 
 test('the Save bar gives up its home indicator room while the keyboard is up', async ({ page }) => {
