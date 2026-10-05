@@ -244,7 +244,9 @@ test('words that couldn’t save before the app lock are still on the page after
     state.writesFail = true
     const failing = <A extends unknown[], R>(write: (...args: A) => R, store: (target: never) => string) =>
       function (this: never, ...args: A): R {
-        if (state.writesFail && store(this) === 'meetups') throw new DOMException('The phone is full', 'QuotaExceededError')
+        if (state.writesFail && store(this) === 'meetups') {
+          throw new DOMException('The phone is full', 'QuotaExceededError')
+        }
         return write.apply(this, args)
       }
     const ofStore = (target: IDBObjectStore) => target.name
@@ -269,7 +271,10 @@ test('words that couldn’t save before the app lock are still on the page after
   await page.evaluate(() => {
     ;(window as unknown as { writesFail: boolean }).writesFail = false
   })
-  await expect.poll(async () => (await readMeetups(page))[0].note, { timeout: 10_000 }).toBe('Ramen night, then karaoke')
+  // The next try comes within 5 seconds.
+  await expect
+    .poll(async () => (await readMeetups(page))[0].note, { timeout: 10_000 })
+    .toBe('Ramen night, then karaoke')
   await expect(page.getByText("Couldn't save just now", { exact: false })).toHaveCount(0)
 })
 

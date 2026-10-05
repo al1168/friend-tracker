@@ -78,7 +78,13 @@ export function DayHelperBar(props: DayHelperBarProps) {
               <span aria-hidden="true">@ </span>Place
             </button>
             {now !== null && (
-              <button type="button" className="chip" aria-label={`Now, ${now}`} {...keepFocusProps} onClick={props.onNow}>
+              <button
+                type="button"
+                className="chip"
+                aria-label={`Now, ${now}`}
+                {...keepFocusProps}
+                onClick={props.onNow}
+              >
                 Now
               </button>
             )}
@@ -135,7 +141,13 @@ export function DayHelperBar(props: DayHelperBarProps) {
             </span>
             <div className="day-helpers__payers">
               {payers.map((payer) => (
-                <button key={payer.key} type="button" className="chip" {...keepFocusProps} onClick={() => props.onPaid(payer.line)}>
+                <button
+                  key={payer.key}
+                  type="button"
+                  className="chip"
+                  {...keepFocusProps}
+                  onClick={() => props.onPaid(payer.line)}
+                >
                   {payer.friend && (
                     <Avatar name={payer.friend.name} photo={payer.friend.photo} seed={payer.friend.id} size={24} />
                   )}

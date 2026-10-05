@@ -349,7 +349,10 @@ function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
     announce('Pick who paid.')
   }
 
-  /** Closes Who paid. The day keeps its focus if it had it; otherwise focus goes back to "Paid", so VoiceOver isn't lost. */
+  /**
+   * Closes Who paid. The day keeps its focus if it had it; otherwise focus goes back to "Paid", so VoiceOver isn't
+   * left on a button that's gone.
+   */
   function closePaid() {
     const dayFocused = document.activeElement === dayRef.current
     flushSync(() => setRow('helpers'))
