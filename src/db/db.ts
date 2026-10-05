@@ -1,4 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie'
+import { isMood } from '../lib/moods'
+import { cleanWeather } from '../lib/weather'
 import type { Friend, Group, Meetup, MeetupPhoto, MeetupType } from '../types'
 import { DEFAULT_MEETUP_TYPES } from './defaults'
 
@@ -73,9 +75,16 @@ db.friends.hook('reading', (friend) => {
   return friend
 })
 
-// Meetups saved before activities existed have none.
+// Meetups saved before activities existed have none. The day's fields came without a version bump
+// (no index changed), so older meetups get empty ones here, and anything that isn't a known weather
+// or mood (from older code in a second tab, or a rollback) reads as none.
 db.meetups.hook('reading', (meetup) => {
-  if (meetup) meetup.activities ??= []
+  if (meetup) {
+    meetup.activities ??= []
+    meetup.weather = cleanWeather(meetup.weather)
+    if (!isMood(meetup.mood)) meetup.mood = null
+    if (typeof meetup.feelings !== 'string') meetup.feelings = ''
+  }
   return meetup
 })
 

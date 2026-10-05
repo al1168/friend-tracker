@@ -1,8 +1,11 @@
 import { activitiesProblem } from '../lib/activities'
 import { isISODate, type ISODate } from '../lib/dates'
+import { FEELINGS_MAX, normalizeLineBreaks, TOO_LONG_FEELINGS } from '../lib/dayText'
 import { newId } from '../lib/ids'
+import { INVALID_MOOD, isMood } from '../lib/moods'
 import { isValidPhotoData, MAX_PHOTOS, TOO_MANY_PHOTOS } from '../lib/photos'
 import { cleanItems } from '../lib/preferences'
+import { cleanWeather } from '../lib/weather'
 import type { Meetup, MeetupPhoto } from '../types'
 import { db } from './db'
 import { ValidationError } from './errors'
@@ -11,10 +14,12 @@ export interface MeetupInput {
   date: ISODate
   typeId: string
   friendIds: string[]
-  note: string
   /** In the order picked. Cleaned like likes: empties and repeats are dropped. */
   activities: string[]
 }
+
+/** The day page's fields. Only the fields given are written. */
+export type DayInput = Partial<Pick<Meetup, 'note' | 'weather' | 'mood' | 'feelings'>>
 
 /** A photo the meetup sheet has resized and is adding. Its id is chosen up front, so `order` can place it. */
 export type NewPhoto = Pick<MeetupPhoto, 'id' | 'full' | 'thumb' | 'width' | 'height'>
@@ -50,7 +55,27 @@ function clean(input: MeetupInput): MeetupInput {
   const activities = cleanItems(input.activities)
   const problem = activitiesProblem(activities)
   if (problem) throw new ValidationError(problem)
-  return { date: input.date, typeId: input.typeId, friendIds, note: input.note.trim(), activities }
+  return { date: input.date, typeId: input.typeId, friendIds, activities }
+}
+
+/**
+ * The day's fields as they are kept: line breaks normalized and weather cleaned, with your words otherwise
+ * exactly as typed. An unknown mood or feelings over 4,000 characters are refused (only code can reach either).
+ */
+function cleanDay(input: DayInput): DayInput {
+  const day: DayInput = {}
+  if (input.note !== undefined) day.note = normalizeLineBreaks(input.note)
+  if (input.weather !== undefined) day.weather = cleanWeather(input.weather)
+  if (input.mood !== undefined) {
+    if (input.mood !== null && !isMood(input.mood)) throw new ValidationError(INVALID_MOOD)
+    day.mood = input.mood
+  }
+  if (input.feelings !== undefined) {
+    const feelings = normalizeLineBreaks(input.feelings)
+    if (feelings.length > FEELINGS_MAX) throw new ValidationError(TOO_LONG_FEELINGS)
+    day.feelings = feelings
+  }
+  return day
 }
 
 function checkPhotos(changes: PhotoChanges) {
@@ -98,7 +123,15 @@ async function applyPhotoChanges(meetupId: string, changes: PhotoChanges, create
 }
 
 export async function addMeetup(input: MeetupInput, photos: PhotoChanges = NO_PHOTO_CHANGES): Promise<Meetup> {
-  const meetup: Meetup = { id: newId(), ...clean(input), createdAt: new Date().toISOString() }
+  const meetup: Meetup = {
+    id: newId(),
+    ...clean(input),
+    note: '',
+    weather: [],
+    mood: null,
+    feelings: '',
+    createdAt: new Date().toISOString(),
+  }
   checkPhotos(photos)
   await db.transaction('rw', db.meetups, db.meetupPhotos, async () => {
     await db.meetups.add(meetup)
@@ -107,13 +140,31 @@ export async function addMeetup(input: MeetupInput, photos: PhotoChanges = NO_PH
   return meetup
 }
 
+/**
+ * Saves the sheet's fields and photo changes. It never reads or writes the day's fields, so an Edit
+ * meetup save can't overwrite a day being written on the day page.
+ */
 export async function updateMeetup(id: string, input: MeetupInput, photos: PhotoChanges = NO_PHOTO_CHANGES): Promise<void> {
-  const { date, typeId, friendIds, note, activities } = clean(input)
+  const { date, typeId, friendIds, activities } = clean(input)
   checkPhotos(photos)
   await db.transaction('rw', db.meetups, db.meetupPhotos, async () => {
     if (!(await db.meetups.get(id))) throw new ValidationError('This meetup no longer exists.')
-    await db.meetups.update(id, { date, typeId, friendIds, note, activities })
+    await db.meetups.update(id, { date, typeId, friendIds, activities })
     await applyPhotoChanges(id, photos, new Date().toISOString())
+  })
+}
+
+/**
+ * Saves the day page's fields: only the fields given, and never the date, type, friends or activities.
+ * Resolves false, and never throws for this, when the meetup is gone (a partial update, never a put, so a
+ * deleted meetup can't come back).
+ */
+export async function updateDay(id: string, input: DayInput): Promise<boolean> {
+  const fields = cleanDay(input)
+  return db.transaction('rw', db.meetups, async () => {
+    if (!(await db.meetups.get(id))) return false
+    await db.meetups.update(id, fields)
+    return true
   })
 }
 

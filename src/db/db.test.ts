@@ -116,8 +116,8 @@ describe('upgrade from version 2', () => {
     const meetupIndexes = native.transaction('meetups').objectStore('meetups').indexNames
     expect([...meetupIndexes].sort()).toEqual(['date', 'friendIds', 'typeId'])
     expect(await db.meetupPhotos.count()).toBe(0)
-    // The stored meetup is untouched; the reading hook gives it activities.
-    expect(await db.meetups.get('m1')).toEqual({ ...v2Meetup, activities: [] })
+    // The stored meetup is untouched; the reading hook gives it activities and an empty day.
+    expect(await db.meetups.get('m1')).toEqual({ ...v2Meetup, activities: [], weather: [], mood: null, feelings: '' })
     expect(await db.friends.get('f1')).toEqual(v2Friend)
     expect(await db.groups.get('g1')).toEqual(v2Group)
     expect(await db.meetupTypes.get('type-custom')).toEqual(v2Type)
@@ -128,6 +128,59 @@ describe('upgrade from version 2', () => {
 })
 
 describe('meetups read from the database', () => {
+  /** Writes rows the way version 3 of the database holds them, without the reading hook or the app's types. */
+  async function writeRaw(rows: Record<string, unknown>[]) {
+    db.close()
+    const raw = new Dexie('friend-tracker')
+    raw.version(3).stores({ meetups: 'id, date, typeId, *friendIds' })
+    try {
+      await raw.table('meetups').bulkPut(rows)
+    } finally {
+      raw.close()
+    }
+    await db.open()
+  }
+
+  /** The stored rows as they are, read without the reading hook. */
+  async function readRaw(): Promise<Record<string, unknown>[]> {
+    db.close()
+    const raw = new Dexie('friend-tracker')
+    raw.version(3).stores({ meetups: 'id, date, typeId, *friendIds' })
+    try {
+      return await raw.table('meetups').orderBy('id').toArray()
+    } finally {
+      raw.close()
+      await db.open()
+    }
+  }
+
+  const stored = {
+    date: '2026-09-01',
+    typeId: 'type-coffee',
+    friendIds: ['alex'],
+    note: 'Tacos',
+    activities: [],
+    createdAt: '2026-09-01T12:00:00.000Z',
+  }
+
+  it('get an empty day when the stored record has none of its fields, and the rows stay untouched', async () => {
+    await writeRaw([{ ...stored, id: 'a' }])
+    expect(await db.meetups.get('a')).toEqual({ ...stored, id: 'a', weather: [], mood: null, feelings: '' })
+    expect(await db.meetups.where('friendIds').equals('alex').first()).toMatchObject({ weather: [], mood: null })
+    expect(await readRaw()).toEqual([{ ...stored, id: 'a' }])
+  })
+
+  it('read a weather or mood they do not know as none, and keep the known ones', async () => {
+    const rows = [
+      { ...stored, id: 'a', mood: 'amazing', weather: 'rainy', feelings: 3 },
+      { ...stored, id: 'b', mood: 'okay', weather: ['rainy', 'fog', 'rainy'], feelings: 'Good' },
+    ]
+    await writeRaw(rows)
+    expect(await db.meetups.get('a')).toMatchObject({ mood: null, weather: [], feelings: '' })
+    expect(await db.meetups.get('b')).toMatchObject({ mood: 'okay', weather: ['rainy'], feelings: 'Good' })
+    expect(await readRaw()).toEqual(rows)
+  })
+
   it('get empty activities when the stored record has none', async () => {
     await db.meetups.put({
       id: 'old',

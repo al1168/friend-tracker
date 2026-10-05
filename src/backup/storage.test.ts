@@ -42,7 +42,6 @@ describe('backup storage', () => {
         date: '2026-09-01',
         typeId: 'type-meal',
         friendIds: [alex.id, sam.id],
-        note: 'Tacos',
         activities: ['Karaoke', 'Walk'],
       },
       {

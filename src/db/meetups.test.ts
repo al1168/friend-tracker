@@ -10,21 +10,23 @@ import {
   photoCount,
   photoThumbs,
   restoreMeetup,
+  updateDay,
   updateMeetup,
+  type DayInput,
   type MeetupInput,
   NO_PHOTO_CHANGES,
   type NewPhoto,
 } from './meetups'
 
-const base: MeetupInput = { date: '2026-09-01', typeId: 'type-coffee', friendIds: ['alex'], note: '', activities: [] }
+const base: MeetupInput = { date: '2026-09-01', typeId: 'type-coffee', friendIds: ['alex'], activities: [] }
 
 beforeEach(resetDatabase)
 
 describe('addMeetup', () => {
-  it('saves a meetup with unique friends and a trimmed note', async () => {
-    const meetup = await addMeetup({ ...base, friendIds: ['alex', 'sam', 'alex'], note: ' Tacos ' })
+  it('saves a meetup with unique friends and nothing written about the day yet', async () => {
+    const meetup = await addMeetup({ ...base, friendIds: ['alex', 'sam', 'alex'] })
     expect(meetup.friendIds).toEqual(['alex', 'sam'])
-    expect(meetup.note).toBe('Tacos')
+    expect(meetup).toMatchObject({ note: '', weather: [], mood: null, feelings: '' })
     expect(await db.meetups.get(meetup.id)).toEqual(meetup)
   })
 
@@ -55,8 +57,8 @@ describe('addMeetup', () => {
 describe('updateMeetup', () => {
   it('changes the stored fields', async () => {
     const meetup = await addMeetup(base)
-    await updateMeetup(meetup.id, { ...base, date: '2026-09-05', note: 'Pizza' })
-    expect(await db.meetups.get(meetup.id)).toMatchObject({ date: '2026-09-05', note: 'Pizza' })
+    await updateMeetup(meetup.id, { ...base, date: '2026-09-05', typeId: 'type-meal' })
+    expect(await db.meetups.get(meetup.id)).toMatchObject({ date: '2026-09-05', typeId: 'type-meal' })
   })
 
   it('replaces the activities with the cleaned list', async () => {
@@ -72,6 +74,75 @@ describe('updateMeetup', () => {
       'A meetup can have up to 20 activities.',
     )
     expect((await db.meetups.get(meetup.id))?.activities).toEqual(['Walk'])
+  })
+})
+
+describe('the day', () => {
+  const day: DayInput = {
+    note: '@Blue willow 3:30  \nJessie paid  ',
+    weather: ['rainy'],
+    mood: 'okay',
+    feelings: 'It was an ok day.  ',
+  }
+
+  it('is left alone by an Edit meetup save, trailing spaces included', async () => {
+    const meetup = await addMeetup({ ...base, activities: ['Walk'] })
+    expect(await updateDay(meetup.id, day)).toBe(true)
+    await updateMeetup(meetup.id, { ...base, date: '2026-09-05', activities: ['Movie'] })
+    expect(await db.meetups.get(meetup.id)).toMatchObject({ ...day, date: '2026-09-05', activities: ['Movie'] })
+  })
+
+  it('saves only the fields given, and never the date, type, friends or activities', async () => {
+    const meetup = await addMeetup({ ...base, activities: ['Walk'] })
+    await updateDay(meetup.id, day)
+    const sneaky = { mood: 'good', date: '2030-01-01', typeId: 'type-meal', friendIds: [], activities: [] }
+    expect(await updateDay(meetup.id, sneaky as DayInput)).toBe(true)
+    expect(await db.meetups.get(meetup.id)).toEqual({ ...meetup, ...day, mood: 'good' })
+  })
+
+  it('resolves false for a meetup that is gone, and creates nothing', async () => {
+    expect(await updateDay('nope', { note: 'Tacos' })).toBe(false)
+    expect(await db.meetups.count()).toBe(0)
+  })
+
+  it('refuses an unknown mood or long feelings, and writes nothing', async () => {
+    const meetup = await addMeetup(base)
+    await expect(updateDay(meetup.id, { note: 'New', mood: 'amazing' } as unknown as DayInput)).rejects.toThrow(
+      'Please pick a mood from the list.',
+    )
+    await expect(updateDay(meetup.id, { note: 'New', feelings: 'x'.repeat(4_001) })).rejects.toThrow(
+      'Keep how it felt under 4,000 characters.',
+    )
+    expect(await db.meetups.get(meetup.id)).toEqual(meetup)
+    expect(await updateDay(meetup.id, { feelings: 'x'.repeat(4_000), mood: null })).toBe(true)
+  })
+
+  it('saves a day of any length', async () => {
+    const meetup = await addMeetup(base)
+    const long = 'Walked along the river.\n'.repeat(1_250)
+    expect(long.length).toBe(30_000)
+    await updateDay(meetup.id, { note: long })
+    expect((await db.meetups.get(meetup.id))?.note).toBe(long)
+  })
+
+  it('normalizes line breaks and cleans the weather', async () => {
+    const meetup = await addMeetup(base)
+    const weather = ['windy', 'fog', 'rainy', 'rainy'] as unknown as DayInput['weather']
+    await updateDay(meetup.id, { note: 'One\r\nTwo\rThree', feelings: 'Good\r\nday', weather })
+    expect(await db.meetups.get(meetup.id)).toMatchObject({
+      note: 'One\nTwo\nThree',
+      feelings: 'Good\nday',
+      weather: ['rainy', 'windy'],
+    })
+  })
+
+  it('is kept by delete and Undo', async () => {
+    const alex = await addFriend(friendInput('Alex'))
+    const meetup = await addMeetup({ ...base, friendIds: [alex.id] })
+    await updateDay(meetup.id, day)
+    const deleted = await deleteMeetup(meetup.id)
+    expect(await restoreMeetup(deleted!)).toBe(true)
+    expect(await db.meetups.get(meetup.id)).toEqual({ ...meetup, ...day })
   })
 })
 
@@ -115,14 +186,14 @@ describe('photos saved with a meetup', () => {
     })
     await updateMeetup(
       meetup.id,
-      { ...base, note: 'Pizza' },
+      { ...base, date: '2026-09-05' },
       { add: [newPhoto('d')], removeIds: ['b'], order: ['d', 'c', 'a'] },
     )
     expect(await photoIds(meetup.id)).toEqual(['d', 'c', 'a'])
     const orders = (await db.meetupPhotos.where('meetupId').equals(meetup.id).sortBy('order')).map((p) => p.order)
     expect(orders).toEqual([0, 1, 2])
     expect(await db.meetupPhotos.get('b')).toBeUndefined()
-    expect(await db.meetups.get(meetup.id)).toMatchObject({ note: 'Pizza' })
+    expect(await db.meetups.get(meetup.id)).toMatchObject({ date: '2026-09-05' })
   })
 
   it('keeps photos left out of the order after the listed ones, and ignores other meetups photos', async () => {
@@ -135,7 +206,7 @@ describe('photos saved with a meetup', () => {
 
   it('leaves the photos alone when nothing about them changes', async () => {
     const meetup = await addMeetup(base, { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: [] })
-    await updateMeetup(meetup.id, { ...base, note: 'Pizza' })
+    await updateMeetup(meetup.id, { ...base, date: '2026-09-05' })
     expect(await photoIds(meetup.id)).toEqual(['a', 'b'])
   })
 
@@ -143,8 +214,8 @@ describe('photos saved with a meetup', () => {
     const meetup = await addMeetup(base, { add: [newPhoto('a')], removeIds: [], order: [] })
     // Adding a photo id that is already stored fails inside the transaction.
     const sameIdAgain = { add: [newPhoto('a')], removeIds: [], order: [] }
-    await expect(updateMeetup(meetup.id, { ...base, note: 'Pizza' }, sameIdAgain)).rejects.toThrow()
-    expect(await db.meetups.get(meetup.id)).toMatchObject({ note: '' })
+    await expect(updateMeetup(meetup.id, { ...base, date: '2026-09-05' }, sameIdAgain)).rejects.toThrow()
+    expect(await db.meetups.get(meetup.id)).toMatchObject({ date: '2026-09-01' })
     expect(await photoIds(meetup.id)).toEqual(['a'])
 
     await expect(addMeetup(base, sameIdAgain)).rejects.toThrow()
@@ -155,10 +226,10 @@ describe('photos saved with a meetup', () => {
     const twenty = Array.from({ length: 20 }, (_, i) => newPhoto(`p${i}`))
     const meetup = await addMeetup(base, { add: twenty, removeIds: [], order: [] })
     const oneMore = { add: [newPhoto('one-more')], removeIds: [], order: [] }
-    await expect(updateMeetup(meetup.id, { ...base, note: 'Pizza' }, oneMore)).rejects.toThrow(
+    await expect(updateMeetup(meetup.id, { ...base, date: '2026-09-05' }, oneMore)).rejects.toThrow(
       'A meetup can have up to 20 photos.',
     )
-    expect(await db.meetups.get(meetup.id)).toMatchObject({ note: '' })
+    expect(await db.meetups.get(meetup.id)).toMatchObject({ date: '2026-09-01' })
     expect(await db.meetupPhotos.count()).toBe(20)
 
     // Removing one makes room for another in the same update.

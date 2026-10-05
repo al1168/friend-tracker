@@ -17,7 +17,18 @@ export function friend(id: string, name: string, groupId: string | null = null):
 }
 
 export function meetup(id: string, date: string, friendIds: string[], typeId = 'coffee'): Meetup {
-  return { id, date, typeId, friendIds, note: '', activities: [], createdAt: `${date}T12:00:00.000Z` }
+  return {
+    id,
+    date,
+    typeId,
+    friendIds,
+    note: '',
+    activities: [],
+    weather: [],
+    mood: null,
+    feelings: '',
+    createdAt: `${date}T12:00:00.000Z`,
+  }
 }
 
 /** A stored photo with tiny stand-in images (not real JPEGs, but the right shape). */

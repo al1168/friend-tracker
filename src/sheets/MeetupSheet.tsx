@@ -13,6 +13,7 @@ import {
   deleteMeetup,
   NO_PHOTO_CHANGES,
   restoreMeetup,
+  updateDay,
   updateMeetup,
   type PhotoChanges,
 } from '../db/meetups'
@@ -144,7 +145,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
     try {
       // An activity typed into "+ New" but not added yet is saved too.
       const typed = activityDraft?.trim() ? [...activities, activityDraft] : activities
-      const input = { date, typeId: effectiveTypeId, friendIds, note, activities: typed }
+      const input = { date, typeId: effectiveTypeId, friendIds, activities: typed }
       const unchanged =
         !photos ||
         (photos.every((photo) => !photo.added) &&
@@ -159,9 +160,12 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
         : NO_PHOTO_CHANGES
       if (editing) {
         await updateMeetup(editing.id, input, photoChanges)
+        // The one-line Note is the start of the day, saved with the day's fields.
+        if (note.trim() !== editing.note) await updateDay(editing.id, { note: note.trim() })
         toast({ message: 'Saved' })
       } else {
         const meetup = await addMeetup(input, photoChanges)
+        if (note.trim()) await updateDay(meetup.id, { note: note.trim() })
         toast({
           message: `Logged with ${formatNameList(selected.map((f) => f.name))}`,
           actionLabel: 'Undo',

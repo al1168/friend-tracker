@@ -196,6 +196,9 @@ function readBackup(raw: unknown, today: ISODate): BackupData {
       note: text(r, 'note', where),
       // Versions 1 to 3 were made before activities existed.
       activities: version === 4 ? activityList(r, where) : [],
+      weather: [],
+      mood: null,
+      feelings: '',
       createdAt: text(r, 'createdAt', where),
     }
   })

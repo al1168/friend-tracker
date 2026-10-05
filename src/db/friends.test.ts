@@ -108,14 +108,12 @@ describe('deleteFriend', () => {
       date: '2026-09-01',
       typeId: 'type-coffee',
       friendIds: [alex.id],
-      note: '',
       activities: [],
     })
     const shared = await addMeetup({
       date: '2026-09-02',
       typeId: 'type-meal',
       friendIds: [alex.id, sam.id],
-      note: '',
       activities: [],
     })
 
@@ -136,7 +134,7 @@ describe('deleteFriend', () => {
       width: 4,
       height: 3,
     })
-    const meetup = { date: '2026-09-01', typeId: 'type-coffee', note: '', activities: [] }
+    const meetup = { date: '2026-09-01', typeId: 'type-coffee', activities: [] }
     const solo = await addMeetup(
       { ...meetup, friendIds: [alex.id] },
       { add: [photo('a'), photo('b')], removeIds: [], order: [] },

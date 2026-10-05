@@ -36,14 +36,31 @@ export interface MeetupType {
   order: number
 }
 
+/** The day's weather. Emoji and labels live in src/lib/weather.ts. */
+export type Weather = 'sunny' | 'cloudy' | 'rainy' | 'stormy' | 'snowy' | 'windy' | 'hot' | 'cold'
+
+/** How a meetup felt to you. Emoji and labels live in src/lib/moods.ts. A word, never a number (the No Score Rule). */
+export type Mood = 'heavy' | 'okay' | 'good' | 'great'
+
 export interface Meetup {
   id: string
   date: ISODate
   typeId: string
   friendIds: string[]
+  /**
+   * The day, in your words ("The day" in the app). This was the one-line note, so every existing note is
+   * already a day. Stored exactly as typed (line breaks as \n). Lines that start with "@" read back as
+   * places (src/lib/dayText.ts); reading never changes the text.
+   */
   note: string
   /** What you did, in the order picked. Cleaned like likes (see src/lib/activities.ts). */
   activities: string[]
+  /** Weather picked, in chip order, no repeats. [] when none. */
+  weather: Weather[]
+  /** One of four faces, or null. Never preselected, scored, averaged, counted or charted. */
+  mood: Mood | null
+  /** "How it felt", in your words. Stored as typed (line breaks as \n), at most 4,000 characters. '' when none. */
+  feelings: string
   createdAt: string
 }
 
