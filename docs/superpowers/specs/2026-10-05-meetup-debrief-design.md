@@ -73,10 +73,10 @@ export interface Meetup {
 ### Defaults and cleaning
 
 - **New meetups:** `note: ''`, `weather: []`, `mood: null`, `feelings: ''`.
-- **note:** `\r\n` and `\r` become `\n`; nothing else changes. No trimming and no limit in data. The day box stops typing at 10,000 characters (`maxLength`), so a longer note from before, or from a backup, is kept, shown and still editable: you can delete from it, it just can't grow.
+- **note:** `\r\n` and `\r` become `\n`; nothing else changes. No trimming and no limit in data. The day box stops typing at 10,000 characters (`maxLength`), so a longer note from before, or from a backup, is kept, shown and still editable: you can delete from it, it just can't grow. The helpers can't grow it past 10,000 either: a place, paid line or time that doesn't fit adds nothing (WebKit would cut it to fit and still report success), "This box is full." shows (or is announced again when it already shows), and a place stays in its field with the row open.
 - **weather:** `cleanWeather`, quietly.
 - **mood:** `null` or a known key. Anything else throws `ValidationError(INVALID_MOOD)`, which only code can reach.
-- **feelings:** line breaks normalized like the note. Over 4,000 characters throws `ValidationError(TOO_LONG_FEELINGS)`; the box's `maxLength` means only code can reach it.
+- **feelings:** line breaks normalized like the note. Over 4,000 characters throws `ValidationError(TOO_LONG_FEELINGS)`. WebKit's `maxLength` counts what you see (an emoji is one) while this counts UTF-16 units (an emoji is two or more), so a box at its limit can still let an emoji in; the page refuses any change that would take the words past 4,000 units and grow them, showing "This box is full.", so it never holds words that can't save (a refused save would otherwise be retried forever and hold back every other field).
 - When shown, each line's ends are trimmed and blank lines at the start and end are ignored. Storage keeps them.
 
 ### Reading the day (grammar 1)
@@ -331,8 +331,9 @@ A group named "Writing helpers": one row of 36px chips (with 44px hit areas) tha
 - Nothing announces each save; the footnote says how it works.
 - **If the meetup is gone** (`updateDay` resolves false, as after Undo on the "Logged" toast), saving stops quietly and the page goes back, like the Meetup page does, and the Meetup page then goes back too. Undo means the meetup wasn't meant to be logged, so its day goes with it.
 - **If a write fails,** a Footnote Danger Red line with `role="alert"` shows above the helper bar: "Couldn't save just now. Your words are still here, and the app will try again." The page tries again every 5 seconds and with the next change, and the line goes away once a save works. Back, while changes are still unsaved after a failure, asks the existing "Discard changes?" (a destructive "Discard changes", or Cancel to stay). Otherwise Back never asks.
-- **Back** saves anything waiting, then goes back one step (to `/meetups/:id`, replacing, when the page was opened directly).
+- **Back** saves anything waiting, then goes back one step (to `/meetups/:id`, replacing, when the page was opened directly). A second tap while the first is still saving does nothing, and Back and "the meetup is gone" share one way out, so the page never goes back two steps.
 - After the app lock, `LockGate` mounts the app again on the same URL, so the day page comes back holding everything saved before the phone went to the background.
+- **One saver per meetup.** If the last write was still failing when the page unmounted (the app lock, say), its saver keeps trying every 5 seconds. When a day page opens for the same meetup, that saver stops and hands over what it never saved (`handOver` in `useAutosave.ts`): the new page shows those words and saves them. So nothing typed is lost to the lock, and an older value from the old page can never land after a newer one from the new page.
 
 ### Keyboard and long text
 
@@ -556,7 +557,7 @@ Add:
 - `src/backup/format.test.ts`: export writes version 5; a version 5 round trip of the owner's example keeps the note, weather, mood (null too) and feelings identical, and keeps activities and photos (the `>= 4` regression); a version 4 file with a note keeps its activities and photos, gets the defaults and keeps the note byte for byte; versions 1 to 3 get the defaults; every refusal message above, including a missing `mood`; version 6 is refused. The existing test that expects version 5 to be refused now uses version 6.
 - `src/backup/storage.test.ts`: replace then read keeps the day's fields.
 - `src/hooks/useKeyboardInset.test.ts` (jsdom with a fake visual viewport): two users publish; stopping the first keeps `--keyboard-inset`, `--viewport-height` and `keyboard-open`; stopping the last resets them.
-- `src/hooks/useAutosave.test.ts` (fake timers): it saves 600ms after the last change and not before; chip taps save at once; it flushes on blur, `visibilitychange`, `pagehide` and unmount; one write is in flight at a time and the latest wins; a failure sets the error state, retries every 5 seconds and on the next change, and clears on success; a "gone" result stops quietly.
+- `src/hooks/useAutosave.test.ts` (fake timers): it saves 600ms after the last change and not before; chip taps save at once; it flushes on blur, `visibilitychange`, `pagehide` and unmount; one write is in flight at a time and the latest wins; a failure sets the error state, retries every 5 seconds and on the next change, and clears on success; a "gone" result stops quietly; `takeOver` hands over what's waiting or in flight and stops all saving and retries; `handOver` stops the saver before it for the same meetup and passes on what it never saved, and takes nothing for another meetup or the same saver.
 - `src/lib/viewport.test.ts`: the existing tests unchanged, plus `revealOffset` with a caret line inside a field taller than the view.
 
 **E2E** (WebKit, iPhone 13):
@@ -565,7 +566,9 @@ Add:
   - **The owner's example, typed:** every step of the walkthrough through the helpers, with `page.clock` set to Sat, Oct 3, 2026, 9:52 PM. Then: the stored meetup, read from IndexedDB in the page, equals the stored record above apart from ids and `createdAt`; Back lands on "Meal"; the list "Places, 8 stops" has the eight places in order with "10:30 AM", "11:30 AM", "11:53 AM", "3:30 PM", no time, "5:30 PM", "7:30 PM" with "to ~8:10 PM", and "8:30 PM"; "Jessie paid" is in Blue willow's stop and "Mariya paid" in seoulSaloon's; How it felt shows "Okay" and the sentence; the hero reads "Rainy"; Mariya's history row reads exactly the subtitle above and contains neither "Okay" nor "Rainy".
   - **The owner's example, pasted:** fill The day with the message byte for byte; the Meetup page shows "Rainy day", the "Locations" heading, the 8-stop list, the story lines and the "How I felt" heading; the stored note is identical to what was pasted.
   - **Autosave:** type, wait 1 second, reload: the text is back. Type, fire `visibilitychange` to hidden at once, reload: back.
-  - **App lock:** with the app lock on and text on the day page, go 16 minutes into the background (the lock spec's `ft:lastActiveAt` method) and unlock with the PIN: the day page is open with the text.
+  - **App lock:** with the app lock on and text on the day page, go 16 minutes into the background (the lock spec's `ft:lastActiveAt` method) and unlock with the PIN: the day page is open with the text. And with writes to meetups failing, words typed before an in-place lock are still in the box after unlocking, and save once writes work again.
+  - **Limits:** a paid line or place that doesn't fit in a nearly full day adds nothing, says "This box is full." and keeps the place in its field; an emoji that would take How it felt past 4,000 UTF-16 units is refused and every other field still saves.
+  - **Back:** two taps while the first is saving go back one step.
   - **Undo:** tap "Save and write about the day", type a line, tap Undo on the toast: the app goes back to Friends and the meetup is gone.
   - **Old notes:** import a version 4 backup whose note is "Tacos", a line break and "Then karaoke": The day on the Meetup page shows both lines, the history row ends "Tacos", and the day page's box holds the note.
   - **Backup round trip** of the typed example keeps the day, its activities and its photos.

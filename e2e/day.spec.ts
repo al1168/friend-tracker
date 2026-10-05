@@ -225,6 +225,54 @@ test('comes back with your words after the app lock', async ({ page }) => {
   await expect(dayBox(page)).toHaveValue('@Blue willow 3:30\nJessie paid')
 })
 
+test('words that couldn’t save before the app lock are still on the page after it, and save once they can', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await seedAppLock(page, '135790')
+  // The open page reads the lock setting at launch.
+  await page.reload()
+  await logMeal(page)
+  await openMealDay(page)
+  await dayBox(page).fill('Ramen night')
+  await expect.poll(async () => (await readMeetups(page))[0].note).toBe('Ramen night')
+
+  // The phone runs out of room: every write to meetups fails, until the test says otherwise (the lock's own
+  // records still save, so the PIN works).
+  await page.evaluate(() => {
+    const state = window as unknown as { writesFail: boolean }
+    state.writesFail = true
+    const failing = <A extends unknown[], R>(write: (...args: A) => R, store: (target: never) => string) =>
+      function (this: never, ...args: A): R {
+        if (state.writesFail && store(this) === 'meetups') throw new DOMException('The phone is full', 'QuotaExceededError')
+        return write.apply(this, args)
+      }
+    const ofStore = (target: IDBObjectStore) => target.name
+    const ofCursor = ({ source }: IDBCursor) => (source instanceof IDBIndex ? source.objectStore.name : source.name)
+    IDBObjectStore.prototype.put = failing(IDBObjectStore.prototype.put, ofStore)
+    IDBObjectStore.prototype.add = failing(IDBObjectStore.prototype.add, ofStore)
+    IDBCursor.prototype.update = failing(IDBCursor.prototype.update, ofCursor)
+  })
+  await dayBox(page).fill('Ramen night, then karaoke')
+  await expect(page.getByText("Couldn't save just now", { exact: false })).toBeVisible()
+
+  // 16 minutes away, then back: the app locks in place (no reload), and the day page unmounts with it.
+  await page.evaluate(() => {
+    localStorage.setItem('ft:lastActiveAt', String(Date.now() - 16 * 60_000))
+    window.dispatchEvent(new Event('focus'))
+  })
+  await expect(lockHeading(page)).toBeVisible()
+  await enterPin(page, '135790')
+
+  await expect(page.getByRole('heading', { level: 1, name: 'The day' })).toBeVisible()
+  await expect(dayBox(page)).toHaveValue('Ramen night, then karaoke')
+  await page.evaluate(() => {
+    ;(window as unknown as { writesFail: boolean }).writesFail = false
+  })
+  await expect.poll(async () => (await readMeetups(page))[0].note, { timeout: 10_000 }).toBe('Ramen night, then karaoke')
+  await expect(page.getByText("Couldn't save just now", { exact: false })).toHaveCount(0)
+})
+
 test('"@ Place" adds a place line where the caret is, and Close goes back to The day', async ({ page }) => {
   await page.clock.setFixedTime(SATURDAY_NIGHT)
   await page.goto('/')
@@ -432,6 +480,96 @@ test('says when The day is full', async ({ page }) => {
   await page.keyboard.type('yz')
   await expect(dayBox(page)).toHaveValue(`${'x'.repeat(9_999)}y`)
   await expect(page.getByRole('alert')).toHaveText('This box is full.')
+})
+
+test('a helper that would take a full day past its limit adds nothing, keeps what you typed and says so', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await logMeal(page)
+  await openMealDay(page)
+  const full = 'x'.repeat(9_995)
+  await dayBox(page).fill(full)
+  await expect(page.getByRole('alert')).toHaveCount(0)
+
+  // "Jessie paid" on its own line needs 12 more characters than the 5 left.
+  await helpers(page).getByRole('button', { name: 'Paid' }).click()
+  await helpers(page).getByRole('group', { name: 'Who paid?' }).getByRole('button', { name: 'Jessie' }).click()
+  await expect(dayBox(page)).toHaveValue(full)
+  await expect(page.getByRole('alert')).toHaveText('This box is full.')
+  await helpers(page).getByRole('button', { name: 'Close' }).click()
+
+  // The place stays in its field (the row stays open), and the refusal is said again.
+  await helpers(page).getByRole('button', { name: 'Place', exact: true }).click()
+  const place = helpers(page).getByRole('textbox', { name: 'Place and time' })
+  await place.fill('Blue willow 3:30')
+  await place.press('Enter')
+  await expect(dayBox(page)).toHaveValue(full)
+  await expect(place).toHaveValue('Blue willow 3:30')
+  await expect(place).toBeFocused()
+  await expect(announcement(page)).toHaveText('This box is full.')
+
+  // With room made, it goes in.
+  await dayBox(page).fill('x'.repeat(100))
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await helpers(page).getByRole('button', { name: 'Add', exact: true }).click()
+  await expect(dayBox(page)).toHaveValue(`${'x'.repeat(100)}\n@Blue willow 3:30\n`)
+})
+
+test('How it felt never holds more than it can save, even when the box lets an emoji past its limit', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await logMeal(page)
+  await openMealDay(page)
+  const feelings = page.getByRole('textbox', { name: 'How it felt, in your words' })
+  const words = 'a'.repeat(3_999)
+  await feelings.fill(words)
+  await expect.poll(async () => (await readMeetups(page))[0].feelings).toBe(words)
+
+  // WebKit's maxLength counts an emoji as one character; saved, it's two UTF-16 units, so 4,001 here.
+  await feelings.evaluate((box: HTMLTextAreaElement) => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(box, `${box.value}😀`)
+    box.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+
+  await expect(feelings).toHaveValue(words)
+  await expect(page.getByRole('alert')).toHaveText('This box is full.')
+  // Saving carries on: a weather tap saves at once, and no save error shows.
+  await page.getByRole('group', { name: 'Weather' }).getByRole('button', { name: 'Rainy' }).click()
+  await expect.poll(async () => (await readMeetups(page))[0].weather).toEqual(['rainy'])
+  await expect(page.getByText("Couldn't save just now", { exact: false })).toHaveCount(0)
+  expect((await readMeetups(page))[0].feelings).toBe(words)
+})
+
+test('two quick taps on Back go back one step, not two', async ({ page }) => {
+  await page.goto('/')
+  await logMeal(page)
+  await openMealDay(page)
+  await dayBox(page).fill('Tacos')
+
+  // Count the steps back asked of the browser (WebKit may merge two asked in the same moment, a phone may not).
+  await page.evaluate(() => {
+    const go = history.go.bind(history)
+    const counted = window as unknown as { stepsBack: number }
+    counted.stepsBack = 0
+    history.go = (delta?: number) => {
+      counted.stepsBack += 1
+      go(delta)
+    }
+  })
+
+  // The second tap comes while the first is still saving "Tacos" on its way out.
+  await page.getByRole('button', { name: 'Meal' }).evaluate((back: HTMLButtonElement) => {
+    back.click()
+    back.click()
+  })
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
+  await page.waitForTimeout(500)
+  await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
+  expect(await page.evaluate(() => (window as unknown as { stepsBack: number }).stepsBack)).toBe(1)
+  expect((await readMeetups(page))[0].note).toBe('Tacos')
 })
 
 test('an old note is already the day: shown under The day, previewed in history, and in the box', async ({ page }) => {

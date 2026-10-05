@@ -84,37 +84,41 @@ export function DayScreen() {
   useScrollLock(true)
   useKeyboardInset(true)
 
-  // Deleted (Undo on the "Logged" toast, another tab) or never there: go back, like the Meetup page does.
-  const leave = useCallback(() => {
-    if (leftRef.current) return
-    leftRef.current = true
-    if (location.key === 'default') navigate('/', { replace: true })
-    else navigate(-1)
-  }, [location.key, navigate])
+  // The page's one way out, used by Back and when the meetup is gone, so it never goes back twice: one step
+  // back, or to `fallback` (replacing) when the page was opened directly.
+  const leave = useCallback(
+    (fallback: string) => {
+      if (leftRef.current) return
+      leftRef.current = true
+      if (location.key === 'default') navigate(fallback, { replace: true })
+      else navigate(-1)
+    },
+    [location.key, navigate],
+  )
 
+  // Deleted (Undo on the "Logged" toast, another tab) or never there: go back, like the Meetup page does.
   useEffect(() => {
-    if (meetup === null) leave()
+    if (meetup === null) leave('/')
   }, [meetup, leave])
 
   if (!meetup || !friends || !types) return null
   const typeName = types.find((type) => type.id === meetup.typeId)?.name ?? 'Meetup'
   const friendById = new Map(friends.map((friend) => [friend.id, friend] as const))
   const people = meetup.friendIds.map((friendId) => friendById.get(friendId)).filter((f): f is Friend => !!f)
-  return <DayPage key={meetup.id} meetup={meetup} people={people} typeName={typeName} onGone={leave} />
+  return <DayPage key={meetup.id} meetup={meetup} people={people} typeName={typeName} onLeave={leave} />
 }
 
 interface DayPageProps {
   meetup: Meetup
   people: Friend[]
   typeName: string
-  onGone: () => void
+  /** Goes back (once, however often it's called), or to `fallback` when the page was opened directly. */
+  onLeave: (fallback: string) => void
 }
 
-function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
+function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
   const today = useToday()
   const minutesNow = useMinutesNow()
-  const location = useLocation()
-  const navigate = useNavigate()
   const confirmDiscard = useConfirmDiscard()
   const titleRef = useRef<HTMLHeadingElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -139,8 +143,23 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
   const placeDraftRef = useRef(placeDraft)
   const [scrolled, setScrolled] = useState(false)
   const [announcement, setAnnouncement] = useState({ text: '', n: 0 })
+  // A helper's line didn't fit in The day, or an insert would have taken How it felt past what it can save:
+  // "This box is full." shows until the box changes.
+  const [dayRefused, setDayRefused] = useState(false)
+  const [feelingsRefused, setFeelingsRefused] = useState(false)
+  // Back was tapped and is on its way out (saving first): another tap does nothing.
+  const leavingRef = useRef(false)
 
-  const { saver, status } = useAutosave<DayFields>((changes) => updateDay(meetup.id, changes), commitPlaceDraft)
+  const { saver, status } = useAutosave<DayFields>((changes) => updateDay(meetup.id, changes), {
+    beforeHide: commitPlaceDraft,
+    key: meetup.id,
+    // This page opened again (after the app lock) while the last one's words still hadn't saved: keep them.
+    onTakeOver: (unsaved) => {
+      for (const key of FIELDS) {
+        if (key in unsaved) setField(key, unsaved[key] as DayFields[typeof key], false)
+      }
+    },
+  })
 
   useRevealFocusedField(true, bodyRef)
 
@@ -151,8 +170,8 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
   }, [])
 
   useEffect(() => {
-    if (status.gone) onGone()
-  }, [status.gone, onGone])
+    if (status.gone) onLeave('/')
+  }, [status.gone, onLeave])
 
   // The toast sits 8px above the helper bar here (Toast.css): mark the page and publish the bar's height.
   useLayoutEffect(() => {
@@ -229,8 +248,11 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
    * A selection is never removed by a place or paid line (`'line'`): the line goes after the selection's last
    * line. "Now" (`'text'`) types over a selection the way typing does, but only one you can see: once The day
    * has lost focus its selection isn't shown, so the time goes after it instead.
+   *
+   * Like typing, a helper can't take The day past its 10,000 characters: then nothing goes in (WebKit would cut
+   * the text to fit and still report success), it says "This box is full." and returns null.
    */
-  function editDay(kind: 'line' | 'text', edit: (value: string, caret: number) => DayEdit): DayEdit {
+  function editDay(kind: 'line' | 'text', edit: (value: string, caret: number) => DayEdit): DayEdit | null {
     const box = dayRef.current!
     const value = box.value
     const { start, end } = dayCaret()
@@ -238,6 +260,10 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
       kind === 'text' && document.activeElement === box
         ? edit(value.slice(0, start) + value.slice(end), start)
         : edit(value, kind === 'line' ? lineCaret(value, start, end) : end)
+    if (next.value.length > DAY_MAX_TYPED && next.value.length > value.length) {
+      sayDayFull()
+      return null
+    }
     const change = changeBetween(value, next.value)
     focusDay()
     box.setSelectionRange(change.from, change.to)
@@ -247,6 +273,12 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
     }
     box.setSelectionRange(next.caret, next.caret)
     return next
+  }
+
+  /** "This box is full." under The day, or said again when it already shows. */
+  function sayDayFull() {
+    if (fieldsRef.current.note.length >= DAY_MAX_TYPED || dayRefused) announce('This box is full.')
+    else setDayRefused(true)
   }
 
   /** "Added Blue willow, 3:30 PM.", read from the day as it now stands, so the time reads in day order. */
@@ -267,6 +299,8 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
       return
     }
     const next = editDay('line', (value, caret) => insertPlaceLine(value, caret, text))
+    // No room: the place stays in its field, ready once there is.
+    if (!next) return
     updatePlaceDraft('')
     setRow('helpers')
     announce(describeAddedPlace(next, line))
@@ -301,8 +335,7 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
 
   function addNow() {
     if (now === null) return
-    editDay('text', (value, caret) => insertAtCaret(value, caret, now))
-    announce(`Added ${now}.`)
+    if (editDay('text', (value, caret) => insertAtCaret(value, caret, now))) announce(`Added ${now}.`)
   }
 
   function addNowInPlace() {
@@ -324,7 +357,7 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
   }
 
   function addPaid(line: string) {
-    editDay('line', (value, caret) => insertPaidLine(value, caret, line))
+    if (!editDay('line', (value, caret) => insertPaidLine(value, caret, line))) return
     setRow('helpers')
     announce(`Added ${line}.`)
   }
@@ -342,14 +375,18 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
   }
 
   async function goBack() {
+    if (leavingRef.current) return
+    leavingRef.current = true
     commitPlaceDraft()
     await saver.flush()
     if (saver.isUnsaved()) {
-      if (!(await confirmDiscard(true))) return
+      if (!(await confirmDiscard(true))) {
+        leavingRef.current = false
+        return
+      }
       saver.discard()
     }
-    if (location.key === 'default') navigate(`/meetups/${meetup.id}`, { replace: true })
-    else navigate(-1)
+    onLeave(`/meetups/${meetup.id}`)
   }
 
   const names = people.map((friend) => friend.name)
@@ -409,7 +446,10 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
             autoCorrect="on"
             spellCheck
             maxLength={DAY_MAX_TYPED}
-            onChange={(event) => setField('note', event.target.value, false)}
+            onChange={(event) => {
+              setDayRefused(false)
+              setField('note', event.target.value, false)
+            }}
             onFocus={() => {
               dayTouched.current = true
               setFocus('note')
@@ -419,7 +459,7 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
               void saver.flush()
             }}
           />
-          {fields.note.length >= DAY_MAX_TYPED && (
+          {(fields.note.length >= DAY_MAX_TYPED || dayRefused) && (
             <p className="field-hint" role="alert">
               This box is full.
             </p>
@@ -439,7 +479,18 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
               placeholder="A few words, just for you"
               autoCapitalize="sentences"
               maxLength={FEELINGS_MAX}
-              onChange={(event) => setField('feelings', event.target.value, false)}
+              onChange={(event) => {
+                const value = event.target.value
+                // WebKit's maxLength counts what you see (an emoji is one), but what's saved is counted in UTF-16
+                // units (an emoji is two or more), and updateDay refuses more than 4,000. So a box at its limit can
+                // still let an emoji in: refuse it here, as the limit would, rather than hold words that can't save.
+                if (value.length > FEELINGS_MAX && value.length > fieldsRef.current.feelings.length) {
+                  setFeelingsRefused(true)
+                  return
+                }
+                setFeelingsRefused(false)
+                setField('feelings', value, false)
+              }}
               onFocus={() => {
                 setFocus('feelings')
                 // The helpers write into The day, so they step aside here (DayHelperBar); Who paid closes.
@@ -450,7 +501,7 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
                 void saver.flush()
               }}
             />
-            {fields.feelings.length >= FEELINGS_MAX && (
+            {(fields.feelings.length >= FEELINGS_MAX || feelingsRefused) && (
               <p className="field-hint" role="alert">
                 This box is full.
               </p>

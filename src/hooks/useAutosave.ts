@@ -23,6 +23,11 @@ export interface Autosave<T extends object> {
   isUnsaved(field?: keyof T): boolean
   /** Drops what's waiting and stops saving ("Discard changes"). */
   discard(): void
+  /**
+   * Stops saving and returns everything not yet written (waiting, or in a write still out), for the saver
+   * taking over from this one (see handOver).
+   */
+  takeOver(): Partial<T>
 }
 
 /**
@@ -76,6 +81,8 @@ export function createAutosave<T extends object>(
           report({ failed: false, gone: true })
         },
         () => {
+          // Stopped meanwhile (discarded, or taken over): these fields are someone else's now, or dropped.
+          if (stopped) return
           waiting = { ...fields, ...waiting }
           report({ failed: true, gone: false })
           retry = setTimeout(() => void write(), RETRY_MS)
@@ -90,6 +97,13 @@ export function createAutosave<T extends object>(
         }
       })
     return current
+  }
+
+  function stop() {
+    stopped = true
+    waiting = {}
+    clearTimeout(pause)
+    clearTimeout(retry)
   }
 
   return {
@@ -112,16 +126,35 @@ export function createAutosave<T extends object>(
       while (current) await current
     },
     isUnsaved(field) {
+      if (stopped) return false
       if (field === undefined) return hasWaiting() || writing !== null
       return field in waiting || (writing !== null && field in writing)
     },
-    discard() {
-      stopped = true
-      waiting = {}
-      clearTimeout(pause)
-      clearTimeout(retry)
+    discard: stop,
+    takeOver() {
+      const unsaved = stopped ? {} : { ...writing, ...waiting }
+      stop()
+      return unsaved
     },
   }
+}
+
+/** The saver for each record, so the next one for the same record can take over from it. */
+const saversByKey = new Map<string, Autosave<object>>()
+
+/**
+ * Makes `saver` the one saving the record `key`. A saver before it for the same record (its page unmounted, as on
+ * the app lock, while a write was still failing and being retried) stops, so its older words can never land after
+ * newer ones, and what it never saved is returned for the new page to keep and save. Returns {} otherwise.
+ */
+export function handOver<T extends object>(
+  key: string,
+  saver: Autosave<T>,
+  registry: Map<string, Autosave<object>> = saversByKey,
+): Partial<T> {
+  const before = registry.get(key)
+  registry.set(key, saver)
+  return before && before !== saver ? (before.takeOver() as Partial<T>) : {}
 }
 
 /** What the page listens to for "the app is going away": the document and the window, or fakes in tests. */
@@ -143,23 +176,41 @@ export function flushWhenHidden(page: PageEvents, flush: () => void): () => void
   }
 }
 
+export interface AutosaveOptions<T> {
+  /** Runs before the save for the app going away or the page unmounting, so text still in an open field can join it. */
+  beforeHide?: () => void
+  /** The record saved, so a saver left over for it can hand over (see handOver). */
+  key?: string
+  /** Gets the fields a saver left over for this record never saved; the page should take them in and save them. */
+  onTakeOver?: (fields: Partial<T>) => void
+}
+
 /**
  * Saves a page's fields as you type (see createAutosave): everything waiting is saved when the app goes to the
  * background and when the page unmounts (the app lock included). `beforeHide` runs first, so text still in an
- * open field can join the save.
+ * open field can join the save. With a `key`, a saver left over for the same record hands over to this one.
  */
 export function useAutosave<T extends object>(
   save: (fields: Partial<T>) => Promise<boolean>,
-  beforeHide?: () => void,
+  { beforeHide, key, onTakeOver }: AutosaveOptions<T> = {},
 ): { saver: Autosave<T>; status: SaveStatus } {
   const [status, setStatus] = useState<SaveStatus>({ failed: false, gone: false })
   const saveRef = useRef(save)
   const beforeHideRef = useRef(beforeHide)
+  const onTakeOverRef = useRef(onTakeOver)
   useLayoutEffect(() => {
     saveRef.current = save
     beforeHideRef.current = beforeHide
+    onTakeOverRef.current = onTakeOver
   })
   const [saver] = useState(() => createAutosave<T>((fields) => saveRef.current(fields), setStatus))
+
+  useEffect(() => {
+    if (key !== undefined) {
+      const unsaved = handOver(key, saver)
+      if (Object.keys(unsaved).length > 0) onTakeOverRef.current?.(unsaved)
+    }
+  }, [key, saver])
 
   useEffect(() => {
     const flush = () => {

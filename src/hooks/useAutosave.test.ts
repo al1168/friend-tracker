@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createAutosave, flushWhenHidden, type SaveStatus } from './useAutosave'
+import { createAutosave, flushWhenHidden, handOver, type SaveStatus } from './useAutosave'
 
 interface Day {
   note: string
@@ -155,6 +155,46 @@ describe('createAutosave', () => {
     await vi.advanceTimersByTimeAsync(1000)
     expect(save).not.toHaveBeenCalled()
     expect(saver.isUnsaved()).toBe(false)
+  })
+})
+
+describe('takeOver', () => {
+  it('hands over everything unsaved, waiting or in flight, and stops saving', async () => {
+    const { save, calls } = deferredSave()
+    const { saver } = setup(save)
+    saver.changeNow({ note: 'Tacos' })
+    saver.change({ mood: 'okay' })
+    expect(saver.takeOver()).toEqual({ note: 'Tacos', mood: 'okay' })
+    expect(saver.isUnsaved()).toBe(false)
+
+    // The write in flight fails: nothing is retried, and nothing more is written.
+    calls[0].settle(new Error('QuotaExceededError'))
+    saver.change({ note: 'Later' })
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(calls).toHaveLength(1)
+    expect(saver.takeOver()).toEqual({})
+  })
+})
+
+describe('handOver', () => {
+  it('stops the saver before it for the same record, and passes on what it never saved', async () => {
+    const savers = new Map()
+    const { save: oldSave, calls: oldCalls } = deferredSave()
+    const old = setup(oldSave).saver
+    expect(handOver('m1', old, savers)).toEqual({})
+    // The page unmounts (the app lock) while the last write fails: the old saver keeps retrying.
+    old.changeNow({ note: 'Typed before the lock' })
+    oldCalls[0].settle(new Error('UnknownError'))
+    await vi.advanceTimersByTimeAsync(0)
+
+    const next = setup(vi.fn(async () => true)).saver
+    expect(handOver('m1', next, savers)).toEqual({ note: 'Typed before the lock' })
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(oldCalls).toHaveLength(1)
+
+    // Another record, or the same saver again (a remounted effect), takes nothing.
+    expect(handOver('m2', setup(vi.fn(async () => true)).saver, savers)).toEqual({})
+    expect(handOver('m1', next, savers)).toEqual({})
   })
 })
 
