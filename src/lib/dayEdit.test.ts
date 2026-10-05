@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { OWNER_DAY_TYPED } from '../test/dayFixtures'
-import { changeBetween, type DayEdit, insertAtCaret, insertPaidLine, insertPlaceLine } from './dayEdit'
+import { changeBetween, type DayEdit, insertAtCaret, insertPaidLine, insertPlaceLine, lineCaret } from './dayEdit'
 
 describe('insertPlaceLine', () => {
   it('starts an empty day with the place, and leaves the caret on the line under it', () => {
@@ -59,6 +59,35 @@ describe('insertAtCaret', () => {
     expect(insertAtCaret('Left\n', 5, '9:52 PM')).toEqual({ value: 'Left\n9:52 PM', caret: 12 })
     expect(insertAtCaret('', 0, '21:52')).toEqual({ value: '21:52', caret: 5 })
     expect(insertAtCaret('Home by end', 7, '9:52 PM')).toEqual({ value: 'Home by 9:52 PM end', caret: 15 })
+  })
+})
+
+describe('lineCaret', () => {
+  it('is the caret itself when nothing is selected', () => {
+    expect(lineCaret('Took haircut with dyno', 4, 4)).toBe(4)
+  })
+
+  it('is the end of a selection, so a line goes after its last line', () => {
+    expect(lineCaret('Took haircut with dyno\nRead book', 18, 22)).toBe(22)
+    expect(lineCaret('One\nTwo\nThree', 1, 6)).toBe(6)
+  })
+
+  it('steps back off a line break that ends the selection, so a selected line keeps the new line under it', () => {
+    expect(lineCaret('One\nTwo', 0, 4)).toBe(3)
+    expect(lineCaret('One\n', 0, 4)).toBe(3)
+  })
+
+  it('keeps every selected word when a place or paid line goes in at it', () => {
+    const note = 'Took haircut with dyno\nRead book'
+    expect(insertPlaceLine(note, lineCaret(note, 18, 22), 'Blue willow 3:30').value).toBe(
+      'Took haircut with dyno\n@Blue willow 3:30\nRead book',
+    )
+    expect(insertPaidLine(note, lineCaret(note, 18, 22), 'Jessie paid').value).toBe(
+      'Took haircut with dyno\nJessie paid\nRead book',
+    )
+    // Everything selected: the whole day stays, and the line goes at its end.
+    expect(insertPaidLine(note, lineCaret(note, 0, note.length), 'I paid').value).toBe(`${note}\nI paid`)
+    expect(insertPaidLine('One\nTwo', lineCaret('One\nTwo', 0, 4), 'I paid').value).toBe('One\nI paid\nTwo')
   })
 })
 

@@ -46,6 +46,15 @@ export function insertPaidLine(value: string, caret: number, line: string): DayE
   return placeLine(value, caret, line, false)
 }
 
+/**
+ * Where a place or paid line goes when The day has a selection: after the selection's last line, so nothing
+ * selected is removed. A selection that ends just after a line break (a whole line selected) counts as ending on
+ * that line, so the new line goes right under it. With no selection, it's the caret.
+ */
+export function lineCaret(value: string, start: number, end: number): number {
+  return end > start && value[end - 1] === '\n' ? end - 1 : end
+}
+
 /** Puts text at the caret, with a space before it unless the caret follows a space or starts a line. */
 export function insertAtCaret(value: string, caret: number, text: string): DayEdit {
   const space = caret > 0 && !/\s/.test(value[caret - 1]) ? ' ' : ''

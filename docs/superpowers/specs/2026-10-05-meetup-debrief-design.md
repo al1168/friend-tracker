@@ -175,7 +175,7 @@ For the owner's day: 10:30 AM, 11:30 AM, 11:53 AM, 3:30 PM (3:30 AM is before 11
 
 - `daySnippet(note): string | null`, for history rows. With places: up to three, in order and counted once ignoring case, written like names: "nonstopstyle", "nonstopstyle and strand bookstore", "nonstopstyle, strand bookstore and Sammy L coffee", then "nonstopstyle, strand bookstore, Sammy L coffee and 5 more". Without places: the first non-blank line, ends trimmed; over 80 characters it's cut at the last space within the first 80 (or at 80 for one long word) and ends with "…". An empty day gives null. A one-line note of 80 characters or fewer reads exactly as today.
 - `isDayEmpty(meetup)`: the note and feelings are blank, and there's no weather and no mood.
-- `src/lib/dayEdit.ts`: pure string functions for the helper bar, each returning `{ value, caret }`: `insertPlaceLine(value, caret, text)`, `insertPaidLine(value, caret, line)` and `insertAtCaret(value, caret, text)` (rules under "Helper bar").
+- `src/lib/dayEdit.ts`: pure string functions for the helper bar, each returning `{ value, caret }`: `insertPlaceLine(value, caret, text)`, `insertPaidLine(value, caret, line)` and `insertAtCaret(value, caret, text)`, plus `lineCaret(value, start, end)`, where a place or paid line goes when words are selected (rules under "Helper bar").
 - `src/lib/caret.ts` (uses the DOM): `caretLineSpan(textarea): Span`, the screen top and bottom of the line holding the caret. It's measured with a hidden mirror copy of the box (same width, font, padding, line height and wrapping) holding the text up to the caret and a marker.
 
 ### Data functions (`src/db/meetups.ts`)
@@ -315,6 +315,7 @@ A group named "Writing helpers": one row of 36px chips (with 44px hit areas) tha
 - `insertPlaceLine`: on a blank line, the place replaces it; otherwise it goes on a new line after the caret's line. At the end of the text, a new empty line follows with the caret on it, ready for what happened there. In the middle of the text, the caret goes to the end of the place line instead, so no stray blank line splits what's below.
 - `insertPaidLine`: the same placement, with the caret at the end of the new line and no empty line after it.
 - `insertAtCaret`: the text at the caret, with the spacing rule for "Now".
+- **A selection is never removed by a place or paid line.** With words selected, the place or paid line goes after the selection's last line (`lineCaret`; a selection ending just after a line break counts as ending on that line) and every selected word stays. This holds for Add and Return, a "Who paid?" chip, and Place text added on Back or when the app goes to the background. "Now" types over a selection the way typing does, but only while The day has focus, so the selection is showing; otherwise the time goes after it.
 
 **How the keyboard stays up:**
 - Every helper button calls `preventDefault()` on `pointerdown` and `mousedown`, so a focused box keeps its focus.
@@ -547,7 +548,7 @@ Add:
   - `daySnippet`: 8 places; 1, 2 and 3 places; repeats ignoring case; no places; the 80-character cut at a space and for one long word; a blank day gives null; "Tacos" gives "Tacos".
   - `isDayEmpty`.
   - Both golden fixtures carry a comment that they are frozen for grammar 1.
-- `src/lib/dayEdit.test.ts`: `insertPlaceLine` into empty text, onto a blank line, after a line at the end (an empty line follows), and in the middle (no empty line), dropping a leading "@" and keeping an inner one; `insertPaidLine`; `insertAtCaret` spacing; replaying the walkthrough's steps (helper inserts plus typed text) gives fixture A exactly.
+- `src/lib/dayEdit.test.ts`: `insertPlaceLine` into empty text, onto a blank line, after a line at the end (an empty line follows), and in the middle (no empty line), dropping a leading "@" and keeping an inner one; `insertPaidLine`; `insertAtCaret` spacing; `lineCaret` (no selection, a selected word, a selection ending after a line break) keeping every selected word; replaying the walkthrough's steps (helper inserts plus typed text) gives fixture A exactly.
 - `src/lib/clock.test.ts`: the 12-hour and 24-hour formats, the no-break space, "~", and every `speakTime` sentence.
 - `src/lib/weather.test.ts` and `src/lib/moods.test.ts`: keys in order with distinct labels and emoji, and no face emoji in weather; `cleanWeather` (not a list, unknown keys, repeats, order); `isMood` false for "Good", "amazing", 3, "", "toString", null and undefined.
 - `src/db/meetups.test.ts`: `addMeetup` stores the defaults; `updateMeetup` leaves the day alone (a day saved by `updateDay`, trailing spaces included, survives an Edit save untouched); `updateDay` writes only the given fields and never the date, type, friends or activities; it resolves false for a missing id and creates nothing; it refuses an unknown mood ("Please pick a mood from the list.") and long feelings ("Keep how it felt under 4,000 characters.") and writes nothing; it saves a 30,000-character note; it normalizes line breaks and cleans weather; delete then restore keeps the day.
@@ -569,6 +570,7 @@ Add:
   - **Old notes:** import a version 4 backup whose note is "Tacos", a line break and "Then karaoke": The day on the Meetup page shows both lines, the history row ends "Tacos", and the day page's box holds the note.
   - **Backup round trip** of the typed example keeps the day, its activities and its photos.
   - **Helpers:** "Now" shows only on today's meetup and inserts "9:52 PM"; the Who paid row lists "Me", "Mariya", "Jessie", "Brandon" and "Split"; Close puts focus back in The day; a future-dated meetup's day page has no How it felt.
+  - **Selections:** with a word selected, Paid then a friend, and "@ Place" then Back, keep the word; with everything selected, a place goes after the last line; "Now" replaces a selection while The day has focus and goes after it once The day has lost focus.
 - `e2e/dayKeyboard.spec.ts`, using the fake visual viewport from `sheetKeyboard.spec.ts` (moved into a shared `e2e/keyboard.ts`):
   - The layer sits on the keyboard: `--keyboard-inset` is set, the helper bar's bottom is the keyboard's top, and "Hide keyboard" shows.
   - With iOS panning the visual viewport (offsetTop 120), the nav bar and the focused box are both on screen.

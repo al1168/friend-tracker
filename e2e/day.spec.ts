@@ -301,6 +301,65 @@ test('"Now" writes the time on today’s meetup, and "Paid" writes who paid', as
   await expect.poll(async () => (await readMeetups(page))[0].note).toBe('Left at 9:52 PM\nJessie paid')
 })
 
+/** Focuses The day and selects `from` to `to`, as a double-tap or a drag of the handles does. */
+async function selectInDay(page: Page, from: number, to: number) {
+  await dayBox(page).focus()
+  await dayBox(page).evaluate((box: HTMLTextAreaElement, [from, to]) => box.setSelectionRange(from, to), [from, to])
+}
+
+test('a place or paid line never removes the words you have selected', async ({ page }) => {
+  await page.goto('/')
+  await logMeal(page)
+  await openMealDay(page)
+  const note = 'Took haircut with dyno\nRead book'
+  const dyno = [note.indexOf('dyno'), note.indexOf('dyno') + 4] as const
+
+  // "dyno" is selected: Paid, then Jessie.
+  await dayBox(page).fill(note)
+  await selectInDay(page, ...dyno)
+  await helpers(page).getByRole('button', { name: 'Paid' }).click()
+  await helpers(page).getByRole('group', { name: 'Who paid?' }).getByRole('button', { name: 'Jessie' }).click()
+  await expect(dayBox(page)).toHaveValue('Took haircut with dyno\nJessie paid\nRead book')
+
+  // Everything selected: "@ Place", a place, Return.
+  await dayBox(page).fill(note)
+  await selectInDay(page, 0, note.length)
+  await helpers(page).getByRole('button', { name: 'Add a place' }).click()
+  await helpers(page).getByRole('textbox', { name: 'Place and time' }).fill('Cafe')
+  await helpers(page).getByRole('textbox', { name: 'Place and time' }).press('Enter')
+  await expect(dayBox(page)).toHaveValue(`${note}\n@Cafe\n`)
+
+  // "dyno" selected again, a place typed and left in the field, then Back: the place joins, and "dyno" stays.
+  await dayBox(page).fill(note)
+  await selectInDay(page, ...dyno)
+  await helpers(page).getByRole('button', { name: 'Add a place' }).click()
+  await helpers(page).getByRole('textbox', { name: 'Place and time' }).fill('Blue willow 3:30')
+  await page.getByRole('button', { name: 'Meal' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
+  expect((await readMeetups(page))[0].note).toBe('Took haircut with dyno\n@Blue willow 3:30\nRead book')
+})
+
+test('"Now" types over a selection you can see, and goes after one you can’t', async ({ page }) => {
+  await page.clock.setFixedTime(SATURDAY_NIGHT)
+  await page.goto('/')
+  await logMeal(page)
+  await openMealDay(page)
+  const now = helpers(page).getByRole('button', { name: 'Add the time, 9:52 PM' })
+
+  // With The day focused, the selection shows, and "Now" replaces it as typing would.
+  await dayBox(page).fill('Left at noon')
+  await selectInDay(page, 8, 12)
+  await now.click()
+  await expect(dayBox(page)).toHaveValue('Left at 9:52 PM')
+
+  // Once The day loses focus its selection no longer shows, so nothing in it is replaced.
+  await dayBox(page).fill('Left at noon')
+  await selectInDay(page, 8, 12)
+  await dayBox(page).blur()
+  await now.click()
+  await expect(dayBox(page)).toHaveValue('Left at noon 9:52 PM')
+})
+
 test('a day that is not today has no "Now", and an upcoming one has no How it felt', async ({ page }) => {
   await page.goto('/')
   await logMeal(page, { date: '2099-01-01' })

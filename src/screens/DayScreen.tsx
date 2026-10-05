@@ -15,7 +15,7 @@ import { useScrollLock } from '../hooks/useScrollLock'
 import { useToday } from '../hooks/useToday'
 import { clockStyle, describeStopTime, typedClock } from '../lib/clock'
 import { formatDate } from '../lib/dates'
-import { changeBetween, insertAtCaret, insertPaidLine, insertPlaceLine, type DayEdit } from '../lib/dayEdit'
+import { changeBetween, insertAtCaret, insertPaidLine, insertPlaceLine, lineCaret, type DayEdit } from '../lib/dayEdit'
 import { DAY_MAX_TYPED, FEELINGS_MAX, readDay } from '../lib/dayText'
 import { feelingsApply } from '../lib/moods'
 import { payerLabel } from '../lib/payers'
@@ -224,12 +224,19 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
   /**
    * Writes a helper's text into The day at its caret. It goes in with execCommand while The day has focus, so
    * shake to undo still works; if that's refused, setRangeText and an input event (losing only native undo).
+   *
+   * A selection is never removed by a place or paid line (`'line'`): the line goes after the selection's last
+   * line. "Now" (`'text'`) types over a selection the way typing does, but only one you can see: once The day
+   * has lost focus its selection isn't shown, so the time goes after it instead.
    */
-  function editDay(edit: (value: string, caret: number) => DayEdit): DayEdit {
+  function editDay(kind: 'line' | 'text', edit: (value: string, caret: number) => DayEdit): DayEdit {
     const box = dayRef.current!
     const value = box.value
     const { start, end } = dayCaret()
-    const next = edit(value.slice(0, start) + value.slice(end), start)
+    const next =
+      kind === 'text' && document.activeElement === box
+        ? edit(value.slice(0, start) + value.slice(end), start)
+        : edit(value, kind === 'line' ? lineCaret(value, start, end) : end)
     const change = changeBetween(value, next.value)
     focusDay()
     box.setSelectionRange(change.from, change.to)
@@ -258,7 +265,7 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
       closePlace()
       return
     }
-    const next = editDay((value, caret) => insertPlaceLine(value, caret, text))
+    const next = editDay('line', (value, caret) => insertPlaceLine(value, caret, text))
     updatePlaceDraft('')
     setRow('helpers')
     announce(describeAddedPlace(next, line))
@@ -282,7 +289,8 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
     if (text.trim() === '') return
     const { start, end } = dayCaret()
     const note = fieldsRef.current.note
-    const next = insertPlaceLine(note.slice(0, start) + note.slice(end), start, text)
+    // After anything selected in The day, never over it: this saves as the page goes away, with no undo.
+    const next = insertPlaceLine(note, lineCaret(note, start, end), text)
     updatePlaceDraft('')
     setRow('helpers')
     if (next.value !== note) setField('note', next.value, false)
@@ -292,7 +300,7 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
 
   function addNow() {
     if (now === null) return
-    editDay((value, caret) => insertAtCaret(value, caret, now))
+    editDay('text', (value, caret) => insertAtCaret(value, caret, now))
     announce(`Added ${now}.`)
   }
 
@@ -308,7 +316,7 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
   }
 
   function addPaid(line: string) {
-    editDay((value, caret) => insertPaidLine(value, caret, line))
+    editDay('line', (value, caret) => insertPaidLine(value, caret, line))
     setRow('helpers')
     announce(`Added ${line}.`)
   }
