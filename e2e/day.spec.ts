@@ -1,14 +1,20 @@
+import { readFile } from 'node:fs/promises'
 import { expect, test, type Page } from '@playwright/test'
+import { OWNER_DAY_TYPED, OWNER_FEELINGS, OWNER_MESSAGE } from '../src/test/dayFixtures.ts'
 import {
   addFriend,
+  editMeetup,
   enterPin,
+  goToTab,
   lockHeading,
   logMeetup,
   openDay,
   openFriendPage,
+  pickActivity,
   readMeetups,
   reopenAfterAWhile,
   seedAppLock,
+  tinyPhoto,
 } from './helpers.ts'
 
 // Most tests add three friends and log a meetup first, so they get more time than most.
@@ -382,4 +388,241 @@ test('opened directly, Back goes to its meetup; an unknown one goes to Friends',
   await page.goto('about:blank')
   await page.goto('/#/meetups/nope/day')
   await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
+})
+
+test('the owner’s example, written on the walk home, reads back as their day', async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.clock.setFixedTime(SATURDAY_NIGHT)
+  await page.goto('/')
+  for (const name of FRIENDS) await addFriend(page, name)
+
+  // 1. Friends tab, "+ Log meetup": Mariya, Jessie and Brandon under Recent, Meal, Today, Movie and Shopping.
+  await page.getByRole('button', { name: 'Log meetup' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
+  const recent = sheet.getByRole('group', { name: 'Recent friends' })
+  for (const name of FRIENDS) await recent.getByRole('button', { name }).click()
+  await sheet.getByRole('button', { name: 'Meal', exact: true }).click()
+  await expect(sheet.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-pressed', 'true')
+  await pickActivity(sheet, 'Movie')
+  await pickActivity(sheet, 'Shopping')
+
+  // 2. "Save and write about the day": the toast, and the day page slides in.
+  await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
+  await expect(page.getByRole('status')).toContainText('Logged with Mariya, Jessie and Brandon')
+  await expect(page.getByRole('button', { name: 'Meal' })).toBeVisible()
+  await expect(page.getByText('Sat, Oct 3 · with Mariya, Jessie and Brandon', { exact: true })).toBeVisible()
+
+  // 3. "Rainy day".
+  await page.getByRole('group', { name: 'Weather' }).getByRole('button', { name: 'Rainy' }).click()
+
+  // 4. "Locations:" and the story, one place at a time.
+  const place = async (text: string) => {
+    await helpers(page).getByRole('button', { name: 'Add a place' }).click()
+    await helpers(page).getByRole('textbox', { name: 'Place and time' }).fill(text)
+    await helpers(page).getByRole('textbox', { name: 'Place and time' }).press('Enter')
+    await expect(dayBox(page)).toBeFocused()
+  }
+  const type = (text: string) => page.keyboard.insertText(text)
+  const paid = async (name: string) => {
+    await helpers(page).getByRole('button', { name: 'Paid' }).click()
+    await helpers(page).getByRole('group', { name: 'Who paid?' }).getByRole('button', { name }).click()
+  }
+  await place('nonstopstyle 10:30')
+  await type('Took haircut with dyno')
+  await place('strand bookstore 11:30')
+  await place('Sammy L coffee 11:53')
+  await type('Read book and vibe code until 2:50')
+  await place('Blue willow 3:30')
+  await type('Walked to mariya at blue willow. Then Jessie came, then Brandon (late) due to construction')
+  await page.keyboard.press('Enter')
+  await type('Ordered Kong pao chicken (salty) garlic string beans, szcheuan beef and jasmine dragon pearl tea.')
+  await paid('Jessie')
+  await expect(dayBox(page)).toHaveValue(/\nJessie paid$/)
+  await place('hey tea Broadway')
+  await type('Walked to hey tea (got the king jasmine honeydew)')
+  await place('amc 34 5:30')
+  await type('Walked to amc and watch prime time(didn’t like it)')
+  await place('holister + @h&m 7:30 - ~8:10')
+  await type('Stalled time for dinner at holister and H&M')
+  await place('seoulSaloon 8:30')
+  for (const line of [
+    'Then walked to dinner @seoulsaloon',
+    'Ate rose tteboki, fried chicken(chicken nuggets?), octopus kimbap',
+    'Talked about relationship + movie',
+    'Jessie Brandon age gap like 3 years',
+  ]) {
+    await type(line)
+    await page.keyboard.press('Enter')
+  }
+  await type('Mariya like 3 years older 1/2 younger')
+  await paid('Mariya')
+  await page.keyboard.press('Enter')
+  await type('Split ways went home')
+  await expect(dayBox(page)).toHaveValue(OWNER_DAY_TYPED)
+
+  // 5. "How I felt:": the face, then the words.
+  await page.getByRole('group', { name: 'Mood' }).getByRole('button', { name: 'Okay' }).click()
+  await page.getByRole('textbox', { name: 'How it felt, in your words' }).fill(OWNER_FEELINGS)
+
+  // 6. "‹ Meal": everything was saved along the way, and the memory shows.
+  await page.getByRole('button', { name: 'Meal' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
+
+  const [stored] = await readMeetups(page)
+  expect(Object.keys(stored).sort()).toEqual([
+    'activities',
+    'createdAt',
+    'date',
+    'feelings',
+    'friendIds',
+    'id',
+    'mood',
+    'note',
+    'typeId',
+    'weather',
+  ])
+  expect(stored).toMatchObject({
+    date: '2026-10-03',
+    typeId: 'type-meal',
+    note: OWNER_DAY_TYPED,
+    activities: ['Movie', 'Shopping'],
+    weather: ['rainy'],
+    mood: 'okay',
+    feelings: OWNER_FEELINGS,
+  })
+  expect(stored.friendIds).toHaveLength(3)
+
+  await expect(page.getByText('Sat, Oct 3 · 🌧️ Rainy', { exact: true })).toBeVisible()
+  const places = page.getByRole('list', { name: 'Places, 8 stops' })
+  await expect(places.getByRole('heading', { level: 3 })).toHaveText([
+    'nonstopstyle',
+    'strand bookstore',
+    'Sammy L coffee',
+    'Blue willow',
+    'hey tea Broadway',
+    'amc 34',
+    'holister + h&m',
+    'seoulSaloon',
+  ])
+  await expect(places.locator('.day-stop__time')).toHaveText([
+    '10:30 AM',
+    '11:30 AM',
+    '11:53 AM',
+    '3:30 PM',
+    '',
+    '5:30 PM',
+    '7:30 PM to ~8:10 PM',
+    '8:30 PM',
+  ])
+  await expect(places.getByRole('listitem').nth(6).getByText(/^From 7:30.PM to about 8:10.PM\.$/)).toBeAttached()
+  await expect(places.getByRole('listitem').nth(3).locator('.paid-tag')).toHaveText(/Jessie paid$/)
+  await expect(places.getByRole('listitem').nth(7).locator('.paid-tag')).toHaveText(/Mariya paid$/)
+  await expect(places.locator('.paid-tag')).toHaveCount(2)
+  await expect(places.getByRole('listitem').nth(7).locator('.day-line').last()).toHaveText('Split ways went home')
+  const felt = page.getByRole('region', { name: 'How it felt' })
+  await expect(felt.getByText('Mood: Okay')).toBeVisible()
+  await expect(felt).toContainText(OWNER_FEELINGS)
+  await expect(page.getByRole('link', { name: 'Edit the day' })).toBeVisible()
+
+  // In Mariya's history: the date, the others, the activities and the first places. No mood, no weather.
+  await page.getByRole('button', { name: 'Back' }).click()
+  await openFriendPage(page, 'Mariya')
+  const row = page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Meal/ })
+  await expect(row.locator('.row__subtitle')).toHaveText(
+    'Sat, Oct 3 · with Jessie and Brandon · Movie, Shopping · nonstopstyle, strand bookstore, Sammy L coffee and 5 more',
+  )
+  await expect(row).not.toContainText('Okay')
+  await expect(row).not.toContainText('Rainy')
+})
+
+test('the owner’s message, pasted, is kept exactly and reads back with its headings', async ({ page }) => {
+  await page.clock.setFixedTime(SATURDAY_NIGHT)
+  await page.goto('/')
+  await logMeal(page)
+  await openMealDay(page)
+  await dayBox(page).fill(OWNER_MESSAGE)
+  await page.getByRole('button', { name: 'Meal' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
+
+  expect((await readMeetups(page))[0].note).toBe(OWNER_MESSAGE)
+  const day = page.getByRole('region', { name: 'The day' })
+  await expect(day.getByRole('heading', { level: 3 })).toHaveText([
+    'Locations',
+    'nonstopstyle',
+    'strand bookstore',
+    'Sammy L coffee',
+    'Blue willow',
+    'hey tea Broadway',
+    'amc 34',
+    'holister + h&m',
+    'seoulSaloon',
+    'How I felt',
+  ])
+  const places = day.getByRole('list', { name: 'Places, 8 stops' })
+  await expect(places.locator('.day-stop__time')).toHaveText([
+    '10:30 AM',
+    '11:30 AM',
+    '11:53 AM',
+    '3:30 PM',
+    '',
+    '5:30 PM',
+    '7:30 PM to ~8:10 PM',
+    '8:30 PM',
+  ])
+  const prose = day.locator('.day-prose')
+  await expect(prose).toHaveCount(3)
+  await expect(prose.nth(0)).toHaveText('Rainy day')
+  await expect(prose.nth(1).locator('.day-line')).toHaveCount(15)
+  await expect(prose.nth(1).locator('.paid-tag')).toHaveText([/Jessie paid$/, /Mariya paid$/])
+  await expect(prose.nth(1).locator('.day-line').last()).toHaveText('Split ways went home')
+  await expect(prose.nth(2)).toHaveText(OWNER_FEELINGS)
+})
+
+test('a backup keeps the day, its activities and its photos', async ({ page }) => {
+  // Force the download path; the share sheet can't be driven in tests.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'canShare', { value: undefined, configurable: true })
+  })
+  await page.goto('/')
+  await addFriend(page, 'Mariya')
+  await logMeetup(page, ['Mariya'], { type: 'Meal', activities: ['Movie'], photos: [tinyPhoto('one.png')] })
+  await openFriendPage(page, 'Mariya')
+  await page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Meal/ }).click()
+  await openDay(page)
+  await page.getByRole('group', { name: 'Weather' }).getByRole('button', { name: 'Rainy' }).click()
+  await page.getByRole('group', { name: 'Mood' }).getByRole('button', { name: 'Okay' }).click()
+  await dayBox(page).fill(OWNER_DAY_TYPED)
+  await page.getByRole('textbox', { name: 'How it felt, in your words' }).fill(OWNER_FEELINGS)
+  await page.getByRole('button', { name: 'Meal' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
+
+  await goToTab(page, 'Settings')
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export backup' }).click()
+  const backupPath = await (await downloadPromise).path()
+  const backup = JSON.parse(await readFile(backupPath, 'utf8'))
+  expect(backup.version).toBe(5)
+  expect(backup.meetups[0]).toMatchObject({
+    note: OWNER_DAY_TYPED,
+    activities: ['Movie'],
+    weather: ['rainy'],
+    mood: 'okay',
+    feelings: OWNER_FEELINGS,
+  })
+  expect(backup.meetupPhotos).toHaveLength(1)
+
+  await openFriendPage(page, 'Mariya')
+  const sheet = await editMeetup(page, /Meal/)
+  await sheet.getByRole('button', { name: 'Delete meetup' }).click()
+  await goToTab(page, 'Settings')
+  await page.locator('input[type="file"]').setInputFiles(backupPath)
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Replace all data' }).click()
+  await expect(page.getByRole('status')).toContainText('Backup restored')
+
+  await openFriendPage(page, 'Mariya')
+  await page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Meal/ }).click()
+  await expect(page.getByRole('list', { name: 'Places, 8 stops' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Activities' }).getByRole('listitem')).toHaveText(['Movie'])
+  await expect(page.getByRole('region', { name: 'Photos' }).getByRole('img')).toHaveCount(1)
+  await expect(page.getByRole('region', { name: 'How it felt' }).getByText('Mood: Okay')).toBeVisible()
 })

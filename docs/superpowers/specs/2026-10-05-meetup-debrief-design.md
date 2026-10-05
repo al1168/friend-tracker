@@ -633,3 +633,19 @@ About 7 to 8 focused days:
 - Prompts, badges, reminders or notifications to write about a day.
 - AI of any kind.
 - Dates per place or multi-day meetups (late-night times read as past midnight, without dates).
+
+## Decisions made while planning
+
+Recorded in [the plan](../plans/2026-10-05-meetup-debrief.md):
+
+- **Golden fixtures** live in `src/test/dayFixtures.ts`, shared by the unit tests and `e2e/day.spec.ts`: fixture A is the stored record's note (808 characters) and fixture B the owner's message exactly as sent (925 characters, 31 lines, from "Rainy day" to the last sentence). Both lengths are pinned by tests.
+- **Times.** "~" may have spaces after it; "about", "around", "to", "am" and "pm" are read in any case. A range's end needs minutes or am/pm like any lone clock, so "@Show 11am-1" has no time. A 24-hour phone shows two-digit hours ("09:05"). "Now" types an ordinary space before AM or PM ("9:52 PM"); only what the app shows uses the no-break space.
+- **Lines.** "paid" and "for" are read in any case, and one trailing "." or "!" is dropped before matching; a tag shows the line as written ("Mariya paid."). A line that is only "@" is skipped as if it weren't there, so it doesn't end a stop's lines. Headings count characters as code points, and ":" alone is text. Line breaks are split at `\r\n`, `\r` and `\n`, so a note from a backup with Windows line breaks reads the same.
+- **The timeline's large-text layout** switches below 16em, not 22em. The box's content on a 390pt iPhone is 326px, which is under 22em at every iPhone text size (17px by default), so 22em would put every time above its place. 16em keeps the side-by-side timeline at the default and larger standard sizes and moves times above places from about 21px, the largest standard sizes and every accessibility size.
+- **Who paid.** `src/lib/payers.ts` names the chips (`payerLabel`: the first name, or the full name when two friends on the meetup share a first name, ignoring case) and finds a tag's face (`paidBy`: exactly one friend whose first or full name matches, ignoring case).
+- **Announcements** read a new place in the day as it stands ("Added holister + h&m, 7:30 PM to about 8:10 PM."), so its time reads in day order. Escape closes the Place row too.
+- **The day page** starts the scroll lock and the keyboard publishing as soon as its route opens, before its data loads, so a Log sheet still closing always hands the keyboard over. Focus moves to its title before the first paint. It sits at z-index 40: above the tab bar and pages, below sheets, the toast and action sheets. Discarding after a failed save stops the saver, so nothing is written later.
+- **The toast's room** stays after a tall toast goes and resets on the next page; a new page keeps room only for a toast that is showing.
+- **Tests without jsdom.** Unit tests run in Node, so the keyboard and autosave logic live in plain functions (`startKeyboardInset`, `createAutosave`, `flushWhenHidden`) tested with fakes and fake timers; the hooks are thin wrappers.
+- **Between tasks** the Log sheet's one-line Note saved through `updateDay` until the sheet lost it, so every task stayed green.
+- **Screenshots.** The seed adds Mariya, Jessie and Brandon; `12-meetup` shows the owner's example, logged through "Save and write about the day", while the viewer and the Edit sheet still use the seed's Meal. The accessibility-size test captures the day page (`ax-16-day-written`, faces two by two) and its Meetup page (`ax-12-meetup`, times above places).

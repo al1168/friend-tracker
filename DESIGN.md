@@ -218,7 +218,7 @@ Motion is responsive, not choreographed: 160ms for taps and color changes (`--du
 Warm, paper-toned neutrals tinted toward peach, with a single soft peach accent in two strengths: a fill for things you press and a deeper terracotta for peach-colored text.
 
 ### Primary
-- **Peach** (`--accent`, light `oklch(81% 0.095 50)`, dark `oklch(80% 0.1 50)`): the fill for primary buttons, the "+ Log meetup" pill, selected chips, the selected-friend ring and check, the camera badge on the friend photo, and the toast's check mark. Text on it is always **On-Peach** (`--on-accent`, `oklch(29% 0.06 40)` / `oklch(26% 0.05 40)`), 7.8:1 in light and 8.2:1 in dark. Pressed: **Peach Pressed** (`--accent-pressed`).
+- **Peach** (`--accent`, light `oklch(81% 0.095 50)`, dark `oklch(80% 0.1 50)`): the fill for primary buttons, the "+ Log meetup" pill, selected chips, the selected-friend ring and check, the picked mood's ring and check, the camera badge on the friend photo, and the toast's check mark. Text on it is always **On-Peach** (`--on-accent`, `oklch(29% 0.06 40)` / `oklch(26% 0.05 40)`), 7.8:1 in light and 8.2:1 in dark. Pressed: **Peach Pressed** (`--accent-pressed`).
 - **Terracotta Ink** (`--accent-ink`, light `oklch(53% 0.15 38)`, dark `oklch(81% 0.1 52)`): peach-family text and icons. Nav bar actions (Edit, Cancel, back), header icon buttons, the active tab, accent rows such as "Export backup", and the 2px focus ring. 5.1:1 on paper in light, 10.1:1 in dark.
 - **Peach Wash** (`--accent-soft`, light `oklch(94.5% 0.03 55)`, dark `oklch(31% 0.04 50)`): a quiet tint for the install hint card, the "Upcoming" badge, and the back circle of the empty-state art.
 
@@ -228,8 +228,8 @@ Warm, paper-toned neutrals tinted toward peach, with a single soft peach accent 
 
 ### Neutral
 - **Warm Paper** (`--bg`, light `oklch(96.4% 0.009 60)`, dark `oklch(18.5% 0.008 55)`): the page and sheet background. The PWA `theme-color` matches it (#F8F2ED light, #16120F dark).
-- **Paper White** (`--surface`, light `oklch(99.4% 0.004 60)`, dark `oklch(23.5% 0.009 55)`): inset groups, the tab bar, text fields inside sheets, the stat row, chart containers, the "Last seen" pill, action sheet groups.
-- **Linen** (`--surface-2`, light `oklch(93.6% 0.011 60)`, dark `oklch(29% 0.011 55)`): unselected chips, search fields, secondary buttons, emoji badges, icon-button press. **Linen Pressed** (`--surface-pressed`) is the row and action-sheet press state.
+- **Paper White** (`--surface`, light `oklch(99.4% 0.004 60)`, dark `oklch(23.5% 0.009 55)`): inset groups, the tab bar, text fields inside sheets, the stat row, chart containers, the "Last seen" pill, action sheet groups, the day view and How it felt boxes on the Meetup page, and the day page's text boxes and Place field.
+- **Linen** (`--surface-2`, light `oklch(93.6% 0.011 60)`, dark `oklch(29% 0.011 55)`): unselected chips, search fields, secondary buttons, emoji badges, icon-button press, mood faces, helper chips and paid tags. **Linen Pressed** (`--surface-pressed`) is the row and action-sheet press state.
 - **Soft Rule** (`--separator`, light `oklch(89.5% 0.009 60)`, dark `oklch(32% 0.01 55)`): 0.5px hairlines between rows, the sheet grabber, the tab bar's top edge, and the compact nav bar's bottom edge.
 - **Warm Ink** (`--ink`, light `oklch(25% 0.014 50)`, dark `oklch(95% 0.008 70)`): primary text, 14.4:1 on paper.
 - **Warm Ink Secondary** (`--ink-2`, light `oklch(47% 0.014 50)`, dark `oklch(76% 0.012 60)`): subtitles, section labels, footers, trailing values, the stats comparison line, neutral reorder arrows. 6.2:1 on paper.
@@ -238,7 +238,7 @@ Warm, paper-toned neutrals tinted toward peach, with a single soft peach accent 
 - **Viewer Ground** (`--viewer-bg`, `oklch(13% 0.006 55)` in both themes) with **Viewer Ink** (`--viewer-ink`, `oklch(96% 0.006 70)`, about 18:1) and **Viewer Pressed** (`--viewer-pressed`, white at 14%): the photo viewer only. It is the one near-black ground in the app (see the One Dark Room Rule).
 
 ### Destructive
-- **Danger Red** (`--danger`, light `oklch(55% 0.19 27)`, dark `oklch(70% 0.17 25)`): destructive action-sheet buttons ("Delete friend", "Discard changes", "Replace all data"), destructive rows, and form field errors. Nothing else.
+- **Danger Red** (`--danger`, light `oklch(55% 0.19 27)`, dark `oklch(70% 0.17 25)`): destructive action-sheet buttons ("Delete friend", "Discard changes", "Replace all data"), destructive rows, form field errors, and the day page's save error line. Nothing else.
 
 ### Avatar tints
 Six soft pastel pairs (`.tint-0` to `.tint-5`, hues 50, 85, 145, 215, 285, 350), chosen per friend by hashing the friend id so a tint survives renames. Light: background `oklch(91% 0.045 h)`, initials `oklch(42% 0.08 h)`. Dark: background `oklch(36% 0.05 h)`, initials `oklch(90% 0.05 h)`. Every pair is above 6.3:1. These are the only non-peach hues in the app, and they live only inside avatars.
@@ -269,7 +269,7 @@ Six soft pastel pairs (`.tint-0` to `.tint-5`, hues 50, 85, 145, 215, 285, 350),
 - **Caption** (0.7rem): tab bar labels (500, capped at 13px), the "this year" label under counts, the "Upcoming" badge (600), month initials (capped at 18px).
 
 ### Named Rules
-**The Dynamic Type Rule.** The root font is `-apple-system-body`, so 1rem follows the iPhone text-size setting; every type size and spacing step is in rem. Layouts must survive the largest standard size (about 23px body): rows grow taller, subtitles wrap, the stat row stays three across up to about 28px and stacks beyond, the "+ Log meetup" pill stays on one line. The only fixed-pixel exceptions are avatars, the Meetup page's emoji badge (96px with a 48px emoji), the history thumbnail (40px) and the remove button's glyph on photos (24px), icons (except the Log pill's plus, which is 1.15em), tab labels (capped at 13px), month initials (capped at 18px), input text (never below 16px, so iOS doesn't zoom), and the lock screen's keypad and the Settings switches (listed under "Lock screen and PIN pad").
+**The Dynamic Type Rule.** The root font is `-apple-system-body`, so 1rem follows the iPhone text-size setting; every type size and spacing step is in rem. Layouts must survive the largest standard size (about 23px body): rows grow taller, subtitles wrap, the stat row stays three across up to about 28px and stacks beyond, the "+ Log meetup" pill stays on one line. The only fixed-pixel exceptions are avatars, the Meetup page's emoji badge (96px with a 48px emoji), the history thumbnail (40px) and the remove button's glyph on photos (24px), the mood face (a 44px circle with a 26px emoji), the 20px avatar in a paid tag, icons (except the Log pill's plus, which is 1.15em), tab labels (capped at 13px), month initials (capped at 18px), input text (never below 16px, so iOS doesn't zoom), and the lock screen's keypad and the Settings switches (listed under "Lock screen and PIN pad").
 
 **The Rounded Numbers Rule.** Counts and years use the `.numeric` treatment: the rounded face with tabular numerals, so columns of numbers line up.
 
@@ -324,20 +324,33 @@ The thumb-reachable primary action on Friends and friend detail. Peach fill, On-
 ### Bottom sheets
 Used for adding or editing a friend, logging a meetup, and editing groups and types. Warm Paper with 22px top corners and the Float shadow, rising over 340ms with ease-out-expo, draggable to dismiss from its header. Header: a 36×5px Soft Rule grabber, then a three-column bar with Cancel (text button), a centered Body 600 title, and an optional trailing action. Body: 16px side padding, sections 1.5rem apart. Footer: a hairline-topped bar holding the block primary button above the safe area. Cancelling with unsaved changes asks first through an action sheet.
 
-### Meetup sheet: Activities and Photos
-Two sections between **When** and **Note** in the Log and Edit meetup sheet. Both hold their changes until Save, so Cancel (after "Discard changes?") throws them away.
+### Meetup sheet: Activities, Photos and footer
+Activities and Photos follow **When** and end the Log and Edit meetup sheet; there is no Note (the day is written on the day page). Both hold their changes until Save, so Cancel (after "Discard changes?") throws them away.
 - **Activities:** a wrapping cluster of chips (the wrapping variant): activities used before, most used first, then the starters (Board games, Karaoke, Movie, Walk, Concert, Shopping, Cooking, Sports, Beach, Museum). Twelve show at first and a "More" chip shows the rest; an activity already on the meetup always shows. Selected chips are Peach, announced with `aria-pressed`, and a chip tapped off stays where it is until the sheet closes. The cluster ends with "+ New", which puts a Paper White field and a secondary **Add** button on their own line under the chips, like the friend sheet's New group; adding selects it. "A meetup can have up to 20 activities." is a Footnote Warm Ink Secondary hint, never red.
 - **Photos:** a 3-across grid of square thumbnails (12px corners, 8px gaps), shared with the Meetup page. Each has a remove button ("Remove photo 2"): a 44px hit area in the corner around a 24px Warm Ink circle with a Warm Paper cross and a 1.5px Warm Paper ring that keeps it visible on any photo. The grid ends with the **Add photos** tile: Linen with a 1.5px dashed Warm Ink Tertiary outline (an empty slot, not a container), a 26px camera-plus icon, and a Footnote 600 Warm Ink Secondary label that reads "Adding 2 of 5…" while photos are resized. Hints under the grid, never red: "A meetup can have up to 20 photos." and "1 photo couldn't be added.".
+- **Footer:** Log meetup's footer has a centered 44px Terracotta Ink text button, "Save and write about the day", above the Save block button. It's disabled whenever Save is, never hidden for a missing friend, and hidden only while the keyboard is up, so Save never moves.
+
+### The day page
+A pushed, full-screen layer at `/meetups/:id/day` that fills the screen above the keyboard (bottom at `--keyboard-inset`, height `--viewport-height`), with no tab bar. Nav bar: back (the meetup type), the title "The day". Body: the context line, Weather chips, The day box with its hint, How it felt (mood tiles and a box, only for today or earlier), and "Saves as you type, and stays on this iPhone.". Boxes are Paper White, grow with their text and never scroll inside themselves. It saves as you type; a failed save shows a Footnote Danger Red line above the helper bar.
+
+### Helper bar
+The day page's footer, riding on the keyboard: a row of chips ("@ Place", "Now" for today's meetups, "Paid") with a 44px "Hide keyboard" button pinned at the end while the keyboard is up. "@ Place" swaps the row for a one-line Place field (autocorrect off) with Add and Close; "Paid" swaps it for "Who paid?" chips (Me, each friend, Split). Helpers never take focus from the box you're typing in.
+
+### Mood tiles
+Four tiles, low to high: 😔 Heavy, 🙂 Okay, 😊 Good, 😄 Great. Each is a 44px Linen circle with a 26px emoji over a Footnote Warm Ink word, four across, or two by two once a quarter of the row is narrower than 3.25rem. Nothing is picked at first. The picked tile gets the selected-friend ring and check and a 600 word; tapping it again clears it. Press is Linen Pressed, with no scale.
+
+### Weather chips
+Eight chips in a scrolling row, ☀️ Sunny, ⛅ Cloudy, 🌧️ Rainy, ⛈️ Stormy, ❄️ Snowy, 🌬️ Windy, 🌡️ Hot, 🧣 Cold. Never a face emoji. Any number can be picked.
 
 ### Action sheets and confirms
 iOS-style stacks pinned to the bottom with 8px margins: a Paper White group (14px corners) with an optional centered Footnote 600 title and message, 56px buttons in Terracotta Ink at 1.1rem divided by hairlines, then a separate Cancel group in 600. Destructive buttons use Danger Red. The sort chooser is a `dialog`; destructive confirms are an `alertdialog`.
 
 ### Toast
-The one happy moment. An inverted pill (Warm Ink background, Warm Paper text, Float shadow), 52px tall on one line, above the Log pill. Its 26px corners keep it a pill on one line and make it a soft box when a long message wraps; the end of a page then makes room for its real height. It layers above sheets but below action sheets, so an open action sheet's scrim covers it. A 24px Peach circle draws its check mark in over 420ms; an optional "Undo" pill sits at the end. It stays 5 seconds, 8 with an action, and pauses while touched or focused.
+The one happy moment. An inverted pill (Warm Ink background, Warm Paper text, Float shadow), 52px tall on one line, above the Log pill. Its 26px corners keep it a pill on one line and make it a soft box when a long message wraps; the end of a page then makes room for its real height. It layers above sheets but below action sheets, so an open action sheet's scrim covers it. A 24px Peach circle draws its check mark in over 420ms; an optional "Undo" pill sits at the end. It stays 5 seconds, 8 with an action, and pauses while touched or focused. When it goes, the room it took stays until the next page, so the end of a page never jumps. On the day page it sits 8px above the helper bar.
 
 ### Navigation
 - **Nav bar:** sticky, 44px plus the safe area, solid Warm Paper. Back and actions in Terracotta Ink. When the large title scrolls away, a centered Body 600 title fades in and a 0.5px Soft Rule appears underneath.
-- **Tab bar:** fixed, Paper White, 50px plus the safe area, hairline on top. Three tabs (Friends, Stats, Settings) with 26px line icons over Caption labels: Warm Ink Tertiary at rest, Terracotta Ink with a heavier stroke and 600 label when current. A friend's page and a Meetup page belong to Friends, unless they were opened from Stats, which then stays current.
+- **Tab bar:** fixed, Paper White, 50px plus the safe area, hairline on top. Three tabs (Friends, Stats, Settings) with 26px line icons over Caption labels: Warm Ink Tertiary at rest, Terracotta Ink with a heavier stroke and 600 label when current. A friend's page and a Meetup page belong to Friends, unless they were opened from Stats, which then stays current. The tab bar is hidden on the day page.
 
 ### Avatars
 Circles. Initials in the rounded face (600, 40% of the size) on a per-friend pastel tint, or a cropped photo. Sizes: 44px in rows, 52px in the recent-friends grid, 96px in the detail hero, 24 to 28px inside chips.
@@ -346,13 +359,16 @@ Circles. Initials in the rounded face (600, 40% of the size) on a per-friend pas
 Reads as one calm column, not a grid of cards: centered 96px avatar, Title name, group in Warm Ink Secondary, then a Paper White "Last seen" pill (Subhead, 1em corners so it becomes a soft box if large text wraps it between the date and the time since). Below: the notes, then **Birthday**, **Likes** and **Dislikes** (people before numbers), then the stat row, "Month by month", and the history grouped by month.
 - **Birthday:** always shown. With a birthday, one inset row: a 🎂 emoji badge leading, the date as the title ("March 14, 1996", or "March 14" without a year), the countdown as the subtitle ("In 12 days · turns 31", "Tomorrow", "Today"), and a chevron. Tapping it opens the Edit friend sheet. Without one, a "+ Add birthday" chip opens the same sheet. Plain facts: no color, badge or reminder copy.
 - **Likes and Dislikes:** each a section with a Footnote label over a wrapping cluster of item chips (the wrapping variant) on the page background, with no container. The cluster ends with a "+ Add" chip; tapping it puts a Paper White field and a secondary **Add** button in its place (one field open at a time). Notes under the field ("Already in Likes.", "This list is full.") are Footnote Warm Ink Secondary with `role="alert"`, never red. Tapping an item opens an action sheet titled with it: **Move to Dislikes** (or **Move to Likes**) and a destructive **Remove**, which an Undo toast reverses. An empty list shows only the "+ Add" chip.
-- **History:** rows grouped by month, each with the type's emoji badge, the type (and "Upcoming"), and a subtitle of the date, "with" the others, the activities and the note. A meetup with photos ends its row with its first photo, a 40px thumbnail with 8px corners, before the chevron. Tapping a row opens the Meetup page.
+- **History:** rows grouped by month, each with the type's emoji badge, the type (and "Upcoming"), and a subtitle of the date, "with" the others, the activities, and the day's first places ("and 5 more") or its first line, cut at 80 characters. Moods and weather never show here. A meetup with photos ends its row with its first photo, a 40px thumbnail with 8px corners, before the chevron. Tapping a row opens the Meetup page.
 
 ### Meetup page
 The memory view of one meetup, pushed like a friend's page. Nav bar: back ("Back", or the friend's name when opened from their history) and **Edit**, which opens the Edit meetup sheet.
-- **Hero:** centered: the type's emoji in a 96px Linen circle (a 48px emoji), the type name in Title, the date in Warm Ink Secondary with the "Upcoming" badge for a future date, then a Footnote "With" label over the friends as person chips (a 28px avatar and the name in a Paper White pill) that open the friend.
-- **Then, each hidden when empty:** **Activities** as read-only chips (the chip look without a press state), **Note** as Body text in a Paper White box with 14px corners, and **Photos** in the 3-across grid; a thumbnail opens the photo viewer.
+- **Hero:** centered: the type's emoji in a 96px Linen circle (a 48px emoji), the type name in Title, the date in Warm Ink Secondary, then the weather after a middle dot ("Sat, Oct 3 · 🌧️ Rainy", the emoji hidden from VoiceOver), with the "Upcoming" badge for a future date, then a Footnote "With" label over the friends as person chips (a 28px avatar and the name in a Paper White pill) that open the friend.
+- **Then, each hidden when empty:** **Activities** as read-only chips (the chip look without a press state), **The day** (the day view, below), **How it felt** (the face in a 44px Linen circle and its word in Body 600, then the words, in a Paper White box with 14px corners; never for an upcoming meetup), the day row ("Write about the day" as an accent row with the subtitle "Places, what happened, how it felt", or "Edit the day", with a 📝 emoji badge; always there), and **Photos** in the 3-across grid; a thumbnail opens the photo viewer.
 - When the meetup is deleted from the sheet, the page goes back.
+
+### Day view
+The day's text read back: Paper White, 14px corners. Places form an ordered list: a 7em Subhead time column (rounded tabular, Warm Ink Secondary, right-aligned; a range adds "to 8:10 PM", rough times show "~"), the place in Body 600, then each line as its own paragraph. Hairlines (0.5px, inset to the place column) separate stops; no rails or dots. Below 16em wide (about 21px text on an iPhone: the largest standard sizes and every accessibility size) the time sits above the place. Headings are Footnote 600 Warm Ink Secondary; other lines read as prose. Paid lines are read-only Linen tags: 🧾, a 20px avatar when the name matches one friend, and the words.
 
 ### Photo viewer
 Full screen over everything, on the Viewer Ground with Viewer Ink controls: a Close button top left; the photo fit between the bars, letterboxed, with no zoom; and Previous, "2 of 5" (rounded, tabular) and Next along the bottom, all 44px. A sideways swipe or the arrow keys change photos: the next one slides 32px and fades in over 220ms (with Reduce Motion it only fades). Previous and Next dim to 35% at the ends. Escape closes it. It is a modal dialog named "Photo 2 of 5", the image's alt names the photo, the type and the date ("Photo 2 of 5, Coffee, Sat, Sep 12"), focus stays inside, and closing puts focus back on the photo's thumbnail.
@@ -385,6 +401,15 @@ Shown instead of the app, never over it, when the app lock is on and the app has
 
 ## 6. Do's and Don'ts
 
+### Named Rules
+**The No Score Rule.** A mood is a word about how a meetup felt to you. It is never stored or shown as a number, stars or a score; never averaged, counted, charted or ranked; never summed up per friend; never shown in lists; and no mood gets a color of its own.
+
+**The No Ledger Rule.** Who paid is a plain fact on one place, in your words. It's never totaled, balanced, counted or compared across meetups or friends.
+
+**The Your Words Rule.** The day is stored exactly as typed. The app may change how text looks when it's read back, never the text itself, and it never moves words between fields.
+
+**The Frozen Grammar Rule.** The rules that read a day (grammar 1) never change. A new rule is a new grammar for days saved after it, so a memory reads the same after every update.
+
 ### Do:
 - **Do** keep the "+ Log meetup" pill in the bottom third of the screen, 16px above the tab bar, reachable by thumb.
 - **Do** use iOS-native patterns: large titles, inset grouped lists, bottom sheets, action sheets, a bottom tab bar.
@@ -409,3 +434,6 @@ Shown instead of the app, never over it, when the app lock is on and the app has
 - **Don't** use bouncy or elastic animations; ease out smoothly, and fade instead when Reduce Motion is on.
 - **Don't** open a modal as the first answer; prefer sheets, inline editing, and undo.
 - **Don't** use em dashes in UI copy; use commas, colons, periods, or parentheses.
+- **Don't** show moods or weather in lists, rows, Stats or summaries.
+- **Don't** draw timeline rails, dots or connecting lines; stops are separated by hairlines.
+- **Don't** rewrite, sort or move what the owner wrote.

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { OWNER_DAY_TYPED, OWNER_FEELINGS } from '../src/test/dayFixtures.ts'
 import {
   addFriend,
   addToList,
@@ -14,6 +15,7 @@ import {
   stubFaceId,
   stubPush,
 } from './helpers.ts'
+import { closeKeyboard, fakeVisualViewport, openKeyboard } from './keyboard.ts'
 
 const DIR = 'e2e/screenshots'
 
@@ -26,6 +28,8 @@ function daysAgo(days: number): string {
 }
 
 async function seed(page: Page) {
+  // The day page's Place and Who paid rows are captured over the fake keyboard.
+  await fakeVisualViewport(page)
   await page.goto('/')
   await page.getByRole('complementary', { name: 'Install the app' }).getByRole('button', { name: 'Dismiss' }).click()
   // Birthdays soon shows Maya (today), Sam (in 3 days, with an age) and Theo (in 9 days).
@@ -39,6 +43,8 @@ async function seed(page: Page) {
   await addFriend(page, 'Jordan Lee', 'Work')
   await addFriend(page, 'Maya Patel', undefined, { month: today.month, day: today.day })
   await addFriend(page, 'Theo Brooks', 'Family', { month: inNine.month, day: inNine.day })
+  // The owner's example day is written with these three.
+  for (const name of ['Mariya', 'Jessie', 'Brandon']) await addFriend(page, name)
   // The meetup page, the viewer and the sheet show this one: two activities and three photos.
   const photos = [
     await drawnPhoto(page, 'ramen.png', 1200, 900, 25),
@@ -75,17 +81,75 @@ async function seed(page: Page) {
   await expect(page.getByRole('status')).toBeEmpty({ timeout: 12_000 })
 }
 
+/**
+ * A full-page capture of the day page: it's a fixed layer that scrolls inside, so for the capture it becomes a
+ * plain block as tall as its content.
+ */
+async function captureFullDay(page: Page, path: string) {
+  const style = await page.addStyleTag({
+    content: `.day-page { position: absolute; top: 0; bottom: auto; height: auto; }
+      .day-page__body { overflow: visible; }
+      .scroll-locked, .scroll-locked body { overflow: visible !important; }`,
+  })
+  await page.waitForTimeout(300)
+  await page.screenshot({ path, fullPage: true })
+  await style.evaluate((element) => element.parentNode?.removeChild(element))
+}
+
+/** On the day page: writes the owner's example (as typed in the app), with the weather, the face and the words. */
+async function writeOwnersDay(page: Page) {
+  await page.getByRole('group', { name: 'Weather' }).getByRole('button', { name: 'Rainy' }).click()
+  await page.getByRole('textbox', { name: 'The day' }).fill(OWNER_DAY_TYPED)
+  await page.getByRole('group', { name: 'Mood' }).getByRole('button', { name: 'Okay' }).click()
+  await page.getByRole('textbox', { name: 'How it felt, in your words' }).fill(OWNER_FEELINGS)
+}
+
 async function captureAll(page: Page, prefix: string) {
   await page.screenshot({ path: `${DIR}/${prefix}-02-friends.png` })
 
+  // The Log sheet's footer, then the day page written through it.
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
-  await sheet.getByRole('group', { name: 'Recent friends' }).getByRole('button').first().click()
+  for (const name of ['Mariya', 'Jessie', 'Brandon']) {
+    await sheet.getByLabel('Search all friends').fill(name)
+    await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name, exact: true }).click()
+  }
+  await sheet.getByRole('button', { name: 'Meal', exact: true }).click()
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${DIR}/${prefix}-03-log-sheet.png` })
-  await sheet.getByRole('button', { name: 'Cancel' }).click()
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Discard changes' }).click()
-  await expect(sheet).toBeHidden()
+  await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'The day' })).toBeVisible()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-15-day-empty.png` })
+
+  await writeOwnersDay(page)
+  await expect(page.getByRole('status')).toBeEmpty({ timeout: 12_000 })
+  await captureFullDay(page, `${DIR}/${prefix}-16-day-written.png`)
+
+  const day = page.getByRole('textbox', { name: 'The day' })
+  await day.focus()
+  await day.press('End')
+  await openKeyboard(page)
+  const helpers = page.getByRole('group', { name: 'Writing helpers' })
+  await helpers.getByRole('button', { name: 'Add a place' }).click()
+  await helpers.getByRole('textbox', { name: 'Place and time' }).fill('Blue willow 3:30')
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-17-day-place.png` })
+  await helpers.getByRole('button', { name: 'Close' }).click()
+  await helpers.getByRole('button', { name: 'Paid' }).click()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-18-day-paid.png` })
+  await helpers.getByRole('group', { name: 'Who paid?' }).getByRole('button', { name: 'Close' }).click()
+  await helpers.getByRole('button', { name: 'Hide keyboard' }).click()
+  await closeKeyboard(page)
+
+  // The Meetup page holding the owner's example.
+  await page.getByRole('button', { name: 'Meal' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-12-meetup.png`, fullPage: true })
+  await page.getByRole('button', { name: 'Back' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
 
   await page.getByRole('link', { name: /Alex Rivera/ }).click()
   await page.waitForTimeout(500)
@@ -94,9 +158,6 @@ async function captureAll(page: Page, prefix: string) {
 
   await page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Meal/ }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
-  await page.waitForTimeout(500)
-  await page.screenshot({ path: `${DIR}/${prefix}-12-meetup.png`, fullPage: true })
-
   await page.getByRole('region', { name: 'Photos' }).getByRole('button').first().click()
   await expect(page.getByRole('dialog', { name: 'Photo 1 of 3' })).toBeVisible()
   await page.waitForTimeout(500)
@@ -172,6 +233,29 @@ test('large text', async ({ page }) => {
   await seed(page)
   await page.addStyleTag({ content: LARGE_TEXT })
   await captureAll(page, 'large-text')
+})
+
+test('accessibility text size day page and memory', async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.goto('/')
+  for (const name of ['Mariya', 'Jessie', 'Brandon']) await addFriend(page, name)
+  await page.addStyleTag({ content: 'html { font: 33px/1.35 -apple-system, system-ui, sans-serif !important; }' })
+  await page.getByRole('button', { name: 'Log meetup' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
+  for (const name of ['Mariya', 'Jessie', 'Brandon']) {
+    await sheet.getByRole('group', { name: 'Recent friends' }).getByRole('button', { name }).click()
+  }
+  await sheet.getByRole('button', { name: 'Meal', exact: true }).click()
+  await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
+  await writeOwnersDay(page)
+  await expect(page.getByRole('status')).toBeEmpty({ timeout: 12_000 })
+  // The faces two by two.
+  await captureFullDay(page, `${DIR}/ax-16-day-written.png`)
+  // The timeline's times above the places.
+  await page.getByRole('button', { name: 'Meal' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/ax-12-meetup.png`, fullPage: true })
 })
 
 test('large text reminders on', async ({ page }) => {
