@@ -77,11 +77,36 @@
   overflow-wrap: anywhere;
 }
 
-.meetup-note {
-  margin: 0;
+/* How it felt: the face and its word, then your words, in a Paper White box. No colors and no scale. */
+.felt-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-group);
   background: var(--surface);
+}
+.felt-box__mood {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  font-weight: 600;
+}
+.felt-box__face {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 26px;
+  line-height: 1;
+}
+.felt-box__words {
+  max-width: 65ch;
+  margin: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

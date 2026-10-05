@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test'
-import { addFriend, logMeetup, openFriendPage, tinyPhoto } from './helpers.ts'
+import { addFriend, logMeetup, openDay, openFriendPage, tinyPhoto } from './helpers.ts'
 
 /** Today as the app writes it in the current year ("Sat, Oct 3"). */
 function todayLabel(): string {
   return new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())
 }
 
-test('shows who, what you did, the note and the photos', async ({ page }) => {
+test('shows who, what you did, the day and the photos', async ({ page }) => {
   await page.goto('/')
   await addFriend(page, 'Alex')
   await addFriend(page, 'Sam')
@@ -32,7 +32,8 @@ test('shows who, what you did, the note and the photos', async ({ page }) => {
     'Karaoke',
     'Pottery class',
   ])
-  await expect(page.getByRole('region', { name: 'Note' })).toContainText('Tacos')
+  await expect(page.getByRole('region', { name: 'The day' })).toContainText('Tacos')
+  await expect(page.getByRole('link', { name: 'Edit the day' })).toBeVisible()
   const photos = page.getByRole('region', { name: 'Photos' }).getByRole('img')
   await expect(photos).toHaveCount(2)
   await expect(photos.nth(1)).toHaveAccessibleName('Photo 2 of 2')
@@ -56,9 +57,67 @@ test('hides what a meetup does not have, and marks one that is upcoming', async 
   await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
   await expect(page.getByText('Upcoming', { exact: true })).toBeVisible()
   await expect(page.getByRole('list', { name: 'With' }).getByRole('link')).toContainText(['Alex'])
-  for (const name of ['Activities', 'Note', 'Photos']) {
-    await expect(page.getByRole('region', { name })).toHaveCount(0)
+  for (const name of ['Activities', 'The day', 'How it felt', 'Photos']) {
+    await expect(page.getByRole('region', { name, exact: true })).toHaveCount(0)
   }
+  await expect(page.getByRole('link', { name: /^Write about the day/ })).toHaveAccessibleName(
+    'Write about the day Places, what happened, how it felt',
+  )
+})
+
+test('reads the day back: places in order with their times, paid tags, headings and prose', async ({ page }) => {
+  await page.goto('/')
+  for (const name of ['Jessie', 'Sam Lee', 'Sam Park']) await addFriend(page, name)
+  await logMeetup(page, ['Jessie', 'Sam Lee', 'Sam Park'], {
+    type: 'Meal',
+    note: ['Rainy', 'Plan:', '@Cafe 10:30', 'Coffee', 'Jessie paid', '', '@Park', '@Bar 7-9pm', 'Sam paid', '', 'Home', '', '', 'Tired'].join(
+      '\n',
+    ),
+  })
+  await openFriendPage(page, 'Jessie')
+  await page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Meal/ }).click()
+  const day = page.getByRole('region', { name: 'The day' })
+
+  const places = day.getByRole('list', { name: 'Places, 3 stops' })
+  await expect(places.getByRole('heading', { level: 3 })).toHaveText(['Cafe', 'Park', 'Bar'])
+  await expect(places.getByRole('listitem').nth(0)).toContainText('10:30')
+  await expect(places.getByRole('listitem').nth(0).getByText('At 10:30', { exact: false })).toBeAttached()
+  await expect(places.getByRole('listitem').nth(2).getByText(/^From 7:00.PM to 9:00.PM\.$/)).toBeAttached()
+  await expect(day.getByRole('heading', { level: 3, name: 'Plan' })).toBeVisible()
+  // "Jessie paid" names one friend, so it gets her face; "Sam paid" fits two, so it gets none.
+  const jessiePaid = places.getByRole('listitem').nth(0).locator('.paid-tag')
+  await expect(jessiePaid).toHaveText(/Jessie paid$/)
+  await expect(jessiePaid.locator('.avatar')).toHaveCount(1)
+  await expect(places.getByRole('listitem').nth(2).locator('.paid-tag .avatar')).toHaveCount(0)
+  await expect(day.locator('.day-prose')).toHaveText([/^Rainy$/, /^Home\s*Tired$/])
+  await expect(day.locator('.day-gap')).toHaveCount(1)
+  await expect(page.getByRole('region', { name: 'How it felt' })).toHaveCount(0)
+})
+
+test('shows the weather in the hero and how it felt, and never in the history', async ({ page }) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await logMeetup(page, ['Alex'], { type: 'Meal' })
+  await openFriendPage(page, 'Alex')
+  await page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Meal/ }).click()
+  await openDay(page)
+  await page.getByRole('group', { name: 'Weather' }).getByRole('button', { name: 'Windy' }).click()
+  await page.getByRole('group', { name: 'Weather' }).getByRole('button', { name: 'Rainy' }).click()
+  await page.getByRole('group', { name: 'Mood' }).getByRole('button', { name: 'Good' }).click()
+  await page.getByRole('textbox', { name: 'How it felt, in your words' }).fill('Easy and warm.\nWould go again.')
+  await page.getByRole('button', { name: 'Meal' }).click()
+
+  await expect(page.getByText(`${todayLabel()} · 🌧️ Rainy, 🌬️ Windy`, { exact: true })).toBeVisible()
+  const felt = page.getByRole('region', { name: 'How it felt' })
+  await expect(felt.getByText('Mood: Good')).toBeVisible()
+  await expect(felt).toContainText('Easy and warm.\nWould go again.')
+  await expect(page.getByRole('region', { name: 'The day' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Edit the day' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Alex' }).click()
+  const row = page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Meal/ })
+  await expect(row).not.toContainText('Rainy')
+  await expect(row).not.toContainText('Good')
 })
 
 test('redirects to Friends for an unknown meetup', async ({ page }) => {

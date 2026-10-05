@@ -1,17 +1,21 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { Avatar } from '../components/Avatar'
-import { Section } from '../components/InsetGroup'
+import { DayView } from '../components/DayView'
+import { InsetGroup, Row, Section } from '../components/InsetGroup'
 import { Page, type NavState } from '../components/Page'
 import { PhotoViewer } from '../components/PhotoViewer'
 import { useFriends, useMeetup, useMeetupPhotoThumbs, useMeetupTypes } from '../data/hooks'
 import { useToday } from '../hooks/useToday'
 import { formatDate } from '../lib/dates'
+import { isDayEmpty, readDay } from '../lib/dayText'
+import { feelingsApply, moodInfo } from '../lib/moods'
+import { weatherInfo } from '../lib/weather'
 import { useSheets } from '../sheets/sheetsContext'
 import type { Friend } from '../types'
 import './MeetupScreen.css'
 
-/** The memory view of one meetup: what, when, who, what you did, the note and the photos. */
+/** The memory view of one meetup: what, when, who, what you did, the day, how it felt and the photos. */
 export function MeetupScreen() {
   const { id } = useParams()
   const meetup = useMeetup(id)
@@ -46,6 +50,10 @@ export function MeetupScreen() {
   const fromHere: NavState = { backLabel: title, tab: (location.state as NavState | null)?.tab }
   const describePhoto = (index: number) =>
     `Photo ${index + 1} of ${photos.length}, ${title}, ${formatDate(meetup.date, today)}`
+  const dayParts = readDay(meetup.note)
+  const mood = moodInfo(meetup.mood)
+  const showFelt = feelingsApply(meetup, today) && (mood !== null || meetup.feelings.trim() !== '')
+  const dayEmpty = isDayEmpty(meetup)
 
   function closeViewer() {
     if (viewing !== null) thumbnails.current[viewing]?.focus()
@@ -70,6 +78,17 @@ export function MeetupScreen() {
           <h1 className="meetup-hero__title">{title}</h1>
           <p className="meetup-hero__date">
             {formatDate(meetup.date, today)}
+            {meetup.weather.length > 0 && ' · '}
+            {meetup.weather.map((key, index) => {
+              const { emoji, label } = weatherInfo(key)
+              return (
+                <Fragment key={key}>
+                  {index > 0 && ', '}
+                  <span aria-hidden="true">{emoji} </span>
+                  {label}
+                </Fragment>
+              )
+            })}
             {meetup.date > today && <span className="upcoming-badge">Upcoming</span>}
           </p>
           {people.length > 0 && (
@@ -104,11 +123,45 @@ export function MeetupScreen() {
         </Section>
       )}
 
-      {meetup.note && (
-        <Section title="Note">
-          <p className="meetup-note">{meetup.note}</p>
+      {dayParts.length > 0 && (
+        <Section title="The day">
+          <DayView parts={dayParts} people={people} />
         </Section>
       )}
+
+      {showFelt && (
+        <Section title="How it felt">
+          <div className="felt-box">
+            {mood && (
+              <p className="felt-box__mood">
+                <span className="felt-box__face" aria-hidden="true">
+                  {mood.emoji}
+                </span>
+                <span>
+                  <span className="visually-hidden">Mood: </span>
+                  {mood.label}
+                </span>
+              </p>
+            )}
+            {meetup.feelings.trim() !== '' && <p className="felt-box__words">{meetup.feelings}</p>}
+          </div>
+        </Section>
+      )}
+
+      <InsetGroup>
+        <Row
+          to={`/meetups/${meetup.id}/day`}
+          leading={
+            <span className="emoji-badge" aria-hidden="true">
+              📝
+            </span>
+          }
+          title={dayEmpty ? 'Write about the day' : 'Edit the day'}
+          subtitle={dayEmpty ? 'Places, what happened, how it felt' : undefined}
+          accent={dayEmpty}
+          chevron
+        />
+      </InsetGroup>
 
       {photos.length > 0 && (
         <Section title="Photos">

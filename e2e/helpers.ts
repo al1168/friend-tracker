@@ -202,11 +202,9 @@ export async function readMeetups(page: Page): Promise<StoredMeetup[]> {
   return meetups.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))
 }
 
-/** On a Meetup page: opens its day page. */
+/** On a Meetup page: opens its day page from the day row ("Write about the day" or "Edit the day"). */
 export async function openDay(page: Page) {
-  await page.evaluate(() => {
-    location.hash = `${location.hash}/day`
-  })
+  await page.getByRole('link', { name: /^(Write about|Edit) the day/ }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'The day' })).toBeVisible()
 }
 

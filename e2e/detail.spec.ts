@@ -36,6 +36,24 @@ test('history rows show activities and the first photo', async ({ page }) => {
   await expect(history.getByRole('link', { name: /Coffee/ }).locator('img')).toHaveCount(0)
 })
 
+test('history rows show the day’s first places, or its first line cut at 80 characters', async ({ page }) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await addFriend(page, 'Sam')
+  await logMeetup(page, ['Alex', 'Sam'], { type: 'Meal', note: '@Cafe 10:30\nCoffee\n@Park\n@Bar 7pm\n@cafe\n@Gym' })
+  const long = 'We walked all the way along the river to the old bridge and back again before dinner'
+  await logMeetup(page, ['Alex'], { type: 'Drinks', note: `${long}\nSecond line` })
+  await page.getByRole('link', { name: /Alex/ }).click()
+
+  const history = page.getByRole('region', { name: 'History' })
+  await expect(history.getByRole('link', { name: /Meal/ })).toHaveAccessibleName(
+    /with Sam · Cafe, Park, Bar and 1 more$/,
+  )
+  await expect(history.getByRole('link', { name: /Drinks/ })).toHaveAccessibleName(
+    / · We walked all the way along the river to the old bridge and back again before…$/,
+  )
+})
+
 test('logs from the friend page with them preselected', async ({ page }) => {
   await page.goto('/')
   await addFriend(page, 'Alex')

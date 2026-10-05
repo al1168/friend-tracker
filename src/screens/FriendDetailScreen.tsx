@@ -12,6 +12,7 @@ import { useFirstPhotoThumb, useFriend, useFriends, useGroups, useMeetups, useMe
 import { useToday } from '../hooks/useToday'
 import { describeNextBirthday, formatBirthday } from '../lib/birthdays'
 import { daysBetween, formatDate, formatMonthYear, yearOf } from '../lib/dates'
+import { daySnippet } from '../lib/dayText'
 import { formatNameList, formatSince } from '../lib/text'
 import { useSheets } from '../sheets/sheetsContext'
 import { allTimeCountsByFriend, countsByFriendForYear, monthlyCounts } from '../stats/counts'
@@ -163,7 +164,7 @@ export function FriendDetailScreen() {
                       formatDate(meetup.date, today),
                       others.length > 0 ? `with ${formatNameList(others)}` : null,
                       meetup.activities.length > 0 ? meetup.activities.join(', ') : null,
-                      meetup.note || null,
+                      daySnippet(meetup.note),
                     ]
                       .filter(Boolean)
                       .join(' · ')}

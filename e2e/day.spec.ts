@@ -82,6 +82,7 @@ test('the quick log is unchanged: no Note, and Save stays put while "Save and wr
   await openFriendPage(page, 'Alex')
   await page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Coffee/ }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
+  await expect(page.getByRole('link', { name: /^Write about the day/ })).toBeVisible()
 })
 
 test('"Save and write about the day" logs the meetup and opens its day; Back lands on the new memory', async ({
@@ -98,6 +99,11 @@ test('"Save and write about the day" logs the meetup and opens its day; Back lan
   await expect(sheet).toBeHidden()
   await expect(page.getByRole('status')).toContainText('Logged with Mariya')
   await expect(page.getByRole('heading', { level: 1, name: 'The day' })).toBeFocused()
+  // The toast sits 8px above the helper bar.
+  const toast = await page.locator('.toast').boundingBox()
+  const bar = await page.locator('.day-page__footer').boundingBox()
+  if (!toast || !bar) throw new Error('The toast or the helper bar is not on screen')
+  expect(Math.abs(toast.y + toast.height - (bar.y - 8)), 'Within a pixel').toBeLessThanOrEqual(1)
   await dayBox(page).fill('Tacos')
   await page.getByRole('button', { name: 'Meal' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
@@ -130,6 +136,7 @@ test('opens on its title, with the meetup on Back and who was there', async ({ p
   await openMealDay(page)
 
   await expect(page).toHaveTitle('The day · Friend Tracker')
+  await expect(page.getByRole('navigation', { name: 'Main' })).toHaveCount(0)
   await expect(page.getByRole('heading', { level: 1, name: 'The day' })).toBeFocused()
   await expect(page.getByText('Sat, Oct 3 · with Mariya, Jessie and Brandon', { exact: true })).toBeVisible()
   for (const name of ['Weather', 'The day', 'How it felt']) {
@@ -308,6 +315,59 @@ test('says when The day is full', async ({ page }) => {
   await page.keyboard.type('yz')
   await expect(dayBox(page)).toHaveValue(`${'x'.repeat(9_999)}y`)
   await expect(page.getByRole('alert')).toHaveText('This box is full.')
+})
+
+test('an old note is already the day: shown under The day, previewed in history, and in the box', async ({ page }) => {
+  await page.goto('/#/settings')
+  const backup = {
+    app: 'friend-tracker',
+    version: 4,
+    exportedAt: '2026-09-13T12:00:00.000Z',
+    groups: [],
+    meetupTypes: [{ id: 'type-meal', name: 'Meal', emoji: '🍽️', order: 0 }],
+    friends: [
+      {
+        id: 'f-sam',
+        name: 'Sam',
+        groupId: null,
+        photo: null,
+        notes: '',
+        likes: [],
+        dislikes: [],
+        birthday: null,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+    meetups: [
+      {
+        id: 'm-old',
+        date: '2026-09-12',
+        typeId: 'type-meal',
+        friendIds: ['f-sam'],
+        note: 'Tacos\nThen karaoke',
+        activities: ['Karaoke'],
+        createdAt: '2026-09-12T12:00:00.000Z',
+      },
+    ],
+    meetupPhotos: [],
+  }
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'friend-tracker-backup-2026-09-13.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(backup)),
+  })
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Replace all data' }).click()
+  await expect(page.getByRole('status')).toContainText('Backup restored')
+
+  await openFriendPage(page, 'Sam')
+  const row = page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Meal/ })
+  await expect(row).toHaveAccessibleName(/ · Karaoke · Tacos$/)
+  await row.click()
+  const day = page.getByRole('region', { name: 'The day' })
+  await expect(day.locator('.day-line')).toHaveText(['Tacos', 'Then karaoke'])
+  await openDay(page)
+  await expect(dayBox(page)).toHaveValue('Tacos\nThen karaoke')
+  expect((await readMeetups(page))[0]).toMatchObject({ note: 'Tacos\nThen karaoke', activities: ['Karaoke'], weather: [] })
 })
 
 test('opened directly, Back goes to its meetup; an unknown one goes to Friends', async ({ page }) => {

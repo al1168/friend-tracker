@@ -120,6 +120,7 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const dayRef = useRef<HTMLTextAreaElement>(null)
   const placeRef = useRef<HTMLInputElement>(null)
+  const footerRef = useRef<HTMLDivElement>(null)
   const weatherId = useId()
   const dayId = useId()
   const hintId = useId()
@@ -151,6 +152,21 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
   useEffect(() => {
     if (status.gone) onGone()
   }, [status.gone, onGone])
+
+  // The toast sits 8px above the helper bar here (Toast.css): mark the page and publish the bar's height.
+  useLayoutEffect(() => {
+    const root = document.documentElement
+    root.classList.add('day-open')
+    const observer = new ResizeObserver(([entry]) => {
+      root.style.setProperty('--day-bar-height', `${Math.ceil(entry.borderBoxSize[0].blockSize)}px`)
+    })
+    if (footerRef.current) observer.observe(footerRef.current)
+    return () => {
+      observer.disconnect()
+      root.classList.remove('day-open')
+      root.style.removeProperty('--day-bar-height')
+    }
+  }, [])
 
   // A newer stored value (another tab, a backup restore) only goes into a field that isn't focused and has
   // nothing waiting to save, so nothing changes under your thumb.
@@ -423,7 +439,7 @@ function DayPage({ meetup, people, typeName, onGone }: DayPageProps) {
         <p className="day-page__footnote">Saves as you type, and stays on this iPhone.</p>
       </div>
 
-      <div className="day-page__footer">
+      <div ref={footerRef} className="day-page__footer">
         {status.failed && (
           <p className="field-error" role="alert">
             {SAVE_FAILED}

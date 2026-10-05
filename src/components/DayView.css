@@ -1,0 +1,112 @@
+/* The day read back: one Paper White box, its parts divided by hairlines. A size container, so at large text
+   sizes the times move above the places. */
+.day-view {
+  container-type: inline-size;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-group);
+  background: var(--surface);
+}
+.day-view > * + * {
+  border-top: 0.5px solid var(--separator);
+}
+
+/* A timeline: a 7em Subhead time column, then the place and its lines. No rails, dots or stripes. */
+.day-timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.day-stop {
+  position: relative;
+  display: grid;
+  grid-template-columns: calc(7 * var(--text-subhead)) minmax(0, 1fr);
+  column-gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-3) 0;
+}
+/* A hairline above each stop after the first, starting at the place column. */
+.day-stop + .day-stop::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: calc(7 * var(--text-subhead) + var(--space-3));
+  border-top: 0.5px solid var(--separator);
+}
+.day-stop__time {
+  padding-top: 0.15em;
+  color: var(--ink-2);
+  font-size: var(--text-subhead);
+  line-height: 1.35;
+  text-align: right;
+}
+.day-stop__time span {
+  display: block;
+}
+.day-stop__place {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.day-line {
+  max-width: 65ch;
+  margin: var(--space-1) 0 0;
+  overflow-wrap: anywhere;
+}
+
+/* Large text: once the box is narrower than 16em (about 21px text on an iPhone, so the largest standard sizes and
+   every accessibility size) the time sits above the place, on one line, and the place takes the full width. */
+@container (width < 16em) {
+  .day-stop {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .day-stop + .day-stop::before {
+    left: 0;
+  }
+  .day-stop__time {
+    padding-top: 0;
+    font-size: var(--text-footnote);
+    font-weight: 600;
+    text-align: left;
+  }
+  .day-stop__time span {
+    display: inline;
+  }
+}
+
+.day-heading {
+  margin: 0;
+  padding: var(--space-3) 0 var(--space-2);
+  color: var(--ink-2);
+  font-size: var(--text-footnote);
+  font-weight: 600;
+}
+
+/* Prose: one paragraph per line, with one small gap for any run of blank lines. */
+.day-prose {
+  padding: var(--space-3) 0;
+}
+.day-prose > .day-line:first-child {
+  margin-top: 0;
+}
+.day-gap {
+  height: 0.75em;
+}
+
+/* "Jessie paid": a read-only Linen tag, never a control. */
+.paid-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  min-height: 28px;
+  padding: 0.15rem 0.6rem;
+  border-radius: 1em;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: var(--text-subhead);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
