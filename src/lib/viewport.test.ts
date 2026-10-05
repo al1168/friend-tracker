@@ -49,6 +49,12 @@ describe('keyboardIsUp', () => {
   it('is false while zoomed in, where a short visual viewport is the zoom', () => {
     expect(keyboardIsUp(664, { height: 332, scale: 2 })).toBe(false)
   })
+
+  it('treats a scale within 0.01 of 1 as normal zoom, since floating point can give 1.0000001', () => {
+    expect(keyboardIsUp(664, { height: 324, scale: 1.0000001 })).toBe(true)
+    expect(keyboardIsUp(664, { height: 324, scale: 0.9999999 })).toBe(true)
+    expect(keyboardIsUp(664, { height: 324, scale: 1.02 })).toBe(false)
+  })
 })
 
 describe('revealOffset', () => {
@@ -115,15 +121,34 @@ describe('revealOffset', () => {
 })
 
 describe('caretEdge', () => {
-  it('is the end when the caret or selection reaches the last character or past it', () => {
-    expect(caretEdge(20, 20)).toBe('end')
-    expect(caretEdge(19, 20)).toBe('end')
-    expect(caretEdge(0, 0)).toBe('end')
+  /** A Notes box 88px tall: `text` with the caret at `caret` (the end by default), its text `textHeight` tall. */
+  function box(text: string, textHeight: number, caret: number | null = text.length) {
+    return { value: text, selectionEnd: caret, scrollHeight: Math.max(88, textHeight), clientHeight: 88 }
+  }
+  const long = 'x'.repeat(400)
+
+  it('is the end when the caret reaches the last character, or past it, of text that runs past the box', () => {
+    expect(caretEdge(box(long, 300))).toBe('end')
+    expect(caretEdge(box(long, 300, 399))).toBe('end')
   })
 
-  it('is the start anywhere earlier, or without a selection', () => {
-    expect(caretEdge(18, 20)).toBe('start')
-    expect(caretEdge(0, 20)).toBe('start')
-    expect(caretEdge(null, 20)).toBe('start')
+  it('is the start anywhere earlier in text that runs past the box, or without a selection', () => {
+    expect(caretEdge(box(long, 300, 398))).toBe('start')
+    expect(caretEdge(box(long, 300, 0))).toBe('start')
+    expect(caretEdge(box(long, 300, null))).toBe('start')
+  })
+
+  it('is the start when the text fits in the box, since its end is then not at the bottom', () => {
+    expect(caretEdge(box('Met at work', 22))).toBe('start')
+    expect(caretEdge(box('', 0, 0))).toBe('start')
+    // A pixel of rounding is not overflow.
+    expect(caretEdge({ ...box('Met at work', 22), scrollHeight: 89 })).toBe('start')
+  })
+
+  it('shows the top of an empty Notes box taller than the view, where its caret is', () => {
+    const port = { top: 100, bottom: 150 }
+    const notes = { top: 120, bottom: 208 }
+    const offset = revealOffset(port, notes, 12, caretEdge(box('', 0, 0)))
+    expect(notes.top - offset, 'The top of Notes is at the top of the view').toBe(port.top)
   })
 })

@@ -4,6 +4,9 @@ import { expect, type Locator, type Page } from '@playwright/test'
 export const ONE_PIXEL_PNG =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 
+/** Roughly the iPhone's largest standard text size, for page.addStyleTag. */
+export const LARGE_TEXT = 'html { font: 23px/1.35 -apple-system, system-ui, sans-serif !important; }'
+
 export async function goToTab(page: Page, name: 'Friends' | 'Stats' | 'Settings') {
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name }).click()
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()

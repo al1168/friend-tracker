@@ -5,6 +5,7 @@ import {
   dayFromToday,
   drawnPhoto,
   goToTab,
+  LARGE_TEXT,
   lockHeading,
   logMeetup,
   reopenAfterAWhile,
@@ -15,8 +16,6 @@ import {
 } from './helpers.ts'
 
 const DIR = 'e2e/screenshots'
-// Roughly the iPhone's largest standard text size.
-const LARGE_TEXT = 'html { font: 23px/1.35 -apple-system, system-ui, sans-serif !important; }'
 
 function daysAgo(days: number): string {
   const date = new Date()

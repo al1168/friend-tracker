@@ -1,7 +1,7 @@
 import { useEffect, type RefObject } from 'react'
 import { caretEdge, keyboardIsUp, revealOffset } from '../lib/viewport'
 
-/** Room kept between a revealed field and the edges of the sheet's visible area when the sheet shrinks. */
+/** Room kept between a field the app scrolls into view and the edges of the sheet's visible area. */
 const MARGIN = 12
 
 /** Input types that type no text and open no picker, so they bring up no keyboard. */
@@ -28,13 +28,17 @@ export function useRevealFocusedField(active: boolean, bodyRef: RefObject<HTMLEl
     const body = bodyRef.current
     if (!active || !body) return
 
-    const reveal = (margin: number) => {
+    /** Scrolls the focused field into view with MARGIN to spare; `onlyIfHidden` leaves it while all of it shows. */
+    const reveal = (onlyIfHidden: boolean) => {
       const field = document.activeElement
       if (!isEditable(field) || !body.contains(field)) return
       const top = body.getBoundingClientRect().top + body.clientTop
-      // A note taller than the view shows the end you're typing at.
-      const caret = field instanceof HTMLTextAreaElement ? caretEdge(field.selectionEnd, field.value.length) : 'start'
-      const offset = revealOffset({ top, bottom: top + body.clientHeight }, field.getBoundingClientRect(), margin, caret)
+      const port = { top, bottom: top + body.clientHeight }
+      const rect = field.getBoundingClientRect()
+      // A note taller than the view shows the end you're typing at, when its text runs to the bottom.
+      const caret = field instanceof HTMLTextAreaElement ? caretEdge(field) : 'start'
+      if (onlyIfHidden && revealOffset(port, rect, 0, caret) === 0) return
+      const offset = revealOffset(port, rect, MARGIN, caret)
       if (offset !== 0) body.scrollTop += offset
     }
 
@@ -47,17 +51,18 @@ export function useRevealFocusedField(active: boolean, bodyRef: RefObject<HTMLEl
       const height = body.clientHeight
       const shrank = lastHeight !== null && height < lastHeight
       lastHeight = height
-      if (shrank) reveal(MARGIN)
+      if (shrank) reveal(false)
     })
     observer.observe(body)
 
     // Moving to another field with the keyboard already up changes no size. Wait a frame so the
-    // browser's own scrolling for the focus goes first, then only act if it left the field out of view.
+    // browser's own scrolling for the focus goes first, then only act if it left part of the field out of
+    // view: one just in view, close to an edge, is not nudged. Acting, it leaves the same margin as above.
     let frame = 0
     const onFocusIn = () => {
       if (!keyboardIsUp(window.innerHeight, window.visualViewport)) return
       cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => reveal(0))
+      frame = requestAnimationFrame(() => reveal(true))
     }
     body.addEventListener('focusin', onFocusIn)
 

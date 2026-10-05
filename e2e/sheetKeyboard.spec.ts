@@ -112,13 +112,19 @@ async function placement(field: Locator) {
   })
 }
 
-/** The field has focus and is all on screen: inside the sheet's visible scroll area, above the Save bar. */
-async function expectRevealed(field: Locator, name: string) {
+/** The room the app leaves between a field it reveals and the edges of the sheet's visible area. */
+const MARGIN = 12
+
+/**
+ * The field has focus and is all on screen: inside the sheet's visible scroll area, and above the Save bar
+ * with `room` to spare.
+ */
+async function expectRevealed(field: Locator, name: string, { room = 0 } = {}) {
   const at = await placement(field)
   expect(at.focused, `${name} has focus`).toBe(true)
   expect(at.top, `The top of ${name} is inside the visible part of the sheet`).toBeGreaterThanOrEqual(at.visibleTop)
   expect(at.bottom, `The bottom of ${name} is inside the visible part of the sheet`).toBeLessThanOrEqual(at.visibleBottom)
-  expect(at.bottom, `${name} is above the Save bar`).toBeLessThanOrEqual(at.footerTop)
+  expect(at.bottom, `${name} is above the Save bar, with ${room}px to spare`).toBeLessThanOrEqual(at.footerTop - room)
 }
 
 /** Scrolls to a field the way someone does before tapping it, and checks that its top shows. */
@@ -206,12 +212,15 @@ test('moving to the meetup Note while the keyboard is up shows all of it above t
   await tapFocus(sheet.getByLabel('Search all friends'))
   await openKeyboard(page)
   const note = sheet.getByLabel('Note')
+  // So the browser has scrolling to do: if it ever starts with the Note in view, this test checks nothing.
+  const before = await placement(note)
+  expect(before.bottom, 'The Note starts out of the visible part of the sheet').toBeGreaterThan(before.visibleBottom)
 
   // As the keyboard's next-field arrow does: a plain focus, with the browser's own scrolling.
   await note.focus()
   await nextFrames(page)
 
-  await expectRevealed(note, 'Note')
+  await expectRevealed(note, 'Note', { room: MARGIN })
 })
 
 test('moving to Notes while the keyboard is up brings it into view, before any typing', async ({ page }) => {
@@ -228,7 +237,7 @@ test('moving to Notes while the keyboard is up brings it into view, before any t
   await notes.evaluate((element) => element.focus({ preventScroll: true }))
   await nextFrames(page)
 
-  await expectRevealed(notes, 'Notes')
+  await expectRevealed(notes, 'Notes', { room: MARGIN })
 })
 
 test('moving to Notes brings it into view while iOS has panned the visual viewport over the keyboard', async ({
@@ -245,7 +254,7 @@ test('moving to Notes brings it into view while iOS has panned the visual viewpo
   await notes.evaluate((element) => element.focus({ preventScroll: true }))
   await nextFrames(page)
 
-  await expectRevealed(notes, 'Notes')
+  await expectRevealed(notes, 'Notes', { room: MARGIN })
 })
 
 test('a field already in view is not nudged when it takes focus with the keyboard up', async ({ page }) => {

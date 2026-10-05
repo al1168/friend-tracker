@@ -107,7 +107,7 @@ test('skips a photo that cannot be read, and photos past 20', async ({ page }) =
   await expect(sheet.getByRole('alert')).toHaveText('A meetup can have up to 20 photos.')
 })
 
-test('removes a photo in Edit, and Cancel discards changes', async ({ page }) => {
+test('Cancel discards photo changes', async ({ page }) => {
   await page.goto('/')
   await addFriend(page, 'Alex')
   await logMeetup(page, ['Alex'], { activities: ['Karaoke'], photos: [tinyPhoto('one.png'), tinyPhoto('two.png')] })
@@ -129,6 +129,15 @@ test('removes a photo in Edit, and Cancel discards changes', async ({ page }) =>
     'aria-pressed',
     'true',
   )
+})
+
+test('Save removes a photo', async ({ page }) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await logMeetup(page, ['Alex'], { activities: ['Karaoke'], photos: [tinyPhoto('one.png'), tinyPhoto('two.png')] })
+
+  await openFriendPage(page, 'Alex')
+  let sheet = await editMeetup(page, /Coffee/)
   await photoGrid(sheet).getByRole('button', { name: 'Remove photo 2' }).click()
   await sheet.getByRole('button', { name: 'Save' }).click()
   await expect(sheet).toBeHidden()

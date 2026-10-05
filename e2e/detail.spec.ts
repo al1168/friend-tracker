@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { addFriend, logMeetup, tinyPhoto } from './helpers.ts'
+import { addFriend, LARGE_TEXT, logMeetup, tinyPhoto } from './helpers.ts'
 
 test('shows a friend’s stats and history', async ({ page }) => {
   await page.goto('/')
@@ -67,10 +67,41 @@ test('the meetup just logged scrolls clear of its toast and opens with one tap',
   if (!rowBox || !toastBox) throw new Error('The row or the toast is not on screen')
   expect(rowBox.y + rowBox.height, 'The row ends above the toast').toBeLessThanOrEqual(toastBox.y)
 
-  // So a tap opens it right away, with no waiting for the toast to go.
-  await row.click()
+  // So a tap opens it right away, with no waiting for the toast to go: a click held up by the toast times out.
+  await expect(toast).toBeVisible()
+  await row.click({ timeout: 2000 })
   await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
   await expect(toast).toContainText('Logged with Alex')
+})
+
+test('at large text, the meetup just logged scrolls clear of a toast that wraps, and opens with one tap', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.addStyleTag({ content: LARGE_TEXT })
+  const name = 'Bartholomew Fitzgerald-Montgomery'
+  await addFriend(page, name)
+  await page.getByRole('link', { name: new RegExp(name) }).click()
+  await page.getByRole('button', { name: 'Log meetup' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
+  await sheet.getByRole('button', { name: 'Save' }).click()
+  await expect(sheet).toBeHidden()
+  const toast = page.getByRole('status')
+  await expect(toast).toContainText(`Logged with ${name}`)
+  const toastHeight = await toast.locator('.toast').evaluate((element) => element.getBoundingClientRect().height)
+  // About 159px here: the name wraps the message onto several lines, three times the one-line 52px.
+  expect(toastHeight, 'The toast wraps onto several lines').toBeGreaterThan(100)
+
+  const row = page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Coffee/ })
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  const rowBox = await row.boundingBox()
+  const toastBox = await toast.boundingBox()
+  if (!rowBox || !toastBox) throw new Error('The row or the toast is not on screen')
+  expect(rowBox.y + rowBox.height, 'The row ends above the toast').toBeLessThanOrEqual(toastBox.y)
+
+  await expect(toast).toBeVisible()
+  await row.click({ timeout: 2000 })
+  await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
 })
 
 test('edits a meetup from its page, then deletes it with undo', async ({ page }) => {

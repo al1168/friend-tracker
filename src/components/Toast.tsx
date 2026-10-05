@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import './Toast.css'
 
@@ -18,6 +18,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<(ToastOptions & { id: number }) | null>(null)
   const [paused, setPaused] = useState(false)
   const nextId = useRef(0)
+  const toastRef = useRef<HTMLDivElement>(null)
 
   const show = useCallback((options: ToastOptions) => {
     nextId.current += 1
@@ -31,6 +32,28 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timer)
   }, [toast, paused])
 
+  // Publishes the shown toast's real height on <html> as --toast-space (0 with none), so the end of a page
+  // scrolls clear of a toast that wraps taller than its one line (see .app in base.css). Set before paint.
+  useLayoutEffect(() => {
+    const root = document.documentElement
+    const element = toastRef.current
+    if (!element) {
+      root.style.setProperty('--toast-space', '0px')
+      return
+    }
+    const observer = new ResizeObserver(([entry]) => {
+      root.style.setProperty('--toast-space', `${Math.ceil(entry.borderBoxSize[0].blockSize)}px`)
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [toast])
+  useLayoutEffect(
+    () => () => {
+      document.documentElement.style.removeProperty('--toast-space')
+    },
+    [],
+  )
+
   return (
     <ToastContext.Provider value={show}>
       {children}
@@ -39,6 +62,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           {toast && (
             <div
               key={toast.id}
+              ref={toastRef}
               className="toast"
               onFocus={() => setPaused(true)}
               onBlur={() => setPaused(false)}

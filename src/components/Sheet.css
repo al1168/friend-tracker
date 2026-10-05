@@ -90,6 +90,11 @@
 .sheet__body:last-child {
   padding-bottom: calc(var(--space-6) + var(--safe-bottom));
 }
+/* The browser's own scrolling to a focused field leaves the same room as the app's (useRevealFocusedField),
+   so a field it brings up from under the Save bar doesn't end flush against it. */
+.sheet__body :is(input, textarea, select) {
+  scroll-margin-block: var(--space-3);
+}
 .sheet__footer {
   flex: none;
   display: flex;
@@ -99,10 +104,7 @@
   border-top: 0.5px solid var(--separator);
   background: var(--bg);
 }
-/* The keyboard covers the home indicator, so the bottom of the sheet needs no room for it. */
-.keyboard-open .sheet__body:last-child {
-  padding-bottom: var(--space-6);
-}
+/* The keyboard covers the home indicator, so the Save bar needs no room for it. */
 .keyboard-open .sheet__footer {
   padding-bottom: var(--space-3);
 }

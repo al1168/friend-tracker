@@ -4,8 +4,16 @@ export interface Span {
   bottom: number
 }
 
-/** Which end of a field the caret is at: its last character, or anywhere before it. */
+/** Which end of a field to show when it is taller than the view: its top or its bottom (see caretEdge). */
 export type CaretEdge = 'start' | 'end'
+
+/** A text box's caret and size, as an HTMLTextAreaElement has them. */
+export interface TextBox {
+  value: string
+  selectionEnd: number | null
+  scrollHeight: number
+  clientHeight: number
+}
 
 /** How much shorter than the layout viewport the visual viewport must be before it counts as the keyboard. */
 const KEYBOARD_MIN_HEIGHT = 50
@@ -23,17 +31,28 @@ export function keyboardInset(layoutHeight: number, viewport: { height: number; 
  * Whether the on-screen keyboard is up: the visual viewport, at normal zoom, is more than 50px shorter
  * than the layout viewport. Unlike keyboardInset this ignores offsetTop, since iOS pans the visual
  * viewport to show a field while the keyboard stays up. False without a visual viewport at all.
+ * Normal zoom is a scale within 0.01 of 1, since a floating-point scale can come back as 1.0000001.
  */
 export function keyboardIsUp(
   layoutHeight: number,
   viewport: { height: number; scale: number } | null | undefined,
 ): boolean {
-  return viewport != null && viewport.scale === 1 && layoutHeight - viewport.height > KEYBOARD_MIN_HEIGHT
+  return (
+    viewport != null && Math.abs(viewport.scale - 1) < 0.01 && layoutHeight - viewport.height > KEYBOARD_MIN_HEIGHT
+  )
 }
 
-/** Where a text field's caret is (`selectionEnd`, null when it has none) against its text's `length`. */
-export function caretEdge(selectionEnd: number | null, length: number): CaretEdge {
-  return selectionEnd !== null && selectionEnd >= length - 1 ? 'end' : 'start'
+/**
+ * Which end of a text box to show when the box is taller than the view: the end only when the caret
+ * (`selectionEnd`, null when it has none) reaches the last character or past it and the text runs past
+ * the box, since only then does the end of the text sit at the bottom of the box. Otherwise the top,
+ * where text that fits begins and an empty box has its caret. A pixel of rounding between scrollHeight
+ * and clientHeight is not overflow.
+ */
+export function caretEdge(box: TextBox): CaretEdge {
+  const overflows = box.scrollHeight > box.clientHeight + 1
+  const atEnd = box.selectionEnd !== null && box.selectionEnd >= box.value.length - 1
+  return overflows && atEnd ? 'end' : 'start'
 }
 
 /**
