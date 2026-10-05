@@ -180,7 +180,7 @@ test('keeps photos and activities through a backup', async ({ page }) => {
   await page.getByRole('button', { name: 'Export backup' }).click()
   const backupPath = await (await downloadPromise).path()
   const backup = JSON.parse(await readFile(backupPath, 'utf8'))
-  expect(backup.version).toBe(4)
+  expect(backup.version).toBe(5)
   expect(backup.meetups[0].activities).toEqual(['Karaoke'])
   expect(backup.meetupPhotos).toHaveLength(2)
 

@@ -7,6 +7,7 @@ import { addMeetup } from '../db/meetups'
 import { addPreferences } from '../db/preferences'
 import type { AppLock, LockFailures } from '../lock/types'
 import type { BirthdayReminders } from '../reminders/types'
+import { OWNER_DAY_TYPED, OWNER_FEELINGS } from '../test/dayFixtures'
 import { friend, meetup, meetupPhoto, meetupType } from '../test/fixtures'
 import { createBackup, type BackupData } from './format'
 import { parseBackupFile, readAllData, readAllPhotos, replaceAllData } from './storage'
@@ -126,6 +127,27 @@ describe('backup storage', () => {
     await replaceAllData(data)
     expect(sortById(await readAllData())).toEqual(sortById(data))
     expect((await readAllPhotos()).map((photo) => photo.id).sort()).toEqual(['p1', 'p2'])
+  })
+
+  it('keeps the day’s note, weather, mood and feelings through replace and read', async () => {
+    const data: BackupData = {
+      friends: [friend('f1', 'Alex')],
+      groups: [],
+      meetupTypes: [meetupType('t1', 'Coffee', 0)],
+      meetups: [
+        {
+          ...meetup('m1', '2026-10-03', ['f1'], 't1'),
+          note: OWNER_DAY_TYPED,
+          weather: ['rainy', 'windy'],
+          mood: 'okay',
+          feelings: OWNER_FEELINGS,
+        },
+        meetup('m2', '2026-10-04', ['f1'], 't1'),
+      ],
+      meetupPhotos: [],
+    }
+    await replaceAllData(data)
+    expect(sortById(await readAllData())).toEqual(sortById(data))
   })
 
   it('leaves existing data untouched if writing fails', async () => {

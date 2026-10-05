@@ -107,7 +107,7 @@ test('keeps likes and dislikes through a backup', async ({ page }) => {
   await page.getByRole('button', { name: 'Export backup' }).click()
   const backupPath = await (await downloadPromise).path()
   const backup = JSON.parse(await readFile(backupPath, 'utf8'))
-  expect(backup.version).toBe(4)
+  expect(backup.version).toBe(5)
   expect(backup.friends[0]).toMatchObject({ name: 'Alex', likes: ['Sushi'], dislikes: ['Cilantro'] })
 
   await goToTab(page, 'Friends')

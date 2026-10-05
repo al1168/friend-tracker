@@ -226,7 +226,7 @@ test('keeps birthdays through a backup', async ({ page }) => {
   await page.getByRole('button', { name: 'Export backup' }).click()
   const backupPath = await (await downloadPromise).path()
   const backup = JSON.parse(await readFile(backupPath, 'utf8'))
-  expect(backup.version).toBe(4)
+  expect(backup.version).toBe(5)
   expect(backup.friends[0]).toMatchObject({ name: 'Alex', birthday: { month: 3, day: 14, year: 1996 } })
 
   await goToTab(page, 'Friends')

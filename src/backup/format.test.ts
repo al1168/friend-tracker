@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { MAX_FULL_LENGTH, MAX_THUMB_LENGTH } from '../lib/photos'
+import { OWNER_DAY_TYPED, OWNER_FEELINGS } from '../test/dayFixtures'
 import { friend, group, meetup, meetupPhoto, meetupType } from '../test/fixtures'
+import type { Meetup } from '../types'
 import { backupFileName, createBackup, parseBackup, type BackupData } from './format'
 
 const sample: BackupData = {
@@ -47,7 +49,7 @@ function expectError(raw: unknown, message: string) {
 describe('createBackup and parseBackup', () => {
   it('accepts a backup it created', () => {
     const file = createBackup(sample, new Date('2026-10-02T09:00:00Z'))
-    expect(file).toMatchObject({ app: 'friend-tracker', version: 4, exportedAt: '2026-10-02T09:00:00.000Z' })
+    expect(file).toMatchObject({ app: 'friend-tracker', version: 5, exportedAt: '2026-10-02T09:00:00.000Z' })
     expect(parseBackup(jsonCopy(file))).toEqual({ ok: true, data: sample })
   })
 
@@ -109,6 +111,10 @@ describe('parseBackup reads version 1 backups', () => {
       ])
       expect(result.data.friends[1]).toMatchObject({ name: 'Sam', notes: 'Likes jazz' })
       expect(result.data.meetups.map((m) => m.activities)).toEqual([[], []])
+      expect(result.data.meetups.map((m) => [m.weather, m.mood, m.feelings])).toEqual([
+        [[], null, ''],
+        [[], null, ''],
+      ])
       expect(result.data.meetupPhotos).toEqual([])
     }
   })
@@ -124,6 +130,10 @@ describe('parseBackup reads version 2 backups', () => {
       expect(result.data.friends.map((f) => f.birthday)).toEqual([null, null])
       expect(result.data.friends[1]).toMatchObject({ likes: ['Jazz', 'Board games'], dislikes: ['Early mornings'] })
       expect(result.data.meetups.map((m) => m.activities)).toEqual([[], []])
+      expect(result.data.meetups.map((m) => [m.weather, m.mood, m.feelings])).toEqual([
+        [[], null, ''],
+        [[], null, ''],
+      ])
       expect(result.data.meetupPhotos).toEqual([])
     }
   })
@@ -138,6 +148,10 @@ describe('parseBackup reads version 3 backups', () => {
     if (result.ok) {
       expect(result.data.friends[1].birthday).toEqual({ month: 3, day: 14, year: 1996 })
       expect(result.data.meetups.map((m) => m.activities)).toEqual([[], []])
+      expect(result.data.meetups.map((m) => [m.weather, m.mood, m.feelings])).toEqual([
+        [[], null, ''],
+        [[], null, ''],
+      ])
       expect(result.data.meetupPhotos).toEqual([])
     }
     const withoutLists = broken((f) => {
@@ -149,6 +163,75 @@ describe('parseBackup reads version 3 backups', () => {
   })
 })
 
+describe('parseBackup reads version 4 backups', () => {
+  it('keeps activities, photos and the note byte for byte, and gives every meetup an empty day', () => {
+    // Version 4 had no weather, mood or feelings, so any in a version 4 file are ignored.
+    const note = 'Tacos\r\nThen karaoke  '
+    const file = broken((f) => {
+      f.version = 4
+      list(f, 'meetups')[0].note = note
+      list(f, 'meetups')[0].mood = 'okay'
+      delete list(f, 'meetups')[1].weather
+      delete list(f, 'meetups')[1].mood
+      delete list(f, 'meetups')[1].feelings
+    })
+    const result = parseBackup(file)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.meetups[0]).toMatchObject({
+        note,
+        activities: ['Karaoke', 'Board games'],
+        weather: [],
+        mood: null,
+        feelings: '',
+      })
+      expect(result.data.meetups[1]).toMatchObject({ weather: [], mood: null, feelings: '' })
+      expect(result.data.meetupPhotos).toEqual(sample.meetupPhotos)
+    }
+  })
+})
+
+describe('parseBackup reads version 5 backups', () => {
+  const ownersDay: Meetup = {
+    ...meetup('m3', '2026-10-03', ['f1', 'f2'], 't1'),
+    note: OWNER_DAY_TYPED,
+    activities: ['Movie', 'Shopping'],
+    weather: ['rainy'],
+    mood: 'okay',
+    feelings: OWNER_FEELINGS,
+  }
+  const withDay: BackupData = {
+    ...sample,
+    meetups: [...sample.meetups, ownersDay],
+    meetupPhotos: [...sample.meetupPhotos, meetupPhoto('p3', 'm3', 0)],
+  }
+
+  it('keeps the owner’s day, its weather, mood and feelings, and every activity and photo', () => {
+    const file = jsonCopy(createBackup(withDay, new Date('2026-10-04T05:00:00Z')))
+    expect(file.version).toBe(5)
+    const result = parseBackup(file)
+    expect(result).toEqual({ ok: true, data: withDay })
+    if (result.ok) {
+      expect(result.data.meetups[2].note).toBe(OWNER_DAY_TYPED)
+      expect(result.data.meetups[2].activities).toEqual(['Movie', 'Shopping'])
+      expect(result.data.meetups[1].mood).toBeNull()
+      expect(result.data.meetupPhotos.map((photo) => photo.id)).toEqual(['p1', 'p2', 'p3'])
+    }
+  })
+
+  it('drops repeated weather quietly and puts it in chip order', () => {
+    const file = broken((f) => (list(f, 'meetups')[0].weather = ['windy', 'rainy', 'windy']))
+    const result = parseBackup(file)
+    expect(result.ok && result.data.meetups[0].weather).toEqual(['rainy', 'windy'])
+  })
+
+  it('keeps a note of any length exactly', () => {
+    const note = 'Walked.\r\n'.repeat(5_000)
+    const result = parseBackup(broken((f) => (list(f, 'meetups')[0].note = note)))
+    expect(result.ok && result.data.meetups[0].note).toBe(note)
+  })
+})
+
 describe('parseBackup rejects bad files', () => {
   it('rejects things that are not backups', () => {
     expectError('hello', "This isn't a Friend Tracker backup file.")
@@ -156,8 +239,9 @@ describe('parseBackup rejects bad files', () => {
   })
 
   it('rejects other versions', () => {
-    expectError(broken((f) => (f.version = 5)), 'This backup was made by a different version of Friend Tracker.')
-    expectError(broken((f) => (f.version = '4')), 'This backup was made by a different version of Friend Tracker.')
+    expectError(broken((f) => (f.version = 6)), 'This backup was made by a different version of Friend Tracker.')
+    expectError(broken((f) => (f.version = '5')), 'This backup was made by a different version of Friend Tracker.')
+    expectError(broken((f) => (f.version = 0)), 'This backup was made by a different version of Friend Tracker.')
   })
 
   it('rejects a missing or invalid activities list', () => {
@@ -171,6 +255,23 @@ describe('parseBackup rejects bad files', () => {
       broken((f) => (list(f, 'meetups')[1].activities = tooMany)),
       'Meetup 2 has an invalid "activities" list.',
     )
+  })
+
+  it('rejects a version 5 meetup with an invalid weather list, mood or feelings', () => {
+    const meetupTwo = (change: (meetup: Record<string, unknown>) => void) => broken((f) => change(list(f, 'meetups')[1]))
+    for (const weather of ['rainy', ['fog'], ['rainy', 3], null]) {
+      expectError(meetupTwo((m) => (m.weather = weather)), 'Meetup 2 has an invalid "weather" list.')
+    }
+    expectError(meetupTwo((m) => delete m.weather), 'Meetup 2 has an invalid "weather" list.')
+    for (const mood of ['Good', 'amazing', 3, '']) {
+      expectError(meetupTwo((m) => (m.mood = mood)), 'Meetup 2 has an invalid "mood".')
+    }
+    expectError(meetupTwo((m) => delete m.mood), 'Meetup 2 has an invalid "mood".')
+    for (const feelings of ['x'.repeat(4_001), 3, null]) {
+      expectError(meetupTwo((m) => (m.feelings = feelings)), 'Meetup 2 has a missing or invalid "feelings".')
+    }
+    expectError(meetupTwo((m) => delete m.feelings), 'Meetup 2 has a missing or invalid "feelings".')
+    expect(parseBackup(meetupTwo((m) => (m.feelings = 'x'.repeat(4_000)))).ok).toBe(true)
   })
 
   it('rejects an invalid photo', () => {

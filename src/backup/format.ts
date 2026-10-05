@@ -1,9 +1,12 @@
 import { activitiesProblem } from '../lib/activities'
 import { isValidBirthday } from '../lib/birthdays'
 import { addDays, isISODate, todayISO, type ISODate } from '../lib/dates'
+import { FEELINGS_MAX } from '../lib/dayText'
+import { isMood } from '../lib/moods'
 import { isPhotoDataUrl, isPixelSize, MAX_FULL_LENGTH, MAX_PHOTOS, MAX_THUMB_LENGTH } from '../lib/photos'
 import { cleanItems, indexOfItem, MAX_ITEM_LENGTH, MAX_ITEMS, type PreferenceKind } from '../lib/preferences'
-import type { Birthday, Friend, Group, Meetup, MeetupPhoto, MeetupType } from '../types'
+import { cleanWeather, isWeather } from '../lib/weather'
+import type { Birthday, Friend, Group, Meetup, MeetupPhoto, MeetupType, Mood, Weather } from '../types'
 
 export interface BackupData {
   friends: Friend[]
@@ -15,14 +18,14 @@ export interface BackupData {
 
 export interface BackupFile extends BackupData {
   app: 'friend-tracker'
-  version: 4
+  version: 5
   exportedAt: string
 }
 
 export type ParseResult = { ok: true; data: BackupData } | { ok: false; error: string }
 
 export function createBackup(data: BackupData, exportedAt: Date): BackupFile {
-  return { app: 'friend-tracker', version: 4, exportedAt: exportedAt.toISOString(), ...data }
+  return { app: 'friend-tracker', version: 5, exportedAt: exportedAt.toISOString(), ...data }
 }
 
 export function backupFileName(today: ISODate): string {
@@ -113,6 +116,28 @@ function activityList(record: Obj, where: string): string[] {
   return activities
 }
 
+/** A version 5 meetup's weather: a list of known keys. Repeats are dropped quietly and the rest put in chip order. */
+function weatherList(record: Obj, where: string): Weather[] {
+  const value = record.weather
+  if (!Array.isArray(value) || !value.every(isWeather)) throw new BackupError(`${where} has an invalid "weather" list.`)
+  return cleanWeather(value)
+}
+
+/** A version 5 meetup's mood: null or a known key. A missing one is refused too. */
+function moodOf(record: Obj, where: string): Mood | null {
+  const value = record.mood
+  if (value === null) return null
+  if (!isMood(value)) throw new BackupError(`${where} has an invalid "mood".`)
+  return value
+}
+
+/** A version 5 meetup's feelings: words of at most 4,000 characters, kept exactly. */
+function feelingsOf(record: Obj, where: string): string {
+  const feelings = text(record, 'feelings', where)
+  if (feelings.length > FEELINGS_MAX) throw new BackupError(`${where} has a missing or invalid "feelings".`)
+  return feelings
+}
+
 /** A version 4 photo (copied, so stray fields are dropped). Whatever is wrong with it, the message is the same. */
 function photoOf(value: unknown, where: string): MeetupPhoto {
   const invalid = () => new BackupError(`${where} is invalid.`)
@@ -140,7 +165,7 @@ function assertUnique(ids: string[], what: string) {
 function readBackup(raw: unknown, today: ISODate): BackupData {
   if (!isObj(raw) || raw.app !== 'friend-tracker') throw new BackupError("This isn't a Friend Tracker backup file.")
   const { version } = raw
-  if (version !== 1 && version !== 2 && version !== 3 && version !== 4) {
+  if (version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5) {
     throw new BackupError('This backup was made by a different version of Friend Tracker.')
   }
 
@@ -195,17 +220,18 @@ function readBackup(raw: unknown, today: ISODate): BackupData {
       friendIds: [...new Set(friendIds as string[])],
       note: text(r, 'note', where),
       // Versions 1 to 3 were made before activities existed.
-      activities: version === 4 ? activityList(r, where) : [],
-      weather: [],
-      mood: null,
-      feelings: '',
+      activities: version >= 4 ? activityList(r, where) : [],
+      // Versions 1 to 4 were made before the day's weather, mood and feelings existed.
+      weather: version >= 5 ? weatherList(r, where) : [],
+      mood: version >= 5 ? moodOf(r, where) : null,
+      feelings: version >= 5 ? feelingsOf(r, where) : '',
       createdAt: text(r, 'createdAt', where),
     }
   })
 
   // Versions 1 to 3 were made before photos existed.
   const meetupPhotos: MeetupPhoto[] =
-    version === 4 ? list(raw, 'meetupPhotos').map((value, i) => photoOf(value, `Photo ${i + 1}`)) : []
+    version >= 4 ? list(raw, 'meetupPhotos').map((value, i) => photoOf(value, `Photo ${i + 1}`)) : []
 
   assertUnique(groups.map((g) => g.id), 'groups')
   assertUnique(meetupTypes.map((t) => t.id), 'meetup types')
