@@ -1,0 +1,66 @@
+/* Four across at every standard text size; two by two once a quarter of the row is narrower than 3.25rem, so a
+   word never breaks (the same flex-basis trick as the stat row). */
+.mood-tiles {
+  display: flex;
+  flex-wrap: wrap;
+}
+.mood-tile {
+  flex: 1 1 max(25%, min(50%, calc((13rem - 100%) * 999)));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 77px;
+  padding: var(--space-3) var(--space-1) var(--space-2);
+  border-radius: var(--radius-field);
+  color: var(--ink);
+  transition: background-color var(--dur-fast);
+}
+.mood-tile:active {
+  background: var(--surface-pressed);
+}
+.mood-tile__face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 26px;
+  line-height: 1;
+  outline: 3px solid transparent;
+  outline-offset: 2px;
+  transition: outline-color var(--dur-fast) var(--ease-out-quart);
+}
+.mood-tile[aria-pressed='true'] .mood-tile__face {
+  outline-color: var(--accent);
+}
+/* The selected-friend check: a 22px Peach badge ringed in Warm Paper. */
+.mood-tile__check {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  animation: pop-in var(--dur) var(--ease-out-quart);
+}
+.mood-tile__word {
+  font-size: var(--text-footnote);
+  line-height: 1.25;
+}
+.mood-tile[aria-pressed='true'] .mood-tile__word {
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mood-tile__check {
+    animation: fade-in var(--dur) linear;
+  }
+}

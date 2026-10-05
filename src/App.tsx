@@ -4,6 +4,7 @@ import { ScrollManager } from './components/ScrollManager'
 import { TabBar } from './components/TabBar'
 import { ToastProvider } from './components/Toast'
 import { ReminderSync } from './reminders/useReminderSync'
+import { DayScreen } from './screens/DayScreen'
 import { FriendDetailScreen } from './screens/FriendDetailScreen'
 import { FriendsScreen } from './screens/FriendsScreen'
 import { GroupsScreen } from './screens/GroupsScreen'
@@ -26,6 +27,7 @@ export default function App() {
                 <Route path="/" element={<FriendsScreen />} />
                 <Route path="/friends/:id" element={<FriendDetailScreen />} />
                 <Route path="/meetups/:id" element={<MeetupScreen />} />
+                <Route path="/meetups/:id/day" element={<DayScreen />} />
                 <Route path="/stats" element={<StatsScreen />} />
                 <Route path="/settings" element={<SettingsScreen />} />
                 <Route path="/settings/groups" element={<GroupsScreen />} />

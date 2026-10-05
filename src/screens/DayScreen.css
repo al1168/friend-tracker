@@ -1,0 +1,168 @@
+/* The day page: a fixed full-screen layer that always fills exactly the part of the screen above the keyboard
+   (its bottom at --keyboard-inset, its height --viewport-height), so iOS panning the visual viewport can't push
+   the nav bar or the helper bar off screen. Only its body scrolls. */
+.day-page {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--keyboard-inset);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  max-width: 600px;
+  height: var(--viewport-height, 100dvh);
+  margin: 0 auto;
+  background: var(--bg);
+  animation: page-push var(--dur-sheet) var(--ease-out-quart);
+}
+
+.day-page__bar {
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  min-height: calc(var(--navbar-height) + var(--safe-top));
+  padding: var(--safe-top) var(--space-2) 0;
+  border-bottom: 0.5px solid transparent;
+  background: var(--bg);
+  transition: border-color var(--dur) var(--ease-out-quart);
+}
+.day-page__bar[data-scrolled='true'] {
+  border-bottom-color: var(--separator);
+}
+.day-page__bar .navbar__back {
+  justify-self: start;
+}
+.day-page__title {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 600;
+  text-align: center;
+}
+.day-page__title:focus {
+  outline: none;
+}
+.day-page__spacer {
+  justify-self: end;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.day-page__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-2) var(--space-4) var(--space-6);
+}
+/* The browser's own scrolling to a focused box leaves the same room as the app's (useRevealFocusedField reads it). */
+.day-page__body :is(input, textarea) {
+  scroll-margin-block: var(--space-3);
+}
+.day-page__context {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--text-subhead);
+  text-align: center;
+  text-wrap: balance;
+}
+.day-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.day-section .form-section__label {
+  margin: 0 var(--space-1);
+}
+.day-section__hint {
+  margin: 0 var(--space-1);
+  color: var(--ink-2);
+  font-size: var(--text-footnote);
+  line-height: 1.4;
+}
+.day-page__footnote {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--text-footnote);
+  text-align: center;
+}
+
+/* The footer rides on the keyboard: the save error line, then the helper bar. */
+.day-page__footer {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-4) calc(var(--space-2) + var(--safe-bottom));
+  border-top: 0.5px solid var(--separator);
+  background: var(--bg);
+}
+/* The keyboard covers the home indicator, so the bar needs no room for it. */
+.keyboard-open .day-page__footer {
+  padding-bottom: var(--space-2);
+}
+.day-page__footer .field-error {
+  margin: 0;
+}
+
+.day-helpers {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+}
+/* One row that scrolls sideways at large text sizes; "Hide keyboard" stays pinned at its end. */
+.day-helpers__row {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* Room inside the scroller for the focus ring and the chips' taller hit areas, which it would clip. */
+  margin: calc(-1 * var(--space-1)) -3px;
+  padding: var(--space-1) 3px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.day-helpers__row::-webkit-scrollbar {
+  display: none;
+}
+.day-helpers__paid {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.day-helpers__label {
+  flex: none;
+  color: var(--ink-2);
+  font-size: var(--text-footnote);
+  font-weight: 600;
+}
+.day-helpers .icon-button {
+  flex: none;
+}
+/* base.css comes later in the bundle, so these name the bar too, to win over .icon-button. */
+.day-helpers .day-helpers__hide {
+  display: none;
+}
+.keyboard-open .day-helpers .day-helpers__hide {
+  display: inline-grid;
+}
+.day-helpers__add {
+  flex: none;
+  font-weight: 600;
+}
+.day-place.field {
+  flex: 1;
+  min-width: 6em;
+  height: var(--tap);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .day-page {
+    animation-name: fade-in;
+  }
+}

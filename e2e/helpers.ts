@@ -168,6 +168,38 @@ export async function readMeetupPhotos(
   )
 }
 
+/** A meetup as IndexedDB stores it, read without the app's reading hook. */
+export type StoredMeetup = Record<string, unknown> & { id: string; note: string }
+
+/** Every stored meetup, read straight from IndexedDB, oldest first. */
+export async function readMeetups(page: Page): Promise<StoredMeetup[]> {
+  const meetups = await page.evaluate(
+    () =>
+      new Promise<StoredMeetup[]>((resolve, reject) => {
+        const request = indexedDB.open('friend-tracker')
+        request.onerror = () => reject(request.error)
+        request.onsuccess = () => {
+          const database = request.result
+          const getAll = database.transaction('meetups').objectStore('meetups').getAll()
+          getAll.onsuccess = () => {
+            database.close()
+            resolve(getAll.result)
+          }
+          getAll.onerror = () => reject(getAll.error)
+        }
+      }),
+  )
+  return meetups.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))
+}
+
+/** On a Meetup page: opens its day page. */
+export async function openDay(page: Page) {
+  await page.evaluate(() => {
+    location.hash = `${location.hash}/day`
+  })
+  await expect(page.getByRole('heading', { level: 1, name: 'The day' })).toBeVisible()
+}
+
 /** The pixel size of an image data URL, decoded in the page. */
 export async function imageSize(page: Page, src: string): Promise<{ width: number; height: number }> {
   return page.evaluate(async (src) => {
