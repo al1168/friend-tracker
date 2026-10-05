@@ -1,8 +1,5 @@
 import { useEffect, type RefObject } from 'react'
-import { caretEdge, keyboardIsUp, revealOffset } from '../lib/viewport'
-
-/** Room kept between a field the app scrolls into view and the edges of the sheet's visible area. */
-const MARGIN = 12
+import { caretEdge, keyboardIsUp, revealMargin, revealOffset } from '../lib/viewport'
 
 /** Input types that type no text and open no picker, so they bring up no keyboard. */
 const NO_KEYBOARD = new Set(['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit'])
@@ -28,7 +25,11 @@ export function useRevealFocusedField(active: boolean, bodyRef: RefObject<HTMLEl
     const body = bodyRef.current
     if (!active || !body) return
 
-    /** Scrolls the focused field into view with MARGIN to spare; `onlyIfHidden` leaves it while all of it shows. */
+    /**
+     * Scrolls the focused field into view with its scroll margin to spare (var(--space-3) in the CSS, so the
+     * browser's own focus scrolling and this agree at every text size); `onlyIfHidden` leaves it while all of
+     * it shows.
+     */
     const reveal = (onlyIfHidden: boolean) => {
       const field = document.activeElement
       if (!isEditable(field) || !body.contains(field)) return
@@ -38,7 +39,7 @@ export function useRevealFocusedField(active: boolean, bodyRef: RefObject<HTMLEl
       // A note taller than the view shows the end you're typing at, when its text runs to the bottom.
       const caret = field instanceof HTMLTextAreaElement ? caretEdge(field) : 'start'
       if (onlyIfHidden && revealOffset(port, rect, 0, caret) === 0) return
-      const offset = revealOffset(port, rect, MARGIN, caret)
+      const offset = revealOffset(port, rect, revealMargin(getComputedStyle(field).scrollMarginBottom), caret)
       if (offset !== 0) body.scrollTop += offset
     }
 

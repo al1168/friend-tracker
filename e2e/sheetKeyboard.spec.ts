@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { addFriend, editMeetup, logMeetup, openFriendPage } from './helpers.ts'
+import { addFriend, editMeetup, LARGE_TEXT, logMeetup, openFriendPage } from './helpers.ts'
 
 declare global {
   interface Window {
@@ -238,6 +238,25 @@ test('moving to Notes while the keyboard is up brings it into view, before any t
   await nextFrames(page)
 
   await expectRevealed(notes, 'Notes', { room: MARGIN })
+})
+
+test('at large text, moving to Notes leaves the room the CSS sets, which grows with the text', async ({ page }) => {
+  await page.addStyleTag({ content: LARGE_TEXT })
+  const sheet = await openNewFriend(page)
+  const name = sheet.getByLabel('Name', { exact: true })
+  const notes = sheet.getByLabel('Notes')
+  await tapFocus(name)
+  await openKeyboard(page)
+  const room = await notes.evaluate((element) => parseFloat(getComputedStyle(element).scrollMarginBottom))
+  expect(room, 'var(--space-3) at this text size').toBeGreaterThan(MARGIN)
+  const before = await placement(notes)
+  expect(before.top, 'Notes starts below the visible part of the sheet').toBeGreaterThan(before.visibleBottom)
+
+  await notes.evaluate((element) => element.focus({ preventScroll: true }))
+  await nextFrames(page)
+
+  // Layout positions are fractions of a pixel, so allow for rounding below the margin's whole pixels.
+  await expectRevealed(notes, 'Notes', { room: Math.floor(room) })
 })
 
 test('moving to Notes brings it into view while iOS has panned the visual viewport over the keyboard', async ({

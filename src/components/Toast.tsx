@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useLocation } from 'react-router'
 import './Toast.css'
 
 export interface ToastOptions {
@@ -19,6 +20,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [paused, setPaused] = useState(false)
   const nextId = useRef(0)
   const toastRef = useRef<HTMLDivElement>(null)
+  const { key: pageKey } = useLocation()
 
   const show = useCallback((options: ToastOptions) => {
     nextId.current += 1
@@ -32,21 +34,24 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timer)
   }, [toast, paused])
 
-  // Publishes the shown toast's real height on <html> as --toast-space (0 with none), so the end of a page
-  // scrolls clear of a toast that wraps taller than its one line (see .app in base.css). Set before paint.
+  // Publishes the shown toast's real height on <html> as --toast-space, so the end of a page scrolls clear of a
+  // toast that wraps taller than its one line (see .app in base.css). Set before paint. When the toast goes, its
+  // room stays until the next page, so the end of this one doesn't jump up under your thumb.
   useLayoutEffect(() => {
-    const root = document.documentElement
     const element = toastRef.current
-    if (!element) {
-      root.style.setProperty('--toast-space', '0px')
-      return
-    }
+    if (!element) return
     const observer = new ResizeObserver(([entry]) => {
-      root.style.setProperty('--toast-space', `${Math.ceil(entry.borderBoxSize[0].blockSize)}px`)
+      document.documentElement.style.setProperty('--toast-space', `${Math.ceil(entry.borderBoxSize[0].blockSize)}px`)
     })
     observer.observe(element)
     return () => observer.disconnect()
   }, [toast])
+  // A new page keeps room only for a toast that is showing now.
+  useLayoutEffect(() => {
+    const element = toastRef.current
+    const space = element ? Math.ceil(element.getBoundingClientRect().height) : 0
+    document.documentElement.style.setProperty('--toast-space', `${space}px`)
+  }, [pageKey])
   useLayoutEffect(
     () => () => {
       document.documentElement.style.removeProperty('--toast-space')

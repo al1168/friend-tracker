@@ -15,6 +15,19 @@ export interface TextBox {
   clientHeight: number
 }
 
+/** The room kept around a field the app scrolls into view when its CSS sets none it can read. */
+const DEFAULT_REVEAL_MARGIN = 12
+
+/**
+ * The room to keep between a revealed field and the edges of the visible area: the field's own
+ * `scroll-margin-bottom` (a computed length such as "17.25px"), so the CSS that also guides the browser's
+ * own focus scrolling is the one source at every text size. 12px when it can't be read.
+ */
+export function revealMargin(scrollMarginBottom: string): number {
+  const margin = parseFloat(scrollMarginBottom)
+  return Number.isNaN(margin) ? DEFAULT_REVEAL_MARGIN : margin
+}
+
 /** How much shorter than the layout viewport the visual viewport must be before it counts as the keyboard. */
 const KEYBOARD_MIN_HEIGHT = 50
 

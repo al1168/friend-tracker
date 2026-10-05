@@ -87,7 +87,8 @@ img {
 /* The phone layout, centered on wider screens. Bottom padding lets the end of a page scroll clear of the
    tab bar, the Log button and a toast above it: a toast stays 5 to 8 seconds and pauses while touched,
    so a last row left under it can't be tapped until it goes. The room for the toast is its one-line
-   height, or the shown toast's real height when it wraps taller (large text, a long name). */
+   height, or the toast's real height when it wraps taller (large text, a long name), kept until the next page
+   so the end of this one doesn't jump when the toast goes. */
 .app {
   max-width: 600px;
   margin: 0 auto;

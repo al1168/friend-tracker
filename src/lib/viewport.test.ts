@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { caretEdge, keyboardInset, keyboardIsUp, revealOffset } from './viewport'
+import { caretEdge, keyboardInset, keyboardIsUp, revealMargin, revealOffset } from './viewport'
 
 describe('keyboardInset', () => {
   it('is zero with no keyboard', () => {
@@ -117,6 +117,19 @@ describe('revealOffset', () => {
   it('leaves a field that already fills the view, unless the caret is at its hidden end', () => {
     expect(revealOffset(port, { top: 50, bottom: 350 }, 12)).toBe(0)
     expect(revealOffset(port, { top: 50, bottom: 350 }, 12, 'end')).toBe(50)
+  })
+})
+
+describe('revealMargin', () => {
+  it('is the field’s own scroll margin, so the CSS sets it at every text size', () => {
+    expect(revealMargin('12px')).toBe(12)
+    expect(revealMargin('17.25px')).toBe(17.25)
+    expect(revealMargin('0px')).toBe(0)
+  })
+
+  it('is 12px when the field has no margin it can read', () => {
+    expect(revealMargin('')).toBe(12)
+    expect(revealMargin('auto')).toBe(12)
   })
 })
 

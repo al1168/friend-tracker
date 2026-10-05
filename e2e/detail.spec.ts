@@ -102,6 +102,41 @@ test('at large text, the meetup just logged scrolls clear of a toast that wraps,
   await expect(toast).toBeVisible()
   await row.click({ timeout: 2000 })
   await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
+  await expect(toast).toContainText(`Logged with ${name}`)
+})
+
+test('at large text, the room for a toast that wrapped stays after it goes, until the next page', async ({ page }) => {
+  await page.clock.install()
+  await page.goto('/')
+  await page.addStyleTag({ content: LARGE_TEXT })
+  const name = 'Bartholomew Fitzgerald-Montgomery'
+  await addFriend(page, name)
+  await page.getByRole('link', { name: new RegExp(name) }).click()
+  await page.getByRole('button', { name: 'Log meetup' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
+  await sheet.getByRole('button', { name: 'Save' }).click()
+  await expect(sheet).toBeHidden()
+  const toast = page.getByRole('status')
+  await expect(toast).toContainText(`Logged with ${name}`)
+  const toastSpace = () => page.evaluate(() => document.documentElement.style.getPropertyValue('--toast-space'))
+  const pageEnd = () => page.evaluate(() => document.documentElement.scrollHeight)
+  await expect.poll(async () => parseFloat(await toastSpace()), 'Room for the wrapped toast').toBeGreaterThan(100)
+  const space = await toastSpace()
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  const end = await pageEnd()
+  const scrolled = await page.evaluate(() => window.scrollY)
+
+  // The toast goes after 8 seconds; the end of the page stays where it was.
+  await page.clock.fastForward(9000)
+  await expect(toast).toBeEmpty()
+  expect(await toastSpace(), 'The room stays').toBe(space)
+  expect(await pageEnd(), 'The end of the page does not move').toBe(end)
+  expect(await page.evaluate(() => window.scrollY), 'Nothing scrolls').toBe(scrolled)
+
+  // The next page starts with no room kept for a toast that has gone.
+  await page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Coffee/ }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
+  expect(await toastSpace()).toBe('0px')
 })
 
 test('edits a meetup from its page, then deletes it with undo', async ({ page }) => {
