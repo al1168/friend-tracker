@@ -118,6 +118,16 @@ describe('revealOffset', () => {
     expect(revealOffset(port, { top: 50, bottom: 350 }, 12)).toBe(0)
     expect(revealOffset(port, { top: 50, bottom: 350 }, 12, 'end')).toBe(50)
   })
+
+  it('shows the caret’s line inside a box taller than the view, with the margin around the line', () => {
+    // A 60-line day box runs from 40 to 1480; its caret is on the line from 400 to 424, under the view.
+    const line = { top: 400, bottom: 424 }
+    expect(revealOffset(port, line, 12)).toBe(136)
+    // Above the view: the line comes down to the margin under the top.
+    expect(revealOffset(port, { top: 40, bottom: 64 }, 12)).toBe(-72)
+    // Already in view with room to spare: nothing to do.
+    expect(revealOffset(port, { top: 150, bottom: 174 }, 0)).toBe(0)
+  })
 })
 
 describe('revealMargin', () => {
