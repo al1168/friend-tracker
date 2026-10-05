@@ -3,6 +3,7 @@ import {
   compareNames,
   describeBackup,
   describeLastBackup,
+  displayText,
   firstGrapheme,
   formatNameList,
   formatSince,
@@ -93,5 +94,21 @@ describe('describeBackup', () => {
     expect(describeBackup(today, '2026-10-02', 0)).toBe('Last backup: today')
     expect(describeBackup(today, '2026-10-02', 12)).toBe('Last backup: today. Includes 12 photos.')
     expect(describeBackup(null, '2026-10-02', 1)).toBe('Never backed up. Includes 1 photo.')
+  })
+})
+
+describe('displayText', () => {
+  it('trims the ends of each line and drops blank lines at the start and end, keeping the ones between', () => {
+    expect(displayText('  Tired\n\n\n')).toBe('Tired')
+    expect(displayText('\n \n  It was an ok day.  \n\n  Would go again. \n')).toBe('It was an ok day.\n\nWould go again.')
+  })
+
+  it('reads Windows line breaks as line breaks', () => {
+    expect(displayText('One \r\nTwo\r\n')).toBe('One\nTwo')
+  })
+
+  it('gives an empty string for words that are only spaces', () => {
+    expect(displayText(' \n \t ')).toBe('')
+    expect(displayText('')).toBe('')
   })
 })

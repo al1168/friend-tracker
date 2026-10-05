@@ -10,6 +10,7 @@ import { useToday } from '../hooks/useToday'
 import { formatDate } from '../lib/dates'
 import { isDayEmpty, readDay } from '../lib/dayText'
 import { feelingsApply, moodInfo } from '../lib/moods'
+import { displayText } from '../lib/text'
 import { weatherInfo } from '../lib/weather'
 import { useSheets } from '../sheets/sheetsContext'
 import type { Friend } from '../types'
@@ -52,7 +53,9 @@ export function MeetupScreen() {
     `Photo ${index + 1} of ${photos.length}, ${title}, ${formatDate(meetup.date, today)}`
   const dayParts = readDay(meetup.note)
   const mood = moodInfo(meetup.mood)
-  const showFelt = feelingsApply(meetup, today) && (mood !== null || meetup.feelings.trim() !== '')
+  // Shown with each line's ends trimmed and no blank lines around it; stored as typed.
+  const feltWords = displayText(meetup.feelings)
+  const showFelt = feelingsApply(meetup, today) && (mood !== null || feltWords !== '')
   const dayEmpty = isDayEmpty(meetup)
 
   function closeViewer() {
@@ -84,8 +87,11 @@ export function MeetupScreen() {
               return (
                 <Fragment key={key}>
                   {index > 0 && ', '}
-                  <span aria-hidden="true">{emoji} </span>
-                  {label}
+                  {/* Kept on one line, so a wrap never leaves the emoji without its word. */}
+                  <span className="meetup-hero__weather">
+                    <span aria-hidden="true">{emoji} </span>
+                    {label}
+                  </span>
                 </Fragment>
               )
             })}
@@ -143,7 +149,7 @@ export function MeetupScreen() {
                 </span>
               </p>
             )}
-            {meetup.feelings.trim() !== '' && <p className="felt-box__words">{meetup.feelings}</p>}
+            {feltWords !== '' && <p className="felt-box__words">{feltWords}</p>}
           </div>
         </Section>
       )}

@@ -23,6 +23,18 @@ export function formatNameList(names: string[]): string {
   return `${names[0]}, ${names[1]} and ${names.length - 2} others`
 }
 
+/**
+ * Words written in a box, as shown (never as stored): each line's ends trimmed, and blank lines at the start and
+ * end left out. Blank lines between stay. Line breaks may be \r\n, \r or \n.
+ */
+export function displayText(text: string): string {
+  const lines = text.split(/\r\n|\r|\n/).map((line) => line.trim())
+  const first = lines.findIndex((line) => line !== '')
+  if (first === -1) return ''
+  const last = lines.findLastIndex((line) => line !== '')
+  return lines.slice(first, last + 1).join('\n')
+}
+
 const collator = new Intl.Collator('en', { sensitivity: 'base' })
 
 export function compareNames(a: string, b: string): number {

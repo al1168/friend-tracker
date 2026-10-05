@@ -77,7 +77,7 @@ export interface Meetup {
 - **weather:** `cleanWeather`, quietly.
 - **mood:** `null` or a known key. Anything else throws `ValidationError(INVALID_MOOD)`, which only code can reach.
 - **feelings:** line breaks normalized like the note. Over 4,000 characters throws `ValidationError(TOO_LONG_FEELINGS)`. WebKit's `maxLength` counts what you see (an emoji is one) while this counts UTF-16 units (an emoji is two or more), so a box at its limit can still let an emoji in; the page refuses any change that would take the words past 4,000 units and grow them, showing "This box is full.", so it never holds words that can't save (a refused save would otherwise be retried forever and hold back every other field).
-- When shown, each line's ends are trimmed and blank lines at the start and end are ignored. Storage keeps them.
+- When shown, each line's ends are trimmed and blank lines at the start and end are ignored. Storage keeps them. The day does this through `readDay`; How it felt's words through `displayText` in `src/lib/text.ts`.
 
 ### Reading the day (grammar 1)
 
@@ -351,7 +351,7 @@ A group named "Writing helpers": one row of 36px chips (with 44px hit areas) tha
 
 `src/screens/MeetupScreen.tsx`, top to bottom:
 1. **Nav bar:** unchanged ("Back" or the friend's name, and Edit for the Edit meetup sheet).
-2. **Hero:** unchanged, except the date line gains the weather after a middle dot: "Sat, Oct 3 · 🌧️ Rainy", or "Sat, Oct 3 · 🌧️ Rainy, 🌬️ Windy". The emoji are hidden from VoiceOver. The "Upcoming" badge still follows.
+2. **Hero:** unchanged, except the date line gains the weather after a middle dot: "Sat, Oct 3 · 🌧️ Rainy", or "Sat, Oct 3 · 🌧️ Rainy, 🌬️ Windy". The emoji are hidden from VoiceOver. Each weather's emoji and word stay on one line (`white-space: nowrap`), so at large sizes the line wraps between weathers, never between "🌧️" and "Rainy". The "Upcoming" badge still follows.
 3. **Activities:** unchanged.
 4. **The day** (the section that was "Note"; hidden when the note is blank): one Paper White box with 14px corners and `0 1rem` padding, holding the day's parts in order, with 0.5px Soft Rule hairlines between parts.
    - **A timeline** is an ordered list. Each stop is a row at least 52px tall with `0.75rem` above and below: a time column, then the place and its lines.
@@ -363,7 +363,7 @@ A group named "Writing helpers": one row of 36px chips (with 44px hit areas) tha
      - **Large text:** the box is a size container. Below 22em wide, the time moves above the place as a Footnote 600 Warm Ink Secondary line ("7:30 PM to ~8:10 PM"), and the place takes the full width.
    - **A heading** is Footnote 600 Warm Ink Secondary ("Locations").
    - **Prose** is one paragraph per line, Body Warm Ink, at most 65ch, with a 0.75em gap for blank lines. Paid tags show here too.
-5. **How it felt** (hidden when there's no mood and no words, and for meetups dated after today): one Paper White box with 14px corners. With a mood, a row: the 44px Linen circle with the 26px face, then the word in Body 600 ("Okay"). Then the words, in Body with line breaks kept. A mood alone shows just the row; words alone show just the words. No colors and no scale.
+5. **How it felt** (hidden when there's no mood and no words, and for meetups dated after today): one Paper White box with 14px corners. With a mood, a row: the 44px Linen circle with the 26px face, then the word in Body 600 ("Okay"). Then the words, in Body with line breaks kept, each line's ends trimmed and blank lines at the start and end left out (`displayText`; storage keeps them). A mood alone shows just the row; words alone show just the words. No colors and no scale.
 6. **The day row:** an inset group with one row linking to `/meetups/:id/day`, with a 📝 emoji badge leading and a chevron.
    - With nothing written yet (`isDayEmpty`): an accent row, "Write about the day", with the subtitle "Places, what happened, how it felt".
    - Otherwise: "Edit the day".
@@ -550,6 +550,7 @@ Add:
   - `isDayEmpty`.
   - Both golden fixtures carry a comment that they are frozen for grammar 1.
 - `src/lib/dayEdit.test.ts`: `insertPlaceLine` into empty text, onto a blank line, after a line at the end (an empty line follows), and in the middle (no empty line), dropping a leading "@" and keeping an inner one; `insertPaidLine`; `insertAtCaret` spacing; `lineCaret` (no selection, a selected word, a selection ending after a line break) keeping every selected word; replaying the walkthrough's steps (helper inserts plus typed text) gives fixture A exactly.
+- `src/lib/text.test.ts`: `displayText` trims each line's ends, drops blank lines at the start and end and keeps those between, reads `\r\n`, and gives '' for blank words.
 - `src/lib/clock.test.ts`: the 12-hour and 24-hour formats, the no-break space, "~", and every `speakTime` sentence.
 - `src/lib/weather.test.ts` and `src/lib/moods.test.ts`: keys in order with distinct labels and emoji, and no face emoji in weather; `cleanWeather` (not a list, unknown keys, repeats, order); `isMood` false for "Good", "amazing", 3, "", "toString", null and undefined.
 - `src/db/meetups.test.ts`: `addMeetup` stores the defaults; `updateMeetup` leaves the day alone (a day saved by `updateDay`, trailing spaces included, survives an Edit save untouched); `updateDay` writes only the given fields and never the date, type, friends or activities; it resolves false for a missing id and creates nothing; it refuses an unknown mood ("Please pick a mood from the list.") and long feelings ("Keep how it felt under 4,000 characters.") and writes nothing; it saves a 30,000-character note; it normalizes line breaks and cleans weather; delete then restore keeps the day.

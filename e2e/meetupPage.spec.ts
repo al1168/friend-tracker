@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { addFriend, logMeetup, openDay, openFriendPage, tinyPhoto } from './helpers.ts'
+import { addFriend, logMeetup, openDay, openFriendPage, readMeetups, tinyPhoto } from './helpers.ts'
 
 /** Today as the app writes it in the current year ("Sat, Oct 3"). */
 function todayLabel(): string {
@@ -95,6 +95,8 @@ test('reads the day back: places in order with their times, paid tags, headings 
 })
 
 test('shows the weather in the hero and how it felt, and never in the history', async ({ page }) => {
+  // Written with stray spaces and blank lines around it, which are kept but not shown.
+  const felt = '\n  Easy and warm.  \nWould go again.\n\n'
   await page.goto('/')
   await addFriend(page, 'Alex')
   await logMeetup(page, ['Alex'], { type: 'Meal' })
@@ -104,13 +106,19 @@ test('shows the weather in the hero and how it felt, and never in the history', 
   await page.getByRole('group', { name: 'Weather' }).getByRole('button', { name: 'Windy' }).click()
   await page.getByRole('group', { name: 'Weather' }).getByRole('button', { name: 'Rainy' }).click()
   await page.getByRole('group', { name: 'Mood' }).getByRole('button', { name: 'Good' }).click()
-  await page.getByRole('textbox', { name: 'How it felt, in your words' }).fill('Easy and warm.\nWould go again.')
+  await page.getByRole('textbox', { name: 'How it felt, in your words' }).fill(felt)
   await page.getByRole('button', { name: 'Meal' }).click()
 
   await expect(page.getByText(`${todayLabel()} · 🌧️ Rainy, 🌬️ Windy`, { exact: true })).toBeVisible()
-  const felt = page.getByRole('region', { name: 'How it felt' })
-  await expect(felt.getByText('Mood: Good')).toBeVisible()
-  await expect(felt).toContainText('Easy and warm.\nWould go again.')
+  // Each weather keeps its emoji and word together when the line wraps at large text sizes.
+  await expect(page.locator('.meetup-hero__weather')).toHaveText(['🌧️ Rainy', '🌬️ Windy'])
+  await expect(page.locator('.meetup-hero__weather').first()).toHaveCSS('white-space', 'nowrap')
+  const feltBox = page.getByRole('region', { name: 'How it felt' })
+  await expect(feltBox.getByText('Mood: Good')).toBeVisible()
+  expect(await feltBox.locator('.felt-box__words').evaluate((words) => words.textContent)).toBe(
+    'Easy and warm.\nWould go again.',
+  )
+  expect((await readMeetups(page))[0].feelings).toBe(felt)
   await expect(page.getByRole('region', { name: 'The day' })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Edit the day' })).toBeVisible()
 

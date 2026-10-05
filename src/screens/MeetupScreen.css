@@ -28,6 +28,9 @@
   margin: 0;
   color: var(--ink-2);
 }
+.meetup-hero__weather {
+  white-space: nowrap;
+}
 .meetup-hero__with {
   display: flex;
   flex-direction: column;
