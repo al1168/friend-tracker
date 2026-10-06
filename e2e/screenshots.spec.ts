@@ -100,6 +100,16 @@ async function captureFullDay(page: Page, path: string) {
   await style.evaluate((element) => element.parentNode?.removeChild(element))
 }
 
+/**
+ * A full-page capture of a list, to see where everything lands. The tab bar and the "+ Log meetup" pill are fixed,
+ * so they'd be painted where they sit on screen, over the middle of the image: they're hidden for the capture.
+ */
+async function captureFullList(page: Page, path: string) {
+  const style = await page.addStyleTag({ content: '.tabbar, .log-button { visibility: hidden !important; }' })
+  await page.screenshot({ path, fullPage: true })
+  await style.evaluate((element) => element.parentNode?.removeChild(element))
+}
+
 /** On the day page: writes the owner's example (as typed in the app), with the weather, the face and the words. */
 async function writeOwnersDay(page: Page) {
   await page.getByRole('group', { name: 'Weather' }).getByRole('button', { name: 'Rainy' }).click()
@@ -110,8 +120,8 @@ async function writeOwnersDay(page: Page) {
 
 async function captureAll(page: Page, prefix: string) {
   await page.screenshot({ path: `${DIR}/${prefix}-02-friends.png` })
-  // Where the search field and the friend list land below Birthdays soon and Recent meetups.
-  await page.screenshot({ path: `${DIR}/${prefix}-02-friends-full.png`, fullPage: true })
+  // Where the search field, the chips and the friend list land below Birthdays soon and Recent meetups.
+  await captureFullList(page, `${DIR}/${prefix}-02-friends-full.png`)
 
   // The Log sheet's footer, then the day page written through it.
   await page.getByRole('button', { name: 'Log meetup' }).click()
@@ -161,7 +171,7 @@ async function captureAll(page: Page, prefix: string) {
   await page.getByRole('link', { name: 'See all meetups' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Meetups' })).toBeVisible()
   await page.waitForTimeout(500)
-  await page.screenshot({ path: `${DIR}/${prefix}-19-meetups.png`, fullPage: true })
+  await captureFullList(page, `${DIR}/${prefix}-19-meetups.png`)
   await page.getByRole('searchbox', { name: 'Search meetups' }).fill('ramen')
   await expect(page.locator('.inset-group .row__title')).toHaveText(['Meal'])
   await page.waitForTimeout(500)

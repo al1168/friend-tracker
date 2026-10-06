@@ -384,8 +384,9 @@ Counts afterwards: unit tests go from 57 files to 58 (the new `src/stats/meetupH
 **Screenshots** (`e2e/screenshots.spec.ts`, in light, dark and large text, inside `captureAll`, so the test count stays 15):
 - The seed adds an upcoming Party with Maya Patel in 2 days (Stats and the friend pages captured don't change; future meetups aren't counted).
 - `02-friends` now shows Recent meetups under Birthdays soon.
-- New `02-friends-full`: the Friends tab, full page, right after `02-friends`, to see where the search field and the friend list land.
+- New `02-friends-full`: the Friends tab, full page, right after `02-friends`, to see where the search field, the chips and the friend list land.
 - New `19-meetups`: the Meetups page, full page, after the owner's example is logged (Upcoming, then the months).
+- Both full-page captures hide the tab bar and the "+ Log meetup" pill while they're taken (`captureFullList`): they're fixed, so a full-page capture would paint them over the middle of the image, on the chips and the Recent meetups rows to be judged. The older full-page captures (`05-friend-full`, `06-stats`, `12-meetup`) keep them, as before.
 - New `20-meetups-search`: the Meetups page searched for "ramen".
 - `04-friend` and `05-friend-full` look the same as before (the shared row).
 
