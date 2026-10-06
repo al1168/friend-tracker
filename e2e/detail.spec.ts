@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test'
-import { addFriend, LARGE_TEXT, logMeetup, tinyPhoto } from './helpers.ts'
+import { addFriend, friendLink, LARGE_TEXT, logMeetup, tinyPhoto } from './helpers.ts'
 
 test('shows a friend’s stats and history', async ({ page }) => {
   await page.goto('/')
   await addFriend(page, 'Alex')
   await addFriend(page, 'Sam')
   await logMeetup(page, ['Alex', 'Sam'], { type: 'Meal', note: 'Tacos' })
-  await page.getByRole('link', { name: /Alex/ }).click()
+  await friendLink(page, 'Alex').click()
 
   await expect(page.getByRole('heading', { level: 1, name: 'Alex' })).toBeVisible()
   await expect(page.getByText(/^Last seen .* · Today$/)).toBeVisible()
@@ -27,7 +27,7 @@ test('history rows show activities and the first photo', async ({ page }) => {
     photos: [tinyPhoto('one.png'), tinyPhoto('two.png')],
   })
   await logMeetup(page, ['Alex'])
-  await page.getByRole('link', { name: /Alex/ }).click()
+  await friendLink(page, 'Alex').click()
 
   const history = page.getByRole('region', { name: 'History' })
   const meal = history.getByRole('link', { name: /Meal.*with Sam · Karaoke, Walk · Tacos/ })
@@ -46,7 +46,7 @@ test('history rows show the day’s first places, or its first line cut at 80 ch
   await logMeetup(page, ['Alex', 'Sam'], { type: 'Meal', note: '@Cafe 10:30\nCoffee\n@Park\n@Bar 7pm\n@cafe\n@Gym' })
   const long = 'We walked all the way along the river to the old bridge and back again before dinner'
   await logMeetup(page, ['Alex'], { type: 'Drinks', note: `${long}\nSecond line` })
-  await page.getByRole('link', { name: /Alex/ }).click()
+  await friendLink(page, 'Alex').click()
 
   const history = page.getByRole('region', { name: 'History' })
   await expect(history.getByRole('link', { name: /Meal/ })).toHaveAccessibleName(
@@ -60,7 +60,7 @@ test('history rows show the day’s first places, or its first line cut at 80 ch
 test('logs from the friend page with them preselected', async ({ page }) => {
   await page.goto('/')
   await addFriend(page, 'Alex')
-  await page.getByRole('link', { name: /Alex/ }).click()
+  await friendLink(page, 'Alex').click()
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
   await expect(sheet.getByRole('button', { name: 'Remove Alex' })).toBeVisible()
@@ -72,7 +72,7 @@ test('logs from the friend page with them preselected', async ({ page }) => {
 test('the meetup just logged scrolls clear of its toast and opens with one tap', async ({ page }) => {
   await page.goto('/')
   await addFriend(page, 'Alex')
-  await page.getByRole('link', { name: /Alex/ }).click()
+  await friendLink(page, 'Alex').click()
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
   await sheet.getByRole('button', { name: 'Save', exact: true }).click()
@@ -102,7 +102,7 @@ test('at large text, the meetup just logged scrolls clear of a toast that wraps,
   await page.addStyleTag({ content: LARGE_TEXT })
   const name = 'Bartholomew Fitzgerald-Montgomery'
   await addFriend(page, name)
-  await page.getByRole('link', { name: new RegExp(name) }).click()
+  await friendLink(page, name).click()
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
   await sheet.getByRole('button', { name: 'Save', exact: true }).click()
@@ -132,7 +132,7 @@ test('at large text, the room for a toast that wrapped stays after it goes, unti
   await page.addStyleTag({ content: LARGE_TEXT })
   const name = 'Bartholomew Fitzgerald-Montgomery'
   await addFriend(page, name)
-  await page.getByRole('link', { name: new RegExp(name) }).click()
+  await friendLink(page, name).click()
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
   await sheet.getByRole('button', { name: 'Save', exact: true }).click()
@@ -164,7 +164,7 @@ test('edits a meetup from its page, then deletes it with undo', async ({ page })
   await page.goto('/')
   await addFriend(page, 'Alex')
   await logMeetup(page, ['Alex'])
-  await page.getByRole('link', { name: /Alex/ }).click()
+  await friendLink(page, 'Alex').click()
   const history = page.getByRole('region', { name: 'History' })
 
   await history.getByRole('link', { name: /Coffee/ }).click()
@@ -188,7 +188,7 @@ test('edits a meetup from its page, then deletes it with undo', async ({ page })
 test('edits and deletes a friend', async ({ page }) => {
   await page.goto('/')
   await addFriend(page, 'Alex')
-  await page.getByRole('link', { name: /Alex/ }).click()
+  await friendLink(page, 'Alex').click()
 
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
   const sheet = page.getByRole('dialog', { name: 'Edit friend' })
@@ -207,7 +207,7 @@ test('shows a future meetup as upcoming without counting it', async ({ page }) =
   await page.goto('/')
   await addFriend(page, 'Alex')
   await logMeetup(page, ['Alex'], { date: '2099-01-01' })
-  await page.getByRole('link', { name: /Alex/ }).click()
+  await friendLink(page, 'Alex').click()
 
   await expect(page.getByText('Not seen yet')).toBeVisible()
   await expect(page.locator('.stat-row__item').first()).toHaveText(/This year\s*0$/)

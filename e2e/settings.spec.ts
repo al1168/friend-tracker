@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { addFriend, goToTab, logMeetup } from './helpers.ts'
+import { addFriend, friendLink, goToTab, logMeetup } from './helpers.ts'
 
 test('manages groups', async ({ page }) => {
   await page.goto('/#/settings/groups')
@@ -74,8 +74,8 @@ test('exports and imports a backup', async ({ page }) => {
   await expect(page.getByRole('status')).toContainText('Backup restored')
 
   await goToTab(page, 'Friends')
-  await expect(page.getByRole('link', { name: /Alex/ })).toBeVisible()
-  await expect(page.getByRole('link', { name: /Kim/ })).toHaveCount(0)
+  await expect(friendLink(page, 'Alex')).toBeVisible()
+  await expect(friendLink(page, 'Kim')).toHaveCount(0)
 })
 
 test('rejects a file that is not a backup', async ({ page }) => {

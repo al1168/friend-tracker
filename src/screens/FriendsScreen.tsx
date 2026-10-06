@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useActionSheet } from '../components/ActionSheet'
 import { Avatar } from '../components/Avatar'
 import { Chip } from '../components/Chip'
@@ -7,8 +7,9 @@ import { IconPlus, IconSearch, IconSort } from '../components/icons'
 import { InsetGroup, Row } from '../components/InsetGroup'
 import { LogButton } from '../components/LogButton'
 import { InstallHint } from '../components/InstallHint'
-import { Page } from '../components/Page'
-import { useFriends, useGroups, useMeetups, useSetting } from '../data/hooks'
+import { MeetupRow } from '../components/MeetupRow'
+import { Page, type NavState } from '../components/Page'
+import { useFriends, useGroups, useMeetupIdsWithPhotos, useMeetups, useMeetupTypes, useSetting } from '../data/hooks'
 import { setSetting } from '../db/settings'
 import { useToday } from '../hooks/useToday'
 import { describeNextBirthday, upcomingBirthdays } from '../lib/birthdays'
@@ -20,6 +21,7 @@ import { formatSince } from '../lib/text'
 import { useSheets } from '../sheets/sheetsContext'
 import { countsByFriendForYear } from '../stats/counts'
 import { lastSeenByFriend } from '../stats/lastSeen'
+import { meetupNames, RECENT_MEETUPS, RECENT_MEETUPS_WITH_BIRTHDAYS, recentMeetups } from '../stats/meetupHistory'
 import { FRIEND_SORT_LABELS, sortFriends, type FriendSort } from '../stats/sortFriends'
 import './FriendsScreen.css'
 
@@ -27,6 +29,8 @@ const SORT_KEY = 'friend-tracker:sort'
 const SORTS = Object.keys(FRIEND_SORT_LABELS) as FriendSort[]
 /** The most rows Birthdays soon shows. Its footer counts the rest. */
 const MAX_BIRTHDAYS_SOON = 3
+/** A meetup opened from Recent meetups says "Friends" on its back button. */
+const FROM_FRIENDS: NavState = { backLabel: 'Friends' }
 
 function readStoredSort(): FriendSort {
   try {
@@ -50,6 +54,8 @@ export function FriendsScreen() {
   const friends = useFriends()
   const groups = useGroups()
   const meetups = useMeetups()
+  const types = useMeetupTypes()
+  const withPhotos = useMeetupIdsWithPhotos()
   const hintDismissed = useSetting('installHintDismissed')
   const today = useToday()
   const { openFriendSheet } = useSheets()
@@ -57,8 +63,13 @@ export function FriendsScreen() {
   const [query, setQuery] = useState('')
   const [groupFilter, setGroupFilter] = useState<string | null>(null)
   const [sort, setSort] = useState<FriendSort>(readStoredSort)
+  const filtersRef = useRef<HTMLDivElement>(null)
+  // Where the search field was before a search or a chip hid or showed the groups above it.
+  const filtersTopBefore = useRef<number | null>(null)
 
   const activeGroup = groups?.find((group) => group.id === groupFilter) ?? null
+  // Searching or filtering hides Birthdays soon and Recent meetups, so the list below stays a plain filtered list.
+  const unfiltered = query.trim() === '' && activeGroup === null
   const groupNames = useMemo(() => new Map((groups ?? []).map((group) => [group.id, group.name] as const)), [groups])
 
   const rows = useMemo(() => {
@@ -75,6 +86,32 @@ export function FriendsScreen() {
   }, [friends, meetups, today, sort, activeGroup, query])
 
   const birthdaysSoon = useMemo(() => upcomingBirthdays(friends ?? [], today), [friends, today])
+  const showBirthdaysSoon = birthdaysSoon.length > 0 && unfiltered
+  // Recent meetups gives up a row while Birthdays soon shows above it, so the search field stays nearer the top.
+  const recent = useMemo(
+    () => recentMeetups(meetups ?? [], today, showBirthdaysSoon ? RECENT_MEETUPS_WITH_BIRTHDAYS : RECENT_MEETUPS),
+    [meetups, today, showBirthdaysSoon],
+  )
+  const nameById = useMemo(() => new Map((friends ?? []).map((friend) => [friend.id, friend.name] as const)), [friends])
+  const typeById = useMemo(() => new Map((types ?? []).map((type) => [type.id, type] as const)), [types])
+
+  // Safari has no scroll anchoring, so when the groups above the search field hide or come back, the page
+  // scrolls by what went away or came back, before paint: the field stays where your eyes are. The browser clamps
+  // the scroll at the top and bottom of the page, so there the field can come to rest a little off, never off screen.
+  useLayoutEffect(() => {
+    const before = filtersTopBefore.current
+    filtersTopBefore.current = null
+    const filters = filtersRef.current
+    if (before === null || !filters) return
+    window.scrollBy(0, filters.getBoundingClientRect().top - before)
+  }, [unfiltered])
+
+  /** Before a search or chip change: notes where the field is when the change will hide or show the groups. */
+  function keepFiltersStill(nextUnfiltered: boolean) {
+    if (nextUnfiltered !== unfiltered && filtersRef.current) {
+      filtersTopBefore.current = filtersRef.current.getBoundingClientRect().top
+    }
+  }
 
   async function chooseSort() {
     const choice = await showActionSheet<FriendSort>({
@@ -87,10 +124,8 @@ export function FriendsScreen() {
     }
   }
 
-  if (!friends || !groups || !meetups || hintDismissed === undefined) return null
+  if (!friends || !groups || !meetups || !types || !withPhotos || hintDismissed === undefined) return null
 
-  // Hidden while searching or filtering, so the list below stays a plain filtered list.
-  const showBirthdaysSoon = birthdaysSoon.length > 0 && query.trim() === '' && activeGroup === null
   const moreBirthdays = birthdaysSoon.length - MAX_BIRTHDAYS_SOON
 
   return (
@@ -145,7 +180,25 @@ export function FriendsScreen() {
             </InsetGroup>
           )}
 
-          <div className="friends-filters">
+          {unfiltered && recent.length > 0 && (
+            <InsetGroup title="Recent meetups">
+              {recent.map((meetup) => (
+                <MeetupRow
+                  key={meetup.id}
+                  meetup={meetup}
+                  type={typeById.get(meetup.typeId)}
+                  names={meetupNames(meetup, nameById)}
+                  today={today}
+                  state={FROM_FRIENDS}
+                  hasPhoto={withPhotos.has(meetup.id)}
+                  subtitleLines={2}
+                />
+              ))}
+              <Row to="/meetups" title="See all meetups" accent chevron />
+            </InsetGroup>
+          )}
+
+          <div className="friends-filters" ref={filtersRef}>
             <label className="search">
               <IconSearch size={18} />
               <input
@@ -155,7 +208,11 @@ export function FriendsScreen() {
                 aria-label="Search friends"
                 enterKeyHint="search"
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value
+                  keepFiltersStill(value.trim() === '' && activeGroup === null)
+                  setQuery(value)
+                }}
                 onKeyDown={(event) => {
                   if (isPlainEnter(event)) event.currentTarget.blur()
                 }}
@@ -163,14 +220,23 @@ export function FriendsScreen() {
             </label>
             {groups.length > 0 && (
               <div className="chip-row" role="group" aria-label="Filter by group">
-                <Chip selected={activeGroup === null} onClick={() => setGroupFilter(null)}>
+                <Chip
+                  selected={activeGroup === null}
+                  onClick={() => {
+                    keepFiltersStill(query.trim() === '')
+                    setGroupFilter(null)
+                  }}
+                >
                   All
                 </Chip>
                 {groups.map((group) => (
                   <Chip
                     key={group.id}
                     selected={activeGroup?.id === group.id}
-                    onClick={() => setGroupFilter(group.id)}
+                    onClick={() => {
+                      keepFiltersStill(false)
+                      setGroupFilter(group.id)
+                    }}
                   >
                     {group.name}
                   </Chip>

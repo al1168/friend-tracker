@@ -5,6 +5,7 @@ import {
   addToList,
   dayFromToday,
   drawnPhoto,
+  friendLink,
   goToTab,
   LARGE_TEXT,
   lockHeading,
@@ -63,7 +64,7 @@ async function seed(page: Page) {
   await logMeetup(page, ['Theo Brooks'], { type: 'Call', date: daysAgo(120) })
   await logMeetup(page, ['Alex Rivera', 'Kim Park', 'Jordan Lee'], { type: 'Party', date: daysAgo(300) })
   await logMeetup(page, ['Sam Chen'], { type: 'Trip', date: daysAgo(400) })
-  await page.getByRole('link', { name: /Alex Rivera/ }).click()
+  await friendLink(page, 'Alex Rivera').click()
   // Alex's birthday is further off, so the friend page shows it but Birthdays soon doesn't
   // (and Alex keeps a single link on the Friends tab).
   const inForty = dayFromToday(40)
@@ -151,7 +152,7 @@ async function captureAll(page: Page, prefix: string) {
   await page.getByRole('button', { name: 'Back' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
 
-  await page.getByRole('link', { name: /Alex Rivera/ }).click()
+  await friendLink(page, 'Alex Rivera').click()
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${DIR}/${prefix}-04-friend.png` })
   await page.screenshot({ path: `${DIR}/${prefix}-05-friend-full.png`, fullPage: true })

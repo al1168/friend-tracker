@@ -143,7 +143,7 @@ export async function addPhotos(sheet: Locator, files: PhotoFile[]) {
 /** Opens a friend's page from the Friends tab. */
 export async function openFriendPage(page: Page, name: string) {
   await goToTab(page, 'Friends')
-  await page.getByRole('link', { name: new RegExp(name) }).click()
+  await friendLink(page, name).click()
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
 }
 
@@ -488,4 +488,140 @@ export async function stubPush(page: Page, { answer = 'granted' }: { answer?: No
     },
     { answer, subscription: FAKE_SUBSCRIPTION, storeKey: FAKE_SUBSCRIPTION_KEY },
   )
+}
+
+/** "a.b" as a pattern that matches only "a.b". */
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * A friend's row on the Friends tab (or Birthdays soon) by the friend's name. A friend row's name starts with the
+ * friend's name (the avatar is hidden); a meetup row's starts with its type, so "with Alex" never matches.
+ */
+export function friendLink(page: Page, name: string): Locator {
+  return page.getByRole('link', { name: new RegExp(`^${escapeRegExp(name)}`) })
+}
+
+/** A friend as IndexedDB stores it, for seedMeetups. */
+export interface SeedFriend {
+  id: string
+  name: string
+  groupId: string | null
+  photo: string | null
+  notes: string
+  likes: string[]
+  dislikes: string[]
+  birthday: { month: number; day: number; year: number | null } | null
+  createdAt: string
+}
+
+/** A meetup as IndexedDB stores it, for seedMeetups. */
+export interface SeedMeetup {
+  id: string
+  date: string
+  typeId: string
+  friendIds: string[]
+  note: string
+  activities: string[]
+  weather: string[]
+  mood: string | null
+  feelings: string
+  createdAt: string
+}
+
+/** A meetup photo as IndexedDB stores it, for seedMeetups. */
+export interface SeedPhoto {
+  id: string
+  meetupId: string
+  order: number
+  full: string
+  thumb: string
+  width: number
+  height: number
+  createdAt: string
+}
+
+/** A complete friend row with nothing filled in but what's given. */
+export function friendRow(id: string, name: string, fields: Partial<SeedFriend> = {}): SeedFriend {
+  return {
+    id,
+    name,
+    groupId: null,
+    photo: null,
+    notes: '',
+    likes: [],
+    dislikes: [],
+    birthday: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    ...fields,
+  }
+}
+
+/** A complete meetup row: a Coffee (one of the default types) unless `typeId` says otherwise, logged at noon UTC. */
+export function meetupRow(
+  id: string,
+  date: string,
+  friendIds: string[],
+  fields: Partial<SeedMeetup> = {},
+): SeedMeetup {
+  return {
+    id,
+    date,
+    typeId: 'type-coffee',
+    friendIds,
+    note: '',
+    activities: [],
+    weather: [],
+    mood: null,
+    feelings: '',
+    createdAt: `${date}T12:00:00.000Z`,
+    ...fields,
+  }
+}
+
+/** A meetup's first photo: the 1×1 PNG as both the full image and the thumbnail. */
+export function photoRow(id: string, meetupId: string): SeedPhoto {
+  const image = `data:image/png;base64,${ONE_PIXEL_PNG}`
+  return { id, meetupId, order: 0, full: image, thumb: image, width: 1, height: 1, createdAt: '2026-09-01T12:00:00Z' }
+}
+
+/**
+ * Writes friends, groups, meetups and photos straight into IndexedDB in one transaction, skipping the app's
+ * checks (so every row must be complete), then reloads so the app reads them. Call it after the first
+ * `page.goto`, once the app has created its stores.
+ */
+export async function seedMeetups(
+  page: Page,
+  seed: {
+    friends?: SeedFriend[]
+    groups?: { id: string; name: string }[]
+    meetups?: SeedMeetup[]
+    photos?: SeedPhoto[]
+  },
+) {
+  await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
+  await page.evaluate(
+    async ({ friends, groups, meetups, photos }) => {
+      await new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open('friend-tracker')
+        request.onerror = () => reject(request.error)
+        request.onsuccess = () => {
+          const database = request.result
+          const transaction = database.transaction(['friends', 'groups', 'meetups', 'meetupPhotos'], 'readwrite')
+          for (const row of friends) transaction.objectStore('friends').put(row)
+          for (const row of groups) transaction.objectStore('groups').put(row)
+          for (const row of meetups) transaction.objectStore('meetups').put(row)
+          for (const row of photos) transaction.objectStore('meetupPhotos').put(row)
+          transaction.oncomplete = () => {
+            database.close()
+            resolve()
+          }
+          transaction.onerror = () => reject(transaction.error)
+        }
+      })
+    },
+    { friends: seed.friends ?? [], groups: seed.groups ?? [], meetups: seed.meetups ?? [], photos: seed.photos ?? [] },
+  )
+  await page.reload()
 }
