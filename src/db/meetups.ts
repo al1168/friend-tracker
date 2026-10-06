@@ -238,17 +238,26 @@ export function forgetPhotoThumbs() {
 }
 
 /**
- * The thumbnail of a meetup's first photo, or null when it has none. Reads the first photo's id through the
- * [meetupId+order] index without loading it, so a live query still follows photos added, removed or reordered,
- * then takes the thumbnail from the cache, or reads that one photo once and keeps only its thumbnail.
+ * The id of a meetup's first photo, or undefined when it has none: one key-only read of the [meetupId+order]
+ * index, so a live query follows photos added, removed or reordered without loading any.
  */
-export async function firstPhotoThumb(meetupId: string): Promise<string | null> {
-  // Key-only, then get: Dexie's live-query cache keeps whole rows of record queries, full images included.
+async function firstPhotoId(meetupId: string): Promise<string | undefined> {
+  // Key-only: Dexie's live-query cache keeps whole rows of record queries, full images included.
   const [id] = await db.meetupPhotos
     .where('[meetupId+order]')
     .between([meetupId, -Infinity], [meetupId, Infinity])
     .limit(1)
     .primaryKeys()
+  return id
+}
+
+/**
+ * The thumbnail of a meetup's first photo, or null when it has none. Reads the first photo's id without loading
+ * it (firstPhotoId), then takes the thumbnail from the cache, or reads that one photo once and keeps only its
+ * thumbnail.
+ */
+export async function firstPhotoThumb(meetupId: string): Promise<string | null> {
+  const id = await firstPhotoId(meetupId)
   if (!id) return null
   const cached = cachedThumb(id)
   if (cached !== undefined) return cached
@@ -259,9 +268,22 @@ export async function firstPhotoThumb(meetupId: string): Promise<string | null> 
   return thumb
 }
 
-/** The ids of the meetups that have photos, each once: a key-only walk of the meetupId index, reading no image. */
+/**
+ * The ids of the meetups that have photos, each once: a key-only walk of the meetupId index, reading no image.
+ * The walk takes one IndexedDB round trip per meetup with photos, so it grows with the history; for a few known
+ * meetups, meetupIdsWithPhotosAmong is bounded.
+ */
 export async function meetupIdsWithPhotos(): Promise<string[]> {
   return (await db.meetupPhotos.orderBy('meetupId').uniqueKeys()) as string[]
+}
+
+/**
+ * Which of these meetups have photos: each one's first photo id read key-only (firstPhotoId), all at once, so it
+ * takes about one round trip however long the history is. Reads no image.
+ */
+export async function meetupIdsWithPhotosAmong(meetupIds: readonly string[]): Promise<Set<string>> {
+  const firsts = await Promise.all(meetupIds.map(firstPhotoId))
+  return new Set(meetupIds.filter((_, i) => firsts[i] !== undefined))
 }
 
 /** A meetup's photos as ids and thumbnails, in order. Never returns a full image (see firstPhotoThumb). */

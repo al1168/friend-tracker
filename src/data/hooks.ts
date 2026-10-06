@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useContext } from 'react'
 import { db } from '../db/db'
-import { firstPhotoThumb, photoById, photoCount, photoThumbs } from '../db/meetups'
+import { firstPhotoThumb, meetupIdsWithPhotosAmong, photoById, photoCount, photoThumbs } from '../db/meetups'
 import { getSetting, type Settings } from '../db/settings'
 import { compareNames } from '../lib/text'
 import type { Friend, Group, Meetup, MeetupPhoto, MeetupType } from '../types'
@@ -61,6 +61,16 @@ export function useMeetupIdsWithPhotos(): ReadonlySet<string> | undefined {
   const ids = useContext(MeetupIdsWithPhotosContext)
   if (ids === null) throw new Error('useMeetupIdsWithPhotos must be used inside MeetupIdsWithPhotosProvider')
   return ids
+}
+
+/**
+ * Which of a few meetups have photos, kept live: a bounded read for a screen that shows only a few rows, so it
+ * never waits for the app-wide walk. `undefined` while `meetupIds` is (its data is loading) and until the first
+ * answer; when the ids change, the last answer stays until the new one arrives, so the screen never blanks.
+ */
+export function useMeetupIdsWithPhotosAmong(meetupIds: readonly string[] | undefined): ReadonlySet<string> | undefined {
+  const key = meetupIds?.join('\n')
+  return useLiveQuery(async () => (meetupIds ? meetupIdsWithPhotosAmong(meetupIds) : undefined), [key])
 }
 
 /** How many meetup photos are stored. Counts without reading any image. */

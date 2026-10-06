@@ -9,7 +9,7 @@ import { LogButton } from '../components/LogButton'
 import { InstallHint } from '../components/InstallHint'
 import { MeetupRow } from '../components/MeetupRow'
 import { Page, type NavState } from '../components/Page'
-import { useFriends, useGroups, useMeetupIdsWithPhotos, useMeetups, useMeetupTypes, useSetting } from '../data/hooks'
+import { useFriends, useGroups, useMeetupIdsWithPhotosAmong, useMeetups, useMeetupTypes, useSetting } from '../data/hooks'
 import { setSetting } from '../db/settings'
 import { useToday } from '../hooks/useToday'
 import { describeNextBirthday, upcomingBirthdays } from '../lib/birthdays'
@@ -55,9 +55,13 @@ export function FriendsScreen() {
   const groups = useGroups()
   const meetups = useMeetups()
   const types = useMeetupTypes()
-  const withPhotos = useMeetupIdsWithPhotos()
   const hintDismissed = useSetting('installHintDismissed')
   const today = useToday()
+  // The 3 latest past meetups, whatever shows, so searching or Birthdays soon hiding never changes what's read.
+  const latest = useMemo(() => (meetups ? recentMeetups(meetups, today, RECENT_MEETUPS) : undefined), [meetups, today])
+  // Which of them have photos: a few key-only reads at once, so the screen the app opens on never waits for the
+  // app-wide walk of every meetup with photos (MeetupIdsWithPhotosProvider), which grows with the history.
+  const latestWithPhotos = useMeetupIdsWithPhotosAmong(latest?.map((meetup) => meetup.id))
   const { openFriendSheet } = useSheets()
   const showActionSheet = useActionSheet()
   const [query, setQuery] = useState('')
@@ -89,8 +93,8 @@ export function FriendsScreen() {
   const showBirthdaysSoon = birthdaysSoon.length > 0 && unfiltered
   // Recent meetups gives up a row while Birthdays soon shows above it, so the search field stays nearer the top.
   const recent = useMemo(
-    () => recentMeetups(meetups ?? [], today, showBirthdaysSoon ? RECENT_MEETUPS_WITH_BIRTHDAYS : RECENT_MEETUPS),
-    [meetups, today, showBirthdaysSoon],
+    () => (latest ?? []).slice(0, showBirthdaysSoon ? RECENT_MEETUPS_WITH_BIRTHDAYS : RECENT_MEETUPS),
+    [latest, showBirthdaysSoon],
   )
   const nameById = useMemo(() => new Map((friends ?? []).map((friend) => [friend.id, friend.name] as const)), [friends])
   const typeById = useMemo(() => new Map((types ?? []).map((type) => [type.id, type] as const)), [types])
@@ -124,7 +128,7 @@ export function FriendsScreen() {
     }
   }
 
-  if (!friends || !groups || !meetups || !types || !withPhotos || hintDismissed === undefined) return null
+  if (!friends || !groups || !meetups || !types || !latestWithPhotos || hintDismissed === undefined) return null
 
   const moreBirthdays = birthdaysSoon.length - MAX_BIRTHDAYS_SOON
 
@@ -190,7 +194,7 @@ export function FriendsScreen() {
                   names={meetupNames(meetup, nameById)}
                   today={today}
                   state={FROM_FRIENDS}
-                  hasPhoto={withPhotos.has(meetup.id)}
+                  hasPhoto={latestWithPhotos.has(meetup.id)}
                   subtitleLines={2}
                 />
               ))}

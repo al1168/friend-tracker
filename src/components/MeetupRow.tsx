@@ -16,7 +16,10 @@ interface MeetupRowProps {
   today: ISODate
   /** Router state for the Meetup page: its back label, and the tab it keeps. */
   state: NavState
-  /** Whether the meetup has a photo (from useMeetupIdsWithPhotos), so the thumbnail's box is there from the start. */
+  /**
+   * Whether the meetup has a photo (from useMeetupIdsWithPhotos, or useMeetupIdsWithPhotosAmong on the Friends
+   * tab), so the thumbnail's box is there from the start.
+   */
   hasPhoto: boolean
   /** Stops the subtitle at this many lines (Recent meetups passes 2). Omitted: the whole subtitle wraps. */
   subtitleLines?: number

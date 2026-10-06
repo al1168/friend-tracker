@@ -9,6 +9,7 @@ import {
   firstPhotoThumb,
   forgetPhotoThumbs,
   meetupIdsWithPhotos,
+  meetupIdsWithPhotosAmong,
   photoCount,
   photoThumbs,
   restoreMeetup,
@@ -498,5 +499,34 @@ describe('meetupIdsWithPhotos', () => {
     expect((await meetupIdsWithPhotos()).sort()).toEqual([three.id, none.id].sort())
     await updateMeetup(none.id, base, { add: [], removeIds: ['d'], order: [] })
     expect(await meetupIdsWithPhotos()).toEqual([three.id])
+  })
+})
+
+describe('meetupIdsWithPhotosAmong', () => {
+  it('names which of the given meetups have photos, without reading a photo', async () => {
+    const two = await addMeetup(base, { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: [] })
+    const none = await addMeetup(base)
+    const notAsked = await addMeetup(base, { add: [newPhoto('c')], removeIds: [], order: [] })
+    const reads = vi.spyOn(db.meetupPhotos, 'get')
+    expect([...(await meetupIdsWithPhotosAmong([none.id, two.id, 'gone']))]).toEqual([two.id])
+    expect((await meetupIdsWithPhotosAmong([])).size).toBe(0)
+    expect(reads).not.toHaveBeenCalled()
+    reads.mockRestore()
+    expect(await meetupIdsWithPhotosAmong([notAsked.id])).toEqual(new Set([notAsked.id]))
+  })
+
+  it('stays live: a first photo added, then the last one deleted', async () => {
+    const meetup = await addMeetup(base)
+    const other = await addMeetup(base, { add: [newPhoto('x')], removeIds: [], order: [] })
+    const seen: ReadonlySet<string>[] = []
+    const subscription = liveQuery(() => meetupIdsWithPhotosAmong([meetup.id, other.id])).subscribe((value) =>
+      seen.push(value),
+    )
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual(new Set([other.id])))
+    await updateMeetup(meetup.id, base, { add: [newPhoto('a')], removeIds: [], order: [] })
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual(new Set([meetup.id, other.id])))
+    await updateMeetup(other.id, base, { add: [], removeIds: ['x'], order: [] })
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual(new Set([meetup.id])))
+    subscription.unsubscribe()
   })
 })
