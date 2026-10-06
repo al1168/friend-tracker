@@ -1,6 +1,6 @@
 # Meetup history (Recent meetups and the Meetups page): design
 
-Date: 2026-10-05. Status: draft, revised after the UX and engineering reviews, for the owner to confirm.
+Date: 2026-10-05. Status: draft, revised after the UX and engineering reviews and again after the integration review, for the owner to confirm (including the choice under "If it still feels crowded").
 
 The owner said "I also want to see the recent meetup histories, in case I need to edit or look back at it." Today a meetup can only be found again from one friend's page, under History. This design adds two ways in: a small "Recent meetups" group on the Friends tab, and a "See all meetups" row that opens every meetup on one page. Both reuse the friend page's history row, and every row opens the Meetup page, where Edit and "Edit the day" already do the editing.
 
@@ -11,14 +11,14 @@ Make any meetup easy to find again, from the screen the app opens on: the last f
 ## Decisions
 
 - **On the Friends tab, after Birthdays soon.** A "Recent meetups" group shows the 3 latest meetups, then a "See all meetups" row. Looking back starts from people, on the tab the app opens to. (Also considered: a fourth "Meetups" tab, rejected because the app is three tabs and a whole tab for a list opened now and then would crowd the thumb row; and a link on Stats, rejected because Stats counts and doesn't remember. Each friend's page keeps its own History.)
-- **Recent meetups stays short.** Its rows' subtitles stop at two lines, like a Mail preview, so a long day can't push the friend list off the screen. The full text stays in the row for VoiceOver, and the Meetups page and a friend's History still show it all. If the Friends tab still feels crowded, the owner has two more options (see "If it still feels crowded").
+- **Recent meetups stays short.** Its rows' subtitles stop at two lines, like a Mail preview, so a long day can't push the friend list off the screen. The full text stays in the row for VoiceOver, and the Meetups page and a friend's History still show it all. Even so, on days Birthdays soon shows 3 rows the friend list and the search field start below the first screen; "If it still feels crowded" gives the two other options and what each does and doesn't change.
 - **Recent means it happened.** Only meetups dated today or earlier, newest first; on the same date, the one logged later comes first, as on the friend page. Upcoming meetups stay on the friend page and at the top of the Meetups page.
-- **Recent meetups gets out of the way.** It's hidden while searching or filtering by group (like Birthdays soon, so the list below stays a plain filtered list), when there are no friends (the welcome state shows instead), and when no meetup has happened yet. Hiding it (or Birthdays soon) never moves the search field: the page scrolls by what went away, so the field stays where your eyes are.
+- **Recent meetups gets out of the way.** It's hidden while searching or filtering by group (like Birthdays soon, so the list below stays a plain filtered list), when there are no friends (the welcome state shows instead), and when no meetup has happened yet. Searching or picking a group hides it and Birthdays soon without moving the search field: the page scrolls by what went away, so the field stays where your eyes are.
 - **One meetup row everywhere.** The friend page's history row becomes a shared `MeetupRow`: emoji badge, type (and "Upcoming"), the subtitle (date, "with", activities, the day's snippet) and the first photo's thumbnail. On a friend's page "with" still leaves that friend out; on the Friends tab and the Meetups page there's no friend to leave out, so it names everyone. Under the Meetups page's "Upcoming" title the rows leave out the "Upcoming" badge, because the title already says it.
 - **A Meetups page at `/meetups`,** pushed from the Friends tab, with "Friends" on its back button. It belongs to the Friends tab, which already owns every path that starts with `/meetups`.
 - **Grouped like the friend page.** "Upcoming" first (soonest first), then one group per month, newest first, titled "October 2026". Inside a month the order comes from the same `groupByMonth` the friend page uses, so the two can never disagree.
 - **Search finds memories by their words.** Friend names, the type, activities, the day (places are lines of the day, so they're in it) and How it felt's words for meetups that have happened (How it felt never shows for an upcoming one, so it's never searched there either). Every word typed must be found somewhere in the meetup, so "sam tacos" finds the Meal with Sam where you wrote "Tacos". Case, accents ("cafe" finds "Café") and curly or straight apostrophes don't matter. Weather, moods and dates are never searched: a mood is never a way to list meetups (the No Score Rule), and months are already the groups.
-- **Long histories show more when asked.** The page shows 60 rows, then a "Show older meetups" button adds 60 more. Nothing loads as you scroll (the app is not a feed), and only the rows shown read a thumbnail.
+- **Long histories show more when asked.** The page shows 60 rows, then a "Show older meetups" button adds 60 more. Nothing loads as you scroll (the app is not a feed), and only the rows shown that have a photo read a thumbnail.
 - **Coming back keeps your place.** The search, the rows shown and the scroll position survive opening a meetup and going back, so look, edit, back, next works. The app lock starts the page fresh.
 - **Nothing is edited on the lists.** A row opens the Meetup page; Edit there opens the Edit meetup sheet and "Edit the day" opens The day, exactly as today. No swipe actions.
 - **No data changes.** No schema change, no Dexie version, no backup change. The only new thing kept is an in-memory cache of thumbnails, so going back to a list doesn't read every photo again.
@@ -31,50 +31,63 @@ Make any meetup easy to find again, from the screen the app opens on: the last f
 - **Rows:** `recentMeetups(meetups, today)`, up to 3, each a `MeetupRow` naming everyone on the meetup, with `subtitleLines={2}` and the router state `{ backLabel: 'Friends' }`.
 - **The last row:** `<Row to="/meetups" title="See all meetups" accent chevron />`: Terracotta Ink title, no badge, no subtitle. It always shows while the group does, even with fewer than 3 meetups (the Meetups page also holds upcoming meetups and the search). With no leading slot, its hairline starts at the 16px text edge, as the inset group rule already does.
 - **Shown when** all hold: there's at least one friend, the trimmed search is blank, no group filter is on, and at least one meetup is dated today or earlier.
-- **Data:** the screen already reads `useMeetups()` and `useFriends()`; it adds `useMeetupTypes()` and renders nothing until all have loaded, as it does now for the others. A meetup just logged shows at the top straight away (live queries).
+- **Data:** the screen already reads `useMeetups()` and `useFriends()`; it adds `useMeetupTypes()` and `useMeetupIdsWithPhotos()` (see "Data") and renders nothing until all have loaded, as it does now for the others. A meetup just logged shows at the top straight away (live queries).
 - **Tapping a row** opens the Meetup page, whose back button reads "Friends". Back returns to the Friends tab.
 
-With the owner's example from the debrief design and two older meetups, on Mon, Oct 5. The text column is drawn at its real width on an iPhone 13 (about 190px, about 25 characters of Subhead); the badge, thumbnail and chevron are centered on each row:
+With the owner's example from the debrief design and two older meetups, on Mon, Oct 5. The text column is drawn at its real width on an iPhone 13: about 190px (about 30 characters of Subhead) on a row with a photo, about 245px (about 38) on a row without one, which has no thumbnail slot. The badge, thumbnail and chevron are centered on each row:
 
 ```
 Recent meetups
- (🍽️)  Meal                       [photo] ›
+ (🍽️)  Meal                             [photo] ›
        Sat, Oct 3 · with Mariya,
-       Jessie and Brandon · Mov…
- (☕)  Coffee                              ›
+       Jessie and Brandon · Movie,…
+ (☕)  Coffee                                   ›
        Wed, Sep 30 · with Kim Park
- (🍻)  Drinks                              ›
-       Sat, Sep 12 · with Alex
-       Rivera
-       See all meetups                     ›
+ (🍻)  Drinks                                   ›
+       Sat, Sep 12 · with Alex Rivera
+       See all meetups                          ›
 ```
 
 ### Two lines, like a Mail preview
 
-- `MeetupRow` with `subtitleLines={2}` adds the class `meetup-row--clamp`, whose `.row__subtitle` is `display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden`. WebKit ends the second line with "…".
+- With `subtitleLines`, `MeetupRow` passes `Row` its subtitle wrapped in `<span className="meetup-row__clamp" style={{ WebkitLineClamp: subtitleLines }}>`, and `MeetupRow.css` gives `.meetup-row__clamp` `display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden`. WebKit ends the second line with "…". `Row` and its markup stay as they are: it has no `className` prop, and a wrapper around the row would become the inset group body's direct child, which the hairline rules (`> * + *::before` and the `:has(.row__leading)` inset) target.
 - The whole subtitle stays in the DOM, so the link's name (what VoiceOver reads) is the full text, as on the friend page.
 - It stays two lines at every text size; the row grows taller with the text, as every row does.
 - Only Recent meetups clamps. A friend's History and the Meetups page wrap the whole subtitle, as the History does today.
 
 ### Keeping the search field still
 
-Safari has no scroll anchoring (`overflow-anchor` isn't supported), and when the field is low on the screen iOS scrolls the page on focus to lift it above the keyboard. Without help, the first letter typed (or a chip tap) would remove Birthdays soon and Recent meetups, about 550-650px above the field, and the field and the first matches would end up above the screen. Clearing the search would push the field the same distance down. So `FriendsScreen` keeps the field still itself:
+Safari has no scroll anchoring (`overflow-anchor` isn't supported), and when the field is low on the screen iOS scrolls the page on focus to lift it above the keyboard. Without help, the first letter typed (or a chip tap) would remove Birthdays soon and Recent meetups, about 510-600px above the field, and the field and the first matches would end up above the screen. Clearing the search would push the field the same distance down. So `FriendsScreen` keeps the field still itself:
 
 - `.friends-filters` gets a ref. `unfiltered` is `query.trim() === '' && activeGroup === null`, the part of "Shown when" that the search and the chips change.
 - In the search's `onChange` and each chip's `onClick`, when the change flips `unfiltered` (blank to typed, typed to blank, All to a group, a group to All), the handler records `ref.current.getBoundingClientRect().top` before calling the state setter.
 - A `useLayoutEffect` keyed on `unfiltered` then measures the top again, calls `window.scrollBy(0, newTop - oldTop)` and forgets the recorded top. It runs before paint, so nothing visibly jumps. The browser clamps the scroll at 0, so near the top of the page the field can move up into view, never away from it.
-- Changes that don't flip it (typing more letters, one group to another) do nothing. This also fixes the jump Birthdays soon causes today (about 260px).
+- Changes that don't flip it (typing more letters, one group to another) do nothing. This also fixes the jump Birthdays soon causes today (about 230px, about 255px with its "And N more" line).
+- Only the search and the chips are corrected. When the data changes what sits above the field (the first past meetup logged, the last one deleted or moved to a future date, a newer meetup whose subtitle wraps to a different number of lines, Birthdays soon changing at midnight), the field moves with the page, as any list does when its content changes.
+- With option C (below) nothing above the field ever hides, so this section, its e2e test and the "without moving the search field" lines would go.
 
 ### If it still feels crowded
 
-The owner chose 3 rows after Birthdays soon, and this design keeps that. The numbers under "Risks" show that on a day with Birthdays soon at 3 rows the friend list starts below the first screen. If that feels crowded once it's built, either of these can be added without changing anything else:
+The owner chose 3 rows after Birthdays soon (option A), and this design builds that. The positions below are page positions at the default text size, from the top of the page; what shows on first open is what sits above the tab bar, about 614px in Safari and about 713px on the Home Screen, with the "+ Log meetup" pill floating over the middle of the list at about 546-598px in Safari and 645-697px on the Home Screen ("Risks" has the measurements).
 
-- **B: two recent rows while Birthdays soon shows.** Recent meetups shows 2 rows on days Birthdays soon is showing, and 3 otherwise. The search field rises by one row (about 60-80px).
-- **C: the search field and chips at the top,** just under the large title, as in iOS Contacts. Finding a friend is then never below the fold, and hiding the groups can't move the field (it's above them). The friend list itself still starts below both groups.
+- **A, as designed:** on days Birthdays soon shows 3 rows, the search field sits at about 610-670px and the first friend row at about 730-790px. No friend row shows, and the search field is off the first screen too: behind the tab bar in Safari, and at the bottom of the Home Screen with its middle partly under the pill (the magnifier and "Search" stay visible). Today it sits clear at 326-370px. On days with no birthday in the next two weeks, the field sits at about 385-445px and one or two friends show clear on the Home Screen (at most one in Safari).
+- **B: two recent rows while Birthdays soon shows.** Recent meetups shows 2 rows on days Birthdays soon is showing, and 3 otherwise. On those days the search field rises by one row, to about 550-590px: clear of the pill on the Home Screen, but in Safari level with the pill, its bottom running under the tab bar at the high end. On other days nothing changes. B can be added later with no other change (DESIGN.md's "the 3 latest" and one test).
+- **C: the search field and chips at the top,** just under the large title, as in iOS Contacts, at about 100px every day. The order becomes: install hint (when shown), search field, group chips, Birthdays soon, Recent meetups, the friend list. This also moves Birthdays soon, which already ships at the top of the Friends tab ("above the search field" in DESIGN.md and the birthdays design), below the chips, about 116px lower. Nothing above the field ever hides, so "Keeping the search field still", its e2e test "The search field stays put", the "without moving the search field" lines here and in DESIGN.md, and the risk "Hiding the groups moves content above the search field" all go; an e2e check of the order (search field, chips, Birthdays soon, Recent meetups, friend list) takes the test's place. So C is cheaper to choose now than later: chosen after A is built, the scroll correction and its test would have been built only to be removed, and both DESIGN.md entries rewritten. The friend list starts where it does under A.
+
+What none of them does:
+
+- **On days Birthdays soon shows 3 rows, no option puts a friend row on the first screen.** With A or C no friend shows. With B (alone or with C) the first friend row sits at about 666-706px: none shows in Safari, and on the Home Screen at most its top peeks out beside the pill. B mainly lifts the search field by one recent row; C keeps search on the first screen. With 1 or 2 birthdays everything sits about 60 or 120px higher, and B then does bring a friend row into view on the Home Screen.
+- **On days with no birthday in the next two weeks, B changes nothing and C moves only the search field and chips:** the friend list starts at about 500-560px under all three.
+- Only a layout with no Recent meetups above the friend list on Birthdays soon days (hidden while Birthdays soon shows, or placed after the friend list) brings a friend back onto the first screen on those days. Even one recent row leaves the first friend at about 605-625px: below the fold in Safari, its lower part under the pill on the Home Screen.
+
+**VoiceOver and large text:**
+
+- **A and B:** swiping from the top, VoiceOver passes the title, Birthdays soon (its heading, up to 3 links and the "And N more" line), then Recent meetups (its heading, 3 links each read with its whole subtitle, and "See all meetups") before it reaches the search field; the rotor's Form Controls setting still jumps straight to it. At the large-text size the search field moves from about 440px today to an estimated 800-900px under A, and the friend list is about two screens down; B lifts it by one row on Birthdays soon days.
+- **C:** search is the first thing VoiceOver reaches after the title, and the least affected by large text: it stays just under the title at every size.
 
 ## Shared meetup row
 
-New `src/components/MeetupRow.tsx` and `MeetupRow.css`, taken from the friend page's history row with nothing visible changed:
+New `src/components/MeetupRow.tsx` and `MeetupRow.css`, taken from the friend page's history row with nothing visible changed once its thumbnail has loaded (see "Why the box"):
 
 ```tsx
 interface MeetupRowProps {
@@ -86,6 +99,8 @@ interface MeetupRowProps {
   today: ISODate
   /** Router state for the Meetup page: its back label, and the tab it keeps. */
   state: NavState
+  /** Whether the meetup has a photo (from useMeetupIdsWithPhotos), so the thumbnail's box is there from the first render. */
+  hasPhoto: boolean
   /** Stops the subtitle at this many lines (Recent meetups passes 2). Omitted: the whole subtitle wraps. */
   subtitleLines?: number
   /** The "Upcoming" badge on a future date. False under the Meetups page's "Upcoming" title. Default true. */
@@ -97,12 +112,13 @@ interface MeetupRowProps {
 
 - It renders the existing `Row` linking to `/meetups/:id` with `state`; the leading `.emoji-badge` (`aria-hidden`) with the type's emoji, or ✨; the title, the type's name or "Meetup", then a space and the `.upcoming-badge` "Upcoming" when `showUpcoming` and `meetup.date > today`; the subtitle `meetupSubtitle(meetup, names, today)`; the trailing thumbnail; and the chevron.
 - **`Row` gains `ref?: Ref<HTMLAnchorElement>`,** set on its `Link` (React 19 passes `ref` as a prop). `MeetupRow` passes its `ref` through. Nothing else about `Row` changes.
-- **The thumbnail:** `HistoryThumb` moves into this file as `MeetupThumb`, unchanged: `useFirstPhotoThumb(meetup.id)` (a key-only read of the first photo's id, then that photo's thumbnail, from the cache under "Data" when it's there), shown as `<img className="history-thumb" alt="">`, or nothing without photos. The `.history-thumb` rule moves from `FriendDetailScreen.css` to `MeetupRow.css` under the same class name.
-- **The friend page** (`src/screens/FriendDetailScreen.tsx`) uses it with `names={meetupNames(meetup, nameById, friend.id)}` and its existing `fromFriend` state, so the history still leaves out the friend it belongs to, still keeps the tab the page came from, still shows the "Upcoming" badge and still wraps the whole subtitle.
+- **The thumbnail:** `HistoryThumb` moves into this file as `MeetupThumb`, now rendered only when `hasPhoto`. It always draws a 40px box, `<span className="meetup-thumb" aria-hidden="true">` (40 by 40, 8px corners, Linen, `display: block`), and puts `<img className="history-thumb" alt="">` inside it once `useFirstPhotoThumb(meetup.id)` resolves (a key-only read of the first photo's id, then that photo's thumbnail, from the cache under "Data" when it's there). A row without a photo has no trailing slot and runs no thumbnail query. The `.history-thumb` rule moves from `FriendDetailScreen.css` to `MeetupRow.css` under the same class name, next to the new `.meetup-thumb`.
+- **Why the box:** `.row__trailing:empty` takes no space, so today a History row's text column is about 52px wider until its thumbnail arrives (the first render of a live query is always empty), and a subtitle that fit on one line wraps to two when it does. Knowing from the first render whether the row has a photo makes its width final on first paint: about 190px of text with the box, about 245px without. A thumbnail arriving only fills a box that's already there, so it never moves the page, the restored scroll or the search field.
+- **The friend page** (`src/screens/FriendDetailScreen.tsx`) uses it with `names={meetupNames(meetup, nameById, friend.id)}`, `hasPhoto={withPhotos.has(meetup.id)}` (the screen waits for `useMeetupIdsWithPhotos()` with its other data) and its existing `fromFriend` state, so the history still leaves out the friend it belongs to, still keeps the tab the page came from, still shows the "Upcoming" badge and still wraps the whole subtitle. The only visible change: a History row with a photo shows its Linen box for a moment before the thumbnail, instead of growing a line when it arrives.
 
 ## Meetups page
 
-New `src/screens/MeetupsScreen.tsx` and `MeetupsScreen.css`, routed in `src/App.tsx` with `<Route path="/meetups" element={<MeetupsScreen />} />` next to `/meetups/:id`. It's a `Page` with `title="Meetups"`, `back={{ label: 'Friends', fallback: '/' }}` and `pushed`, so the document title is "Meetups · Friend Tracker", the large title is "Meetups", and opened directly its back button goes to Friends. It reads `useMeetups()`, `useFriends()` and `useMeetupTypes()` and renders nothing until they load.
+New `src/screens/MeetupsScreen.tsx` and `MeetupsScreen.css`, routed in `src/App.tsx` with `<Route path="/meetups" element={<MeetupsScreen />} />` next to `/meetups/:id`. It's a `Page` with `title="Meetups"`, `back={{ label: 'Friends', fallback: '/' }}` and `pushed`, so the document title is "Meetups · Friend Tracker", the large title is "Meetups", and opened directly its back button goes to Friends. It reads `useMeetups()`, `useFriends()`, `useMeetupTypes()` and `useMeetupIdsWithPhotos()` and renders nothing until they load.
 
 ### Layout and copy
 
@@ -118,20 +134,19 @@ Top to bottom:
 5. **"Show older meetups":** when rows are left to show, a centered `button button--secondary` after the last group (rules under "Long histories").
 6. **The "+ Log meetup" pill** (`LogButton`, nothing preselected) whenever there's at least one friend, as on the Friends tab.
 
-The text column is drawn at its real width again; here subtitles wrap in full:
+The text column is drawn at its real widths again (narrower only on the row with a photo); here subtitles wrap in full:
 
 ```
 ‹ Friends
 Meetups
-[ 🔍 Search                              ]
+[ 🔍 Search                                   ]
 
 Upcoming
- (🎉)  Party                               ›
-       Wed, Oct 7 · with Maya
-       Patel
+ (🎉)  Party                                    ›
+       Wed, Oct 7 · with Maya Patel
 
 October 2026
- (🍽️)  Meal                       [photo] ›
+ (🍽️)  Meal                             [photo] ›
        Sat, Oct 3 · with Mariya,
        Jessie and Brandon · Movie,
        Shopping · nonstopstyle,
@@ -139,14 +154,13 @@ October 2026
        coffee and 5 more
 
 September 2026
- (☕)  Coffee                              ›
+ (☕)  Coffee                                   ›
        Wed, Sep 30 · with Kim Park
- (🍻)  Drinks                              ›
-       Sat, Sep 12 · with Alex
-       Rivera
+ (🍻)  Drinks                                   ›
+       Sat, Sep 12 · with Alex Rivera
 
-          ( Show older meetups )
-                       ( + Log meetup )
+             ( Show older meetups )
+                            ( + Log meetup )
 ```
 
 **Empty states:**
@@ -160,7 +174,8 @@ September 2026
 - **How it matches** (`matchesSearch`): the query and the text are folded the same way (`searchKey`: lowercased, accents and other marks removed, ‘ and ’ made ' and “ and ” made ", runs of spaces and line breaks made one space). The query is split into words, and a meetup matches when every word is found somewhere in its text, inside a word or not: "sam" finds "Samantha", "blue willow" finds "@Blue willow 3:30", and "didn't" finds "didn’t". A blank query matches everything.
 - **One query for what shows:** the list filters on `useDeferredValue(query)`, trimmed. The results, the no-match line and the announcement all use that deferred trimmed query, so they never disagree with each other while typing catches up.
 - **Results** keep the same groups and order, and the same 60-row limit. The groups, the button and the no-match line follow the query as you type.
-- **Fast enough for years of days:** the folded text of every meetup is built in a `useMemo` keyed on meetups, friends, types and today, and only while the deferred trimmed query isn't blank (the memo returns null otherwise). A blank query skips the index and the filtering altogether, so the most common visit, coming back with no search, folds nothing. Typing never waits for the list.
+- **Fast enough for years of days:** the folded text of every meetup is built in a `useMemo` keyed on meetups, friends, types and today, and only while the deferred trimmed query isn't blank (the memo returns null otherwise). A blank query skips the index and the filtering altogether, so the most common visit, coming back with no search, folds nothing.
+- **Typing never waits for the list:** `useDeferredValue` only helps when the slow part can skip the urgent render, so `MeetupsScreen` renders the groups, the no-match line and "Show older meetups" in a `memo`-wrapped `MeetupList`, whose props are the deferred trimmed query, the row count, the loaded data and a stable `onShowMore` (`useCallback`). A keystroke then re-renders only the field until the deferred value catches up. `MeetupRow` is wrapped in `memo` too: each meetup's `names` come from a `useMemo` keyed on meetups and friends, and the router state is a module constant, so when the results change only rows that weren't shown before render (and read their day for the snippet).
 - **What VoiceOver hears:** `<p className="visually-hidden meetups-announcer" aria-live="polite">`, with no role. It must not be `role="status"`: the toast region already is, and toast lookups (`getByRole('status')`, in 43 e2e assertions) would find two. This follows the PIN pad's announcer (`src/lock/PinPad.tsx`). It's mounted whenever the list shows (not in the empty state) and empty while the query is blank. The search's `onChange` restarts a 700ms timer; when typing pauses that long, the region says "1 meetup matches.", "12 meetups match." (every match, not only the rows shown), or "No meetups match “zebra”.". It starts empty, so a search restored on Back is never announced. The visible no-match line isn't a live region, so nothing is read twice. The timer is cleared on unmount.
 
 ### Long histories
@@ -168,16 +183,16 @@ September 2026
 - The page shows the first 60 rows (`MEETUPS_PAGE_SIZE`), counted in order across the groups: Upcoming first, then the months.
 - **"Show older meetups"** (44px, Linen, Warm Ink 600) adds the next 60. It shows only while rows are left, and the label never changes.
 - **A new search starts again at 60 rows.** The reset happens in the search input's `onChange`, in the same handler that sets the query, never in an effect on the query: an effect would also run when the page comes back with a restored search and undo the restored row count.
-- **Focus** moves to the first row it added, so VoiceOver reads on from there and keyboard focus isn't left on a button that may be gone. The button's handler records the current row count as the pending focus index and raises the count; the row at that index gets a `ref`; an effect keyed on the count calls `ref.current.focus({ preventScroll: true })` and clears the pending index. A restore or a search never sets it, so they never move focus. The new row sits where the button was, so nothing scrolls.
+- **Focus** moves to what the button added, so VoiceOver reads on from there and keyboard focus isn't left on a button that may be gone: the first row it added, or, when that row starts a new month, that month's heading, so VoiceOver reads "August 2026" before the row instead of skipping it. The button's handler records the current row count as the pending focus index and raises the count. The row at that index gets a `ref`; when it's the first row of its group, the group gets `InsetGroup`'s existing `titleRef` instead (which makes the h2 focusable from code, for moving focus after a control is replaced, and draws no ring). An effect keyed on the count calls `focus({ preventScroll: true })` on whichever is set and clears the pending index. A restore or a search never sets it, so they never move focus. The focused element sits where the button was (a new month's heading exactly there, a row that continues its month a little higher), so nothing needs to scroll.
 - **No stray ring on touch:** the app draws a 2px `:focus-visible` ring. WebKit shouldn't show it for focus moved by script after a tap, but this is checked in WebKit (the e2e below and by eye). If a tap does paint a ring on row 61, focus moves only when the button itself had focus (`document.activeElement` was the button: a hardware keyboard or Voice Control), and this spec is updated to say so.
-- **Thumbnails:** each row shown runs its own `useFirstPhotoThumb`, a key-only index read of its first photo's id. The first time a photo's thumbnail is needed, its photo record is read once (IndexedDB can't read part of a record, so the full image comes with it and is dropped at once); after that the thumbnail comes from the cache under "Data". So 60 rows read at most 60 photo records the first time and none when you come back, and nothing keeps a full image. Rows not shown read nothing.
+- **Thumbnails:** each row shown that has a photo runs its own `useFirstPhotoThumb`, a key-only index read of its first photo's id; rows without a photo run none (the page's one `useMeetupIdsWithPhotos` says which is which). The first time a photo's thumbnail is needed, its photo record is read once (IndexedDB can't read part of a record, so the full image comes with it and is dropped at once); after that the thumbnail comes from the cache under "Data". So 60 rows read at most 60 photo records the first time and none when you come back (up to the cache's 300), and nothing keeps a full image. Rows not shown read nothing.
 - The meetups table never holds photos, so reading every meetup for the list stays small; the Friends tab already reads them all.
 
 ### Keeping your place
 
 - The search text and the rows shown are kept in memory per history entry (`location.key`), the way `ScrollManager` keeps scroll positions. The map lives in a small `PlaceMemoryProvider` (`src/components/PlaceMemory.tsx`) that `App` renders inside the `HashRouter`, next to `ScrollManager`: it holds `useRef(new Map<string, { query: string; count: number }>())`, and `usePlaceMemory()` hands the map to `MeetupsScreen`.
 - `MeetupsScreen` reads its first query and row count from the map in `useState` initializers, and writes to it from the same handlers that change them (the search's `onChange` and "Show older meetups"). Going back to the same entry finds them; a fresh visit from the Friends tab is a new entry and starts blank at 60 rows.
-- **The scroll:** `ScrollManager`'s layout effect runs on the key change while `MeetupsScreen` still renders nothing (its three live queries are loading). The rows come back on the first render after the data loads, already at the restored count, and `ScrollManager`'s retry (every frame for up to 1s, stopping early on a touch or wheel) then reaches the saved offset, even past row 60. Thumbnails are a fixed 40px inside rows of at least 52px, so they never shift the page as they arrive. The e2e step "open row 100 and go back" pins this.
+- **The scroll:** `ScrollManager`'s layout effect runs on the key change while `MeetupsScreen` still renders nothing (its four live queries are loading). The rows come back on the first render after the data loads, already at the restored count and at their final size, and `ScrollManager`'s retry (every frame for up to 1s, stopping early on a touch or wheel) then reaches the saved offset, even past row 60. The retry stops as soon as it gets there, before any thumbnail has arrived, so the rows must not change size afterwards: a row with a photo keeps its 40px box from the first render (see "Why the box"), so its thumbnail arriving changes nothing above the place you return to. The e2e step "open row 100 and go back" pins this.
 - **The app lock starts the page fresh:** `LockGate` unmounts `App` while locked, and the map goes with it, like `ScrollManager`'s positions. (A map at module level would survive: `HashRouter` rebuilds the location from `history.state`, so the entry keeps its key after unlocking, and the old search would come back at the top of the page.) After unlocking, `/#/meetups` shows a blank search and 60 rows. Nothing is stored on the phone.
 
 ### From the Meetups page
@@ -197,7 +212,12 @@ September 2026
 
 ## Data
 
-No stored data changes. No new table, field, index or Dexie version; no backup format change; no new writes. The lists read what's already there: `useMeetups()`, `useFriends()`, `useMeetupTypes()`, and one `useFirstPhotoThumb` per row shown.
+No stored data changes. No new table, field, index or Dexie version; no backup format change; no new writes. The lists read what's already there: `useMeetups()`, `useFriends()`, `useMeetupTypes()`, `useMeetupIdsWithPhotos()`, and one `useFirstPhotoThumb` per row shown that has a photo.
+
+### Which meetups have photos (`src/db/meetups.ts`, `src/data/hooks.ts`)
+
+- `meetupIdsWithPhotos()` is `db.meetupPhotos.orderBy('meetupId').uniqueKeys()`: a key-only walk of the existing `meetupId` index that names each meetup with photos once, reading no record and no image.
+- `useMeetupIdsWithPhotos(): ReadonlySet<string> | undefined` wraps it in a live query, `new Set(...)`, so it follows a photo added, removed or put back by Undo. The Friends tab, the Meetups page and the friend page each read it once and pass `hasPhoto` to their rows.
 
 ### Thumbnail cache (`src/db/meetups.ts`)
 
@@ -205,7 +225,8 @@ No stored data changes. No new table, field, index or Dexie version; no backup f
 
 - A module-level `Map<string, string>` from photo id to thumbnail. `firstPhotoThumb` keeps its index-only read of the first photo's id (so the live query still fires when photos are added, removed or reordered), returns the cached thumbnail for a known id, and calls `get()` only on a miss, caching the result.
 - Caching by id is safe: a photo's thumbnail never changes. Updates touch only `order`, and Undo puts back the same ids with the same thumbnails.
-- It holds at most 300 thumbnails (the oldest goes first, using the `Map`'s insertion order). `deleteMeetup` and photos removed in an edit drop their ids; a backup restore (`replaceAllData` in `src/backup/storage.ts`) clears it through a new `forgetPhotoThumbs()`.
+- It holds at most 300 thumbnails and drops the least recently used first: a hit deletes the entry and sets it again, so it moves to the newest end of the `Map`'s insertion order, and a new entry past 300 drops the oldest end. `deleteMeetup` and photos removed in an edit drop their ids; a backup restore (`replaceAllData` in `src/backup/storage.ts`) clears it through a new `forgetPhotoThumbs()`.
+- The limit: with more than 300 photo rows shown at once (five or more taps of "Show older meetups" on a history full of photos), coming back reads some photo records again, since a page longer than the cache can't be held whatever the order.
 - The friend page uses the same function, so its History gets the same saving with nothing visible changed.
 
 ### Pure logic (`src/stats/meetupHistory.ts`)
@@ -274,7 +295,7 @@ export function firstRows(sections: HistorySection[], count: number): { sections
 - The back button reads "Friends"; the large title is the h1 "Meetups".
 - The search is a search field named "Search meetups". Results are announced by the live region above.
 - Each group is a region named by its h2 ("Upcoming", "October 2026"), so the rotor jumps from month to month. Rows in "Upcoming" read without the badge ("Party, Wed, Oct 7 · with Maya Patel"); the region's name says it. On a friend's page the same row still reads "Party Upcoming, Wed, Oct 7 · with Maya Patel".
-- "Show older meetups" is a button; after it, focus is on the first row it added (see "No stray ring on touch").
+- "Show older meetups" is a button; after it, focus is on the first row it added, or on its month's heading when that row starts a month (see "Long histories" and "No stray ring on touch").
 - A Meetup page opened from here reads "Meetups" on its back button.
 
 **Targets:** rows are at least 52px; "See all meetups" is a 52px row; "Show older meetups", the search field and the back button are 44px; the pill is 52px.
@@ -295,10 +316,10 @@ Add or change:
 - **Buttons,** new: "**Show more:** a long list ends with a centered secondary button that adds the next rows ("Show older meetups"). Rows never load by themselves as you scroll."
 - **Inputs and fields, Search:** add "Friends and Meetups each have one, above their list."
 - **"+ Log meetup" pill:** "The thumb-reachable primary action on Friends, friend detail and Meetups."
-- **New, Meetup row:** "One row for a meetup, the same everywhere (a friend's History, Recent meetups, the Meetups page): the type's emoji badge, the type as the title (with "Upcoming" for a future date, except under the Meetups page's "Upcoming" title, which already says it), a subtitle of the date, "with" the friends, the activities, and the day's first places ("and 5 more") or its first line cut at 80 characters, then the first photo as a 40px thumbnail with 8px corners, before the chevron. On a friend's page "with" leaves that friend out; everywhere else it names everyone. In Recent meetups the subtitle stops at two lines; elsewhere it wraps in full. Moods, weather and How it felt never show. Tapping it opens the Meetup page."
+- **New, Meetup row:** "One row for a meetup, the same everywhere (a friend's History, Recent meetups, the Meetups page): the type's emoji badge, the type as the title (with "Upcoming" for a future date, except under the Meetups page's "Upcoming" title, which already says it), a subtitle of the date, "with" the friends, the activities, and the day's first places ("and 5 more") or its first line cut at 80 characters, then the first photo as a 40px thumbnail with 8px corners, before the chevron (its Linen box shows from the start, so a row never shifts when the photo arrives). On a friend's page "with" leaves that friend out; everywhere else it names everyone. In Recent meetups the subtitle stops at two lines; elsewhere it wraps in full. Moods, weather and How it felt never show. Tapping it opens the Meetup page."
 - **Friend detail column, History:** "rows grouped by month, each a Meetup row naming the others. Tapping a row opens the Meetup page."
-- **Birthdays soon:** "at the top of the Friends tab, above Recent meetups and the search field", and add "Hiding it (or Recent meetups) never moves the search field: the page scrolls by what went away."
-- **New, Recent meetups:** "An inset group titled "Recent meetups" on the Friends tab, after Birthdays soon and before the search field: the 3 latest meetups dated today or earlier, newest first, as Meetup rows naming everyone, each subtitle stopped at two lines, then "See all meetups", an accent row with a chevron and no badge, which opens the Meetups page. Hidden when no meetup has happened yet, while searching, and while a group filter is on; hiding it never moves the search field."
+- **Birthdays soon:** "at the top of the Friends tab, above Recent meetups and the search field", and add "Searching or picking a group hides it (and Recent meetups) without moving the search field: the page scrolls by what went away."
+- **New, Recent meetups:** "An inset group titled "Recent meetups" on the Friends tab, after Birthdays soon and before the search field: the 3 latest meetups dated today or earlier, newest first, as Meetup rows naming everyone, each subtitle stopped at two lines, then "See all meetups", an accent row with a chevron and no badge, which opens the Meetups page. Hidden when no meetup has happened yet, while searching, and while a group filter is on; searching or picking a group hides it without moving the search field."
 - **New, Meetups page:** "Every meetup, pushed from Recent meetups: back "Friends", the large title "Meetups", a search field ("Search meetups"), then "Upcoming" (soonest first, its rows without the "Upcoming" badge) and one group per month, newest first ("October 2026"), as Meetup rows naming everyone. The search looks in friend names, the type, activities, the day and, for meetups that have happened, How it felt's words, ignoring case and accents, and every word typed must be found; never weather, moods or dates. It shows 60 rows, then "Show older meetups" adds 60. Going back to it keeps the search, the rows shown and the scroll; the app lock starts it fresh. Empty: "No meetups yet." with "Your first meetup will show up here."; no match: "No meetups match “zebra”." The "+ Log meetup" pill shows whenever there's a friend."
 - **Meetup page,** nav bar: "back ("Back", the friend's name from their history, "Friends" from Recent meetups, or "Meetups" from the Meetups page)".
 - **Navigation, Tab bar:** "A friend's page, a Meetup page and the Meetups page belong to Friends, unless they were opened from Stats, which then stays current."
@@ -307,7 +328,7 @@ Add or change:
 
 ## Testing
 
-Counts afterwards: unit tests go from 57 files to 58 (the new `src/stats/meetupHistory.test.ts`; the cache cases join `src/db/meetups.test.ts`), with the cases below added to today's 676. E2E goes from 158 to 171 (13 tests in the new `e2e/history.spec.ts`, one per bullet below). Screenshots stay at 15 tests and gain 9 PNGs: light, dark and large-text versions of `02-friends-full`, `19-meetups` and `20-meetups-search`.
+Counts afterwards: unit tests go from 57 files to 58 (the new `src/stats/meetupHistory.test.ts`; the cache and photo-ids cases join `src/db/meetups.test.ts`), with the cases below added to today's 676. E2E goes from 158 to 171 (13 tests in the new `e2e/history.spec.ts`, one per bullet below). Screenshots stay at 15 tests and gain 9 PNGs: light, dark and large-text versions of `02-friends-full`, `19-meetups` and `20-meetups-search`.
 
 **Unit tests** (`src/stats/meetupHistory.test.ts`, with today fixed at Mon, Oct 5, 2026 and the shared `meetup()` fixture):
 - `recentMeetups`: two meetups today (logged at 10:00 and 18:00), one on Oct 1, one on Sep 20 and one tomorrow give the 18:00 one, the 10:00 one, then Oct 1; tomorrow's never shows; fewer than 3 gives what there is; only future meetups give `[]`; the limit can be changed.
@@ -332,19 +353,21 @@ Counts afterwards: unit tests go from 57 files to 58 (the new `src/stats/meetupH
 - `historySections`: Oct 9, Oct 7 (two, logged in order), Oct 5, Sep 30 and Dec 24, 2025 give "Upcoming" (Oct 7 logged first, Oct 7 logged second, Oct 9), "October 2026" (Oct 5: today isn't upcoming), "September 2026" and "December 2025"; no meetups gives `[]`; only future meetups give just "Upcoming".
 - `firstRows`: 70 meetups across groups give the first 60 in order and `more: 10`; a cut at a group's end drops the groups after it; a count past the total gives everything and `more: 0`.
 
-**Unit tests, the thumbnail cache** (`src/db/meetups.test.ts`, fake-indexeddb): a second `firstPhotoThumb` for the same meetup doesn't call `db.meetupPhotos.get` (a `vi.spyOn`); after the photos are reordered it returns the new first photo's thumbnail; after `forgetPhotoThumbs()` it reads again; a meetup without photos still gives null.
+**Unit tests, the thumbnail cache** (`src/db/meetups.test.ts`, fake-indexeddb): a second `firstPhotoThumb` for the same meetup doesn't call `db.meetupPhotos.get` (a `vi.spyOn`); after the photos are reordered it returns the new first photo's thumbnail; after `forgetPhotoThumbs()` it reads again; a meetup without photos still gives null; a hit keeps a thumbnail past the cap (302 meetups with a photo: read A, then 299 others, A again, then 2 more; A is still a hit, and the first of the 299, the least recently used, is read again).
+
+**Unit tests, which meetups have photos** (same file): `meetupIdsWithPhotos()` gives each meetup with photos once (a meetup with three photos appears once, one without none), includes a meetup after its first photo is added, drops it after its last photo is deleted, and never calls `db.meetupPhotos.get`.
 
 **E2E** (WebKit, iPhone 13), new `e2e/history.spec.ts`, with `page.clock` set to Mon, Oct 5, 2026, 12:00 PM where dates matter:
 - **Recent meetups shows the three latest that happened, naming everyone:** with a Coffee with Alex on Sep 25, a Meal with Alex and Sam ("Tacos") on Oct 3, Drinks with Kim on Oct 4, a Call with Sam on Sep 5 and a Party with Kim on Oct 8, the "Recent meetups" region's links are, in order, Drinks, Meal ("Sat, Oct 3 · with Alex and Sam · Tacos"), Coffee, then "See all meetups"; there's no Party and no Call.
-- **Two lines in Recent meetups:** with the owner's example logged (three friends, Movie and Shopping, the owner's typed day), its subtitle in Recent meetups is no taller than two of its lines (its height is at most twice its computed line height, plus 1px) and the link's accessible name still holds the whole subtitle; the same row on the Meetups page is taller than two lines.
+- **Two lines in Recent meetups:** with the owner's example logged (three friends, Movie and Shopping, the owner's typed day), its subtitle's `.meetup-row__clamp` in Recent meetups is no taller than two of its lines (its height is at most twice its computed line height, plus 1px) and the link's accessible name still holds the whole subtitle; the same row on the Meetups page is taller than two lines.
 - **It hides and comes back:** with only the upcoming Party it's hidden; after logging a past one it shows; typing in "Search friends" hides it and clearing shows it; a group filter hides it and "All" shows it.
-- **The search field stays put:** with Birthdays soon (a friend whose birthday is in 3 days), Recent meetups, a group, and 12 friends whose names hold an "a", scroll so the search field's top is just under the nav bar; fill "a": the field's top stays within 4px of where it was and the first friend row is in view; clear it: the same. Tapping the group's chip and then "All" keeps the chip row within 4px each time.
+- **The search field stays put:** with Birthdays soon (a friend whose birthday is in 3 days), Recent meetups (one of them with a photo and a subtitle of about 33 characters, one line without a thumbnail and two with one), a group, and 12 friends whose names hold an "a", scroll so the search field's top is just under the nav bar; fill "a": the field's top stays within 4px of where it was and the first friend row is in view; clear it: the same, and the field's top stays within 4px of that over the next 10 animation frames, while Recent meetups comes back and its thumbnail arrives. Tapping the group's chip and then "All" keeps the chip row within 4px each time.
 - **A recent meetup opens its page with "Friends" on the back button,** and Back lands on the Friends tab.
 - **See all opens Meetups:** with the meetups above plus a Trip with Sam on Dec 24, 2025: the h1 "Meetups", the back button "Friends", the Friends tab `aria-current="page"`, and the regions in order "Upcoming", "October 2026", "September 2026", "December 2025", each with its rows in order (Upcoming soonest first). The Party row under "Upcoming" has no "Upcoming" badge (its name doesn't contain "Upcoming"); on Kim's page the same Party still shows it.
 - **Search:** "alex", "MEAL", "karaoke", a place, a word of the day, a word of How it felt, "didn't" against a day written with "didn’t", and "sam tacos" each show just the meetups expected; "zebra" shows "No meetups match “zebra”." and `page.locator('.meetups-announcer')` reaches the same text (`toHaveText` waits past the 700ms); "rainy", picked as weather only, matches nothing; clearing brings every group back. Toast assertions on this page keep using `getByRole('status')`.
 - **Opening from Meetups and coming back:** search "tacos", open the Meal: its back button reads "Meetups"; Edit, change the type to Drinks, Save; Back: the search still reads "tacos", the row is now Drinks, and the announcer is empty (a restored search isn't announced).
 - **Delete and Undo from Meetups:** delete a meetup from its Edit sheet; the page goes back to Meetups without that row; Undo puts it back in its month.
-- **Long histories:** 130 past meetups (one with a photo) seeded with `seedMeetups`, then a reload: 60 rows and "Show older meetups"; a tap on it shows 120 and no element matches `:focus-visible`; focusing the button and pressing Enter shows 130, focus is on row 121, and the button is gone; the meetup with a photo shows its `img.history-thumb`; open row 100 and go back: 130 rows still show and row 100 is in view.
+- **Long histories:** 130 past meetups seeded with `seedMeetups`, then a reload. The first 120 are dated Sep 1 to Oct 5, 2026 and the last 10 in August 2026, so row 61 continues September and row 121 opens "August 2026"; 100 of them have a photo, and their subtitles run about 33 characters (one line without a thumbnail, two with one). 60 rows and "Show older meetups"; a tap on it shows 120, focus is on row 61, and no element matches `:focus-visible`; focusing the button and pressing Enter shows 130, focus is on the "August 2026" heading, and the button is gone; a meetup with a photo shows its `img.history-thumb` and one without has no `.meetup-thumb`; open row 100 and go back: 130 rows still show, row 100 is in view, and its top stays within 1px over the next 10 animation frames.
 - **The app lock starts the page fresh:** with the lock on (`seedAppLock`) and 130 seeded meetups, on Meetups type "coffee" (every meetup is a Coffee, so 60 rows show) and tap "Show older meetups" (120 rows); lock the app the way `lock.spec.ts` does in the background (hidden, 16 minutes, visible) and unlock with the PIN: `/#/meetups` shows a blank search, 60 rows and "Show older meetups".
 - **Empty:** `/#/meetups` with one friend and no meetups shows "No meetups yet." and "Your first meetup will show up here.", no search field, and the "+ Log meetup" pill; logging from it shows the meetup under "October 2026".
 - **The friend page still leaves its friend out:** the same Meal reads "with Sam" in Alex's History and "with Alex and Sam" on the Friends tab.
@@ -372,16 +395,18 @@ Nothing compares images: review them by eye, `large-text-02-friends` and `02-fri
 
 ## Risks and trade-offs
 
-- **The friend list starts lower on the Friends tab.** Measured on `e2e/screenshots/light-02-friends.png` (iPhone 13, default text size): Birthdays soon (3 rows) ends at about 302px, the search field sits at 326-370px and the first friend row starts near 442px. A meetup row's text column is only about 190px (16px padding, the 44px badge, 12px gaps, the 40px thumbnail, the chevron), about 25 characters of 15px Subhead, so subtitles wrap far more than a wide mock suggests: the owner's example wraps to about 5 lines (a row about 140px tall), and the screenshot seed's Meal to about 4. Unclamped, Recent meetups would add about 320-370px with the seed, and 500px or more with three long days. With subtitles stopped at two lines, a row is about 61px (one line) or 81px (two), so the group (title, 3 rows, "See all meetups" and the 24px gap) adds about 285-345px, about 325px for the mock above:
-  - **With Birthdays soon at 3 rows,** the search field sits at about 610-670px and the first friend row at about 730-790px: on first open no friend row shows, in Safari (a 664px viewport) or on the Home Screen (about 760px of content).
-  - **Without Birthdays soon (most days),** the search field sits at about 385-445px and the first friend row at about 500-560px: one or two friends show in Safari, two or three on the Home Screen, under the floating "+ Log meetup" pill.
-  - **At large text sizes** the friend list is about two screens down.
-  This works against PRODUCT.md's "opening the app tells you when you last saw anyone without digging". Options B and C under "If it still feels crowded" are ready if the owner finds it so; the `02-friends-full` and `large-text-02-friends` captures show it.
-- **Hiding the groups moves content above the search field.** Typing a letter or picking a chip removes up to about 550-650px above the field. The scroll correction under "Keeping the search field still" keeps the field in place; without it, the field would end up above the screen or jump.
+- **The friend list starts lower on the Friends tab.** Measured on `e2e/screenshots/light-02-friends.png` (iPhone 13, default text size, Safari's 664px viewport): Birthdays soon (3 rows) ends at about 302px, the search field sits at 326-370px, the group chips at 386-422px and the first friend row starts at 442px; friend rows are 60px.
+  - **What shows** is what sits above the tab bar: about 614px in Safari (the 664px viewport less the 50px tab bar) and about 713px on the Home Screen (844px less the 47px status bar, the 34px home indicator and the 50px tab bar). The "+ Log meetup" pill floats over the middle of the list, at about 546-598px in Safari and 645-697px on the Home Screen, and hides most of the name of any row behind it. Playwright doesn't emulate the status bar or the safe areas, so the captures show the Safari layout and the Home Screen figures are worked out, to check on the phone. In Safari the install hint, until it's dismissed, pushes everything lower still.
+  - **Row widths:** a meetup row's text column is about 190px with a photo's thumbnail (16px padding, the 44px badge, 12px gaps, the 40px thumbnail, the chevron), about 30 characters of 15px Subhead, and about 245px (about 38) without one. Subtitles wrap far more than a wide mock suggests: the owner's example wraps to about 5 lines (a row about 140px tall), and the screenshot seed's Meal to about 4. Unclamped, Recent meetups would add about 320-370px with the seed, and 500px or more with three long days. With subtitles stopped at two lines, a row is about 61px (one line) or 81px (two), so the group (title, 3 rows, "See all meetups" and the 24px gap) adds about 285-345px, about 305px for the mock above.
+  - **With Birthdays soon at 3 rows,** under A the search field sits at about 610-670px and the first friend row at about 730-790px. No friend row shows on first open, and the search field is off the first screen too: behind the tab bar in Safari, and at the bottom of the Home Screen with its middle partly under the pill (the magnifier and "Search" stay visible). Today it sits clear at 326-370px. Each birthday row fewer lifts everything about 60px; with 4 or more birthdays the "And N more" line adds about 25px.
+  - **On days with no birthday in the next two weeks** (Birthdays soon looks 14 days ahead, so with many friends this isn't most days), the search field sits at about 385-445px and the first friend row at about 500-560px. In Safari one friend shows at best, its last line touching the top of the pill, and none when the recent rows wrap to two lines (the first then sits behind the pill and runs under the tab bar). On the Home Screen one or two friends show clear, with one more partly behind the pill.
+  - **At large text sizes** the search field moves from about 440px today to an estimated 800-900px, and the friend list is about two screens down.
+  This works against PRODUCT.md's "opening the app tells you when you last saw anyone without digging". "If it still feels crowded" says what B and C change and what they don't: on Birthdays soon days neither brings a friend row onto the first screen, B lifts the search field by one row and C keeps it at the top. The `02-friends-full` and `large-text-02-friends` captures show it.
+- **Hiding the groups moves content above the search field.** Typing a letter or picking a chip removes about 510-600px above the field. The scroll correction under "Keeping the search field still" keeps the field in place; without it, the field would end up above the screen or jump. Data changes above the field (a meetup logged or deleted, Birthdays soon at midnight) aren't corrected and move the field with the page. Option C would remove this risk and the correction.
 - **A row found by a name it doesn't show:** with four or more friends the row says "and 2 others", and a match deep in the day or in How it felt isn't shown in the row (rows never show How it felt). The meetup still matched; opening it shows why. (How it felt words of a meetup moved to a future date are hidden and never searched.)
-- **Thumbnails read whole photo records once.** IndexedDB can't read part of a record, so the first time a row with a photo shows, its full image (a JPEG up to 1600px, often several hundred KB) is read and dropped. The cache keeps the thumbnail, so coming back to the list reads only the indexes, and "Show older meetups" bounds a first visit to 60 new records at a time. Avoiding even that first read would need a separate thumbnail table (a schema change), which this design doesn't make.
-- **Many live queries:** one key-only index read per row shown, 60 at a time, so even long histories never start hundreds at once.
-- **Search reads every day:** the folded text is built only while there's a search, once per data change, and filtering is deferred, so typing stays smooth at hundreds of days of up to 10,000 characters.
+- **Thumbnails read whole photo records once.** IndexedDB can't read part of a record, so the first time a row with a photo shows, its full image (a JPEG up to 1600px, often several hundred KB) is read and dropped. The cache keeps the thumbnail, so coming back to the list reads only the indexes, and "Show older meetups" bounds a first visit to 60 new records at a time. The cache holds the 300 most recently used thumbnails; past 300 photo rows shown at once, coming back reads some records again. Avoiding even that first read would need a separate thumbnail table (a schema change), which this design doesn't make.
+- **Many live queries:** one walk of the photos' `meetupId` index per screen, then one key-only index read per row shown that has a photo. "Show older meetups" adds 60 rows at a time, but going back to a page that shows more restores every row at once, so it starts one key-only read per restored row with a photo (a few hundred at most after many taps), with their thumbnails from the cache.
+- **Search reads every day:** the folded text is built only while there's a search, once per data change; filtering is deferred, and the memoized list and rows keep a keystroke from re-rendering them, so typing stays smooth at hundreds of days of up to 10,000 characters.
 
 ## Out of scope
 
@@ -406,3 +431,15 @@ Nothing compares images: review them by eye, `large-text-02-friends` and `02-fri
 - **Thumbnails:** the claim "never a full image" is corrected, and a capped in-memory cache by photo id stops repeat reads.
 - **Tests:** the exact list of e2e files that break (including `meetups.spec.ts:57`), an escaped `friendLink`, the `seedMeetups` row shapes, the corrected "jessie coffee" case, and the expected counts.
 - **The pure logic moves to `src/stats/meetupHistory.ts`,** so lib never imports from stats.
+
+## Changes after the integration review
+
+- **The options are restated with what each does and doesn't do:** positions are counted against the top of the tab bar (about 614px in Safari, about 713px on the Home Screen) and the pill; on Birthdays soon days no option puts a friend row on the first screen, and under A the search field is off it too; B's search field is at about 550-590px; on other days B changes nothing and C moves only the search field.
+- **C is no longer called additive:** it moves the shipped Birthdays soon below the search field and drops the scroll correction and its test, so it's cheaper to choose before A is built. B stays the one that can be added later.
+- **VoiceOver order and large text** are compared for each option.
+- **Rows know whether they have a photo from the first render** (`useMeetupIdsWithPhotos`, `hasPhoto`, the `.meetup-thumb` box), so a thumbnail arriving never re-wraps a row, moves the search field after a search is cleared or shifts a restored scroll; the false "never shift the page" line is replaced, and the e2e tests now seed photos where it matters.
+- **The thumbnail cache is least recently used,** with its 300 limit stated, and "Many live queries" says what a Back with many rows starts.
+- **The clamp is an inner span** (`.meetup-row__clamp`), so `Row` and the History markup don't change.
+- **The Meetups list and rows are memoized,** so `useDeferredValue` really keeps typing from waiting on them.
+- **After "Show older meetups", a new month's heading takes focus** when the first added row starts that month.
+- **Smaller corrections:** the mocks use about 190px only for rows with a photo and about 245px otherwise; the removed heights read about 230px for Birthdays soon and about 510-600px for both groups; "never moves the search field" now says searching or picking a group, and data changes are named as not corrected.
