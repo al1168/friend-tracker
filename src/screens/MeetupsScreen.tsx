@@ -175,6 +175,11 @@ export function MeetupsScreen() {
 
   function search(value: string) {
     setQuery(value)
+    // A space at either end changes nothing shown, so it isn't a new search: the rows, focus and announcement stay.
+    if (value.trim() === query.trim()) {
+      places.set(key, { query: value, count })
+      return
+    }
     // A new search starts again at 60 rows. Only here, never in an effect, so a restored search keeps its rows.
     setCount(MEETUPS_PAGE_SIZE)
     setFocusIndex(null)

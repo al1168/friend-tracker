@@ -428,6 +428,32 @@ test('a long history shows 60 rows at a time and keeps its place', async ({ page
   for (const top of tops) expect(Math.abs(top - tops[0]), 'Row 100 stays put').toBeLessThanOrEqual(1)
 })
 
+test('a space at the end of a Meetups search is not a new search', async ({ page }) => {
+  await openWith(page, longHistory())
+  await openMeetups(page)
+  const search = page.getByRole('searchbox', { name: 'Search meetups' })
+  const rows = meetupRows(page)
+  const announcer = page.locator('.meetups-announcer')
+  // Every meetup is a Coffee.
+  await search.fill('coffee')
+  await expect(announcer).toHaveText('130 meetups match.')
+  await page.getByRole('button', { name: 'Show older meetups' }).click()
+  await expect(rows).toHaveCount(120)
+
+  // The trimmed search is the same: the rows shown stay, and nothing is cleared to be read out again.
+  await search.fill('coffee ')
+  expect(await announcer.textContent(), 'The announcement stays').toBe('130 meetups match.')
+  await page.waitForTimeout(1000)
+  await expect(rows).toHaveCount(120)
+  await expect(announcer).toHaveText('130 meetups match.')
+
+  // Another word is a new search: it starts again at 60 rows, and is read out once typing pauses.
+  await search.fill('coffee sam')
+  expect(await announcer.textContent(), 'Cleared for the new search').toBe('')
+  await expect(rows).toHaveCount(60)
+  await expect(announcer).toHaveText('130 meetups match.')
+})
+
 test('the app lock starts the Meetups page fresh', async ({ page }) => {
   test.setTimeout(60_000)
   await page.clock.setFixedTime(MONDAY_NOON)
