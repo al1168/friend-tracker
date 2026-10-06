@@ -152,6 +152,7 @@ export async function updateMeetup(id: string, input: MeetupInput, photos: Photo
     await db.meetups.update(id, { date, typeId, friendIds, activities })
     await applyPhotoChanges(id, photos, new Date().toISOString())
   })
+  forgetThumbs(photos.removeIds)
 }
 
 /**
@@ -170,7 +171,7 @@ export async function updateDay(id: string, input: DayInput): Promise<boolean> {
 
 /** Deletes a meetup and its photos, and returns them so `restoreMeetup` can put them back (Undo). */
 export async function deleteMeetup(id: string): Promise<DeletedMeetup | undefined> {
-  return db.transaction('rw', db.meetups, db.meetupPhotos, async () => {
+  const deleted = await db.transaction('rw', db.meetups, db.meetupPhotos, async () => {
     const meetup = await db.meetups.get(id)
     if (!meetup) return undefined
     const photos = await db.meetupPhotos.where('meetupId').equals(id).sortBy('order')
@@ -178,6 +179,8 @@ export async function deleteMeetup(id: string): Promise<DeletedMeetup | undefine
     await db.meetups.delete(id)
     return { meetup, photos }
   })
+  if (deleted) forgetThumbs(deleted.photos.map((photo) => photo.id))
+  return deleted
 }
 
 /**
@@ -196,9 +199,48 @@ export async function restoreMeetup({ meetup, photos }: DeletedMeetup): Promise<
   })
 }
 
+/** The most thumbnails kept in memory: past it, the least recently used goes first. */
+const THUMB_CACHE_SIZE = 300
+
 /**
- * The thumbnail of a meetup's first photo, or null when it has none. Reads just that one photo,
- * through the [meetupId+order] index, and keeps only its thumbnail.
+ * Thumbnails by photo id, least recently used first (a Map keeps insertion order). A photo's thumbnail never
+ * changes (an edit only changes `order`, and Undo puts back the same ids with the same thumbnails), so its id is
+ * enough. In memory only: nothing is stored.
+ */
+const thumbCache = new Map<string, string>()
+
+function cachedThumb(id: string): string | undefined {
+  const thumb = thumbCache.get(id)
+  if (thumb !== undefined) {
+    // Used again: move it to the newest end.
+    thumbCache.delete(id)
+    thumbCache.set(id, thumb)
+  }
+  return thumb
+}
+
+function cacheThumb(id: string, thumb: string) {
+  thumbCache.delete(id)
+  thumbCache.set(id, thumb)
+  if (thumbCache.size > THUMB_CACHE_SIZE) {
+    const oldest = thumbCache.keys().next()
+    if (!oldest.done) thumbCache.delete(oldest.value)
+  }
+}
+
+function forgetThumbs(ids: readonly string[]) {
+  for (const id of ids) thumbCache.delete(id)
+}
+
+/** Empties the thumbnail cache (a backup restore replaces every photo). */
+export function forgetPhotoThumbs() {
+  thumbCache.clear()
+}
+
+/**
+ * The thumbnail of a meetup's first photo, or null when it has none. Reads the first photo's id through the
+ * [meetupId+order] index without loading it, so a live query still follows photos added, removed or reordered,
+ * then takes the thumbnail from the cache, or reads that one photo once and keeps only its thumbnail.
  */
 export async function firstPhotoThumb(meetupId: string): Promise<string | null> {
   // Key-only, then get: Dexie's live-query cache keeps whole rows of record queries, full images included.
@@ -207,7 +249,19 @@ export async function firstPhotoThumb(meetupId: string): Promise<string | null> 
     .between([meetupId, -Infinity], [meetupId, Infinity])
     .limit(1)
     .primaryKeys()
-  return id ? ((await db.meetupPhotos.get(id))?.thumb ?? null) : null
+  if (!id) return null
+  const cached = cachedThumb(id)
+  if (cached !== undefined) return cached
+  // IndexedDB can't read part of a record, so this reads the full image too, and drops it at once.
+  const thumb = (await db.meetupPhotos.get(id))?.thumb
+  if (thumb === undefined) return null
+  cacheThumb(id, thumb)
+  return thumb
+}
+
+/** The ids of the meetups that have photos, each once: a key-only walk of the meetupId index, reading no image. */
+export async function meetupIdsWithPhotos(): Promise<string[]> {
+  return (await db.meetupPhotos.orderBy('meetupId').uniqueKeys()) as string[]
 }
 
 /** A meetup's photos as ids and thumbnails, in order. Never returns a full image (see firstPhotoThumb). */

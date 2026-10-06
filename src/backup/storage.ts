@@ -1,4 +1,5 @@
 import { db } from '../db/db'
+import { forgetPhotoThumbs } from '../db/meetups'
 import type { MeetupPhoto } from '../types'
 import { parseBackup, type BackupData, type ParseResult } from './format'
 
@@ -37,6 +38,8 @@ export async function replaceAllData(data: BackupData): Promise<void> {
     await db.meetups.bulkAdd(data.meetups)
     await db.meetupPhotos.bulkAdd(data.meetupPhotos)
   })
+  // Every photo was replaced, so no thumbnail kept in memory can be trusted.
+  forgetPhotoThumbs()
 }
 
 export async function parseBackupFile(file: Blob): Promise<ParseResult> {

@@ -3,7 +3,7 @@ import { db, resetDatabase } from '../db/db'
 import { addFriend } from '../db/friends'
 import { getSetting, setSetting } from '../db/settings'
 import { addGroup } from '../db/groups'
-import { addMeetup } from '../db/meetups'
+import { addMeetup, firstPhotoThumb } from '../db/meetups'
 import { addPreferences } from '../db/preferences'
 import type { AppLock, LockFailures } from '../lock/types'
 import type { BirthdayReminders } from '../reminders/types'
@@ -127,6 +127,20 @@ describe('backup storage', () => {
     await replaceAllData(data)
     expect(sortById(await readAllData())).toEqual(sortById(data))
     expect((await readAllPhotos()).map((photo) => photo.id).sort()).toEqual(['p1', 'p2'])
+  })
+
+  it('forgets the thumbnails it kept, so a restored photo shows its own', async () => {
+    await db.meetupPhotos.add(meetupPhoto('p1', 'm1', 0))
+    expect(await firstPhotoThumb('m1')).toBe('data:image/jpeg;base64,THUMBp1')
+    const restored = { ...meetupPhoto('p1', 'm1', 0), thumb: 'data:image/jpeg;base64,RESTORED' }
+    await replaceAllData({
+      friends: [friend('f1', 'Alex')],
+      groups: [],
+      meetupTypes: [meetupType('t1', 'Coffee', 0)],
+      meetups: [meetup('m1', '2026-09-01', ['f1'], 't1')],
+      meetupPhotos: [restored],
+    })
+    expect(await firstPhotoThumb('m1')).toBe('data:image/jpeg;base64,RESTORED')
   })
 
   it('keeps the day’s note, weather, mood and feelings through replace and read', async () => {

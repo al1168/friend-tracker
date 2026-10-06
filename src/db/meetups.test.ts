@@ -7,6 +7,8 @@ import {
   addMeetup,
   deleteMeetup,
   firstPhotoThumb,
+  forgetPhotoThumbs,
+  meetupIdsWithPhotos,
   photoCount,
   photoThumbs,
   restoreMeetup,
@@ -20,7 +22,10 @@ import {
 
 const base: MeetupInput = { date: '2026-09-01', typeId: 'type-coffee', friendIds: ['alex'], activities: [] }
 
-beforeEach(resetDatabase)
+beforeEach(async () => {
+  await resetDatabase()
+  forgetPhotoThumbs()
+})
 
 describe('addMeetup', () => {
   it('saves a meetup with unique friends and nothing written about the day yet', async () => {
@@ -377,5 +382,109 @@ describe('deleteMeetup and restoreMeetup', () => {
     await deleteFriend(alex.id)
     expect(await restoreMeetup(deleted!)).toBe(false)
     expect(await db.meetupPhotos.count()).toBe(0)
+  })
+})
+
+describe('the thumbnail cache', () => {
+  /** Counts the photo records read whole (full image included). */
+  function countPhotoReads() {
+    return vi.spyOn(db.meetupPhotos, 'get')
+  }
+
+  it('reads a thumbnail once, then keeps it', async () => {
+    const meetup = await addMeetup(base, { add: [newPhoto('a')], removeIds: [], order: [] })
+    const reads = countPhotoReads()
+    expect(await firstPhotoThumb(meetup.id)).toBe('data:image/jpeg;base64,THUMBa')
+    expect(await firstPhotoThumb(meetup.id)).toBe('data:image/jpeg;base64,THUMBa')
+    expect(reads).toHaveBeenCalledTimes(1)
+    reads.mockRestore()
+  })
+
+  it('follows a new first photo after a reorder', async () => {
+    const meetup = await addMeetup(base, { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: ['a', 'b'] })
+    expect(await firstPhotoThumb(meetup.id)).toBe('data:image/jpeg;base64,THUMBa')
+    await updateMeetup(meetup.id, base, { add: [], removeIds: [], order: ['b', 'a'] })
+    expect(await firstPhotoThumb(meetup.id)).toBe('data:image/jpeg;base64,THUMBb')
+  })
+
+  it('reads again after forgetPhotoThumbs', async () => {
+    const meetup = await addMeetup(base, { add: [newPhoto('a')], removeIds: [], order: [] })
+    await firstPhotoThumb(meetup.id)
+    const reads = countPhotoReads()
+    forgetPhotoThumbs()
+    expect(await firstPhotoThumb(meetup.id)).toBe('data:image/jpeg;base64,THUMBa')
+    expect(reads).toHaveBeenCalledTimes(1)
+    reads.mockRestore()
+  })
+
+  it('still gives null for a meetup without photos', async () => {
+    const meetup = await addMeetup(base)
+    expect(await firstPhotoThumb(meetup.id)).toBeNull()
+    expect(await firstPhotoThumb(meetup.id)).toBeNull()
+  })
+
+  it('forgets the photos a delete or an edit removes', async () => {
+    const alex = await addFriend(friendInput('Alex'))
+    const meetup = await addMeetup(
+      { ...base, friendIds: [alex.id] },
+      { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: [] },
+    )
+    await firstPhotoThumb(meetup.id)
+    const deleted = await deleteMeetup(meetup.id)
+    await restoreMeetup(deleted!)
+    const reads = countPhotoReads()
+    expect(await firstPhotoThumb(meetup.id)).toBe('data:image/jpeg;base64,THUMBa')
+    expect(reads).toHaveBeenCalledTimes(1)
+    await updateMeetup(meetup.id, { ...base, friendIds: [alex.id] }, { add: [], removeIds: ['a'], order: [] })
+    expect(await firstPhotoThumb(meetup.id)).toBe('data:image/jpeg;base64,THUMBb')
+    expect(reads).toHaveBeenCalledTimes(2)
+    reads.mockRestore()
+  })
+
+  it('keeps the 300 most recently used thumbnails', async () => {
+    const meetupIds = Array.from({ length: 302 }, (_, i) => `m${i}`)
+    await db.meetupPhotos.bulkAdd(
+      meetupIds.map((meetupId, i) => ({
+        id: `p${i}`,
+        meetupId,
+        order: 0,
+        full: `data:image/jpeg;base64,FULL${i}`,
+        thumb: `data:image/jpeg;base64,THUMB${i}`,
+        width: 4,
+        height: 3,
+        createdAt: '2026-09-01T12:00:00.000Z',
+      })),
+    )
+    const [a, ...others] = meetupIds
+    const read = others.slice(0, 299)
+    const more = others.slice(299)
+    await firstPhotoThumb(a)
+    for (const id of read) await firstPhotoThumb(id)
+    await firstPhotoThumb(a)
+    for (const id of more) await firstPhotoThumb(id)
+
+    const reads = countPhotoReads()
+    expect(await firstPhotoThumb(a)).toBe('data:image/jpeg;base64,THUMB0')
+    expect(reads).not.toHaveBeenCalled()
+    // The first of the 299 was used least recently, so it was dropped and is read again.
+    expect(await firstPhotoThumb(read[0])).toBe('data:image/jpeg;base64,THUMB1')
+    expect(reads).toHaveBeenCalledTimes(1)
+    reads.mockRestore()
+  })
+})
+
+describe('meetupIdsWithPhotos', () => {
+  it('names each meetup with photos once, without reading a photo', async () => {
+    const three = await addMeetup(base, { add: [newPhoto('a'), newPhoto('b'), newPhoto('c')], removeIds: [], order: [] })
+    const none = await addMeetup(base)
+    const reads = vi.spyOn(db.meetupPhotos, 'get')
+    expect(await meetupIdsWithPhotos()).toEqual([three.id])
+    expect(reads).not.toHaveBeenCalled()
+    reads.mockRestore()
+
+    await updateMeetup(none.id, base, { add: [newPhoto('d')], removeIds: [], order: [] })
+    expect((await meetupIdsWithPhotos()).sort()).toEqual([three.id, none.id].sort())
+    await updateMeetup(none.id, base, { add: [], removeIds: ['d'], order: [] })
+    expect(await meetupIdsWithPhotos()).toEqual([three.id])
   })
 })
