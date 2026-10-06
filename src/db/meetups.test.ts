@@ -439,6 +439,11 @@ describe('the thumbnail cache', () => {
     expect(await firstPhotoThumb(meetup.id)).toBe('data:image/jpeg;base64,THUMBb')
     expect(reads).toHaveBeenCalledTimes(2)
     reads.mockRestore()
+    // Ids are never reused in the app; reusing one here shows the edit dropped the old entry, since a kept one
+    // would still answer with the old thumbnail.
+    const again = { ...newPhoto('a'), thumb: 'data:image/jpeg;base64,THUMBagain' }
+    await updateMeetup(meetup.id, { ...base, friendIds: [alex.id] }, { add: [again], removeIds: [], order: ['a'] })
+    expect(await firstPhotoThumb(meetup.id)).toBe('data:image/jpeg;base64,THUMBagain')
   })
 
   it('keeps the 300 most recently used thumbnails', async () => {
@@ -463,12 +468,19 @@ describe('the thumbnail cache', () => {
     await firstPhotoThumb(a)
     for (const id of more) await firstPhotoThumb(id)
 
+    // 302 thumbnails were read and a was used again, so the cache holds a, the 2 more and the last 297 of the 299.
     const reads = countPhotoReads()
     expect(await firstPhotoThumb(a)).toBe('data:image/jpeg;base64,THUMB0')
     expect(reads).not.toHaveBeenCalled()
+    // The oldest kept is still there, so the cache holds at least 300...
+    expect(await firstPhotoThumb(read[2])).toBe('data:image/jpeg;base64,THUMB3')
+    expect(reads).not.toHaveBeenCalled()
+    // ...and the one before it was dropped, so it holds no more than 300.
+    expect(await firstPhotoThumb(read[1])).toBe('data:image/jpeg;base64,THUMB2')
+    expect(reads).toHaveBeenCalledTimes(1)
     // The first of the 299 was used least recently, so it was dropped and is read again.
     expect(await firstPhotoThumb(read[0])).toBe('data:image/jpeg;base64,THUMB1')
-    expect(reads).toHaveBeenCalledTimes(1)
+    expect(reads).toHaveBeenCalledTimes(2)
     reads.mockRestore()
   })
 })
