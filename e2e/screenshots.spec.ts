@@ -64,6 +64,9 @@ async function seed(page: Page) {
   await logMeetup(page, ['Theo Brooks'], { type: 'Call', date: daysAgo(120) })
   await logMeetup(page, ['Alex Rivera', 'Kim Park', 'Jordan Lee'], { type: 'Party', date: daysAgo(300) })
   await logMeetup(page, ['Sam Chen'], { type: 'Trip', date: daysAgo(400) })
+  // The Meetups page opens with "Upcoming". Stats and the friend pages captured don't change: future meetups
+  // aren't counted.
+  await logMeetup(page, ['Maya Patel'], { type: 'Party', date: daysAgo(-2) })
   await friendLink(page, 'Alex Rivera').click()
   // Alex's birthday is further off, so the friend page shows it but Birthdays soon doesn't
   // (and Alex keeps a single link on the Friends tab).
@@ -107,6 +110,8 @@ async function writeOwnersDay(page: Page) {
 
 async function captureAll(page: Page, prefix: string) {
   await page.screenshot({ path: `${DIR}/${prefix}-02-friends.png` })
+  // Where the search field and the friend list land below Birthdays soon and Recent meetups.
+  await page.screenshot({ path: `${DIR}/${prefix}-02-friends-full.png`, fullPage: true })
 
   // The Log sheet's footer, then the day page written through it.
   await page.getByRole('button', { name: 'Log meetup' }).click()
@@ -150,6 +155,18 @@ async function captureAll(page: Page, prefix: string) {
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${DIR}/${prefix}-12-meetup.png`, fullPage: true })
   await page.getByRole('button', { name: 'Back' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
+
+  // The Meetups page, with the owner's example among the months, then searched.
+  await page.getByRole('link', { name: 'See all meetups' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Meetups' })).toBeVisible()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-19-meetups.png`, fullPage: true })
+  await page.getByRole('searchbox', { name: 'Search meetups' }).fill('ramen')
+  await expect(page.locator('.inset-group .row__title')).toHaveText(['Meal'])
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-20-meetups-search.png` })
+  await page.locator('header.navbar .navbar__back').click()
   await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
 
   await friendLink(page, 'Alex Rivera').click()
