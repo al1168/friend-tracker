@@ -1,9 +1,11 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { useContext } from 'react'
 import { db } from '../db/db'
-import { firstPhotoThumb, meetupIdsWithPhotos, photoById, photoCount, photoThumbs } from '../db/meetups'
+import { firstPhotoThumb, photoById, photoCount, photoThumbs } from '../db/meetups'
 import { getSetting, type Settings } from '../db/settings'
 import { compareNames } from '../lib/text'
 import type { Friend, Group, Meetup, MeetupPhoto, MeetupType } from '../types'
+import { MeetupIdsWithPhotosContext } from './meetupIdsWithPhotosContext'
 
 // Each hook returns `undefined` while its first query is loading, then re-renders on every change.
 
@@ -53,10 +55,12 @@ export function useFirstPhotoThumb(meetupId: string): string | null | undefined 
 
 /**
  * Which meetups have photos, so a meetup row knows from its first render whether it ends with a thumbnail. A
- * key-only walk of an index: no photo is read.
+ * key-only walk of an index (no photo is read), kept live for the whole app by MeetupIdsWithPhotosProvider.
  */
 export function useMeetupIdsWithPhotos(): ReadonlySet<string> | undefined {
-  return useLiveQuery(async () => new Set(await meetupIdsWithPhotos()))
+  const ids = useContext(MeetupIdsWithPhotosContext)
+  if (ids === null) throw new Error('useMeetupIdsWithPhotos must be used inside MeetupIdsWithPhotosProvider')
+  return ids
 }
 
 /** How many meetup photos are stored. Counts without reading any image. */

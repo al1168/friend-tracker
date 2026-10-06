@@ -1,0 +1,10 @@
+/* "Show older meetups": centered after the last group. At accessibility sizes it may wrap onto two centered lines. */
+.meetups-more {
+  display: flex;
+  justify-content: center;
+}
+.meetups-more .button {
+  max-width: 100%;
+  padding-block: var(--space-2);
+  text-align: center;
+}
