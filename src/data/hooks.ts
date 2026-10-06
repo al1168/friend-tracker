@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
-import { firstPhotoThumb, photoById, photoCount, photoThumbs } from '../db/meetups'
+import { firstPhotoThumb, meetupIdsWithPhotos, photoById, photoCount, photoThumbs } from '../db/meetups'
 import { getSetting, type Settings } from '../db/settings'
 import { compareNames } from '../lib/text'
 import type { Friend, Group, Meetup, MeetupPhoto, MeetupType } from '../types'
@@ -46,9 +46,17 @@ export function useMeetupPhotoThumbs(meetupId: string | undefined): Pick<MeetupP
   return useLiveQuery(async () => (meetupId ? photoThumbs(meetupId) : []), [meetupId])
 }
 
-/** The thumbnail of a meetup's first photo, or null when it has none: a history row's picture. */
+/** The thumbnail of a meetup's first photo, or null when it has none: a meetup row's picture. */
 export function useFirstPhotoThumb(meetupId: string): string | null | undefined {
   return useLiveQuery(() => firstPhotoThumb(meetupId), [meetupId])
+}
+
+/**
+ * Which meetups have photos, so a meetup row knows from its first render whether it ends with a thumbnail. A
+ * key-only walk of an index: no photo is read.
+ */
+export function useMeetupIdsWithPhotos(): ReadonlySet<string> | undefined {
+  return useLiveQuery(async () => new Set(await meetupIdsWithPhotos()))
 }
 
 /** How many meetup photos are stored. Counts without reading any image. */

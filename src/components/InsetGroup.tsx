@@ -66,6 +66,8 @@ interface RowProps {
   chevron?: boolean
   accent?: boolean
   destructive?: boolean
+  /** The link, for moving focus to it from code (a `to` row only). */
+  ref?: Ref<HTMLAnchorElement>
 }
 
 export function Row({
@@ -82,6 +84,7 @@ export function Row({
   chevron,
   accent,
   destructive,
+  ref,
 }: RowProps) {
   const className = [
     'row',
@@ -111,7 +114,7 @@ export function Row({
 
   if (to) {
     return (
-      <Link to={to} state={state} className={className}>
+      <Link ref={ref} to={to} state={state} className={className}>
         {content}
       </Link>
     )

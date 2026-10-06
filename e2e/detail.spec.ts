@@ -32,8 +32,11 @@ test('history rows show activities and the first photo', async ({ page }) => {
   const history = page.getByRole('region', { name: 'History' })
   const meal = history.getByRole('link', { name: /Meal.*with Sam · Karaoke, Walk · Tacos/ })
   await expect(meal).toBeVisible()
-  await expect(meal.locator('img.history-thumb')).toHaveAttribute('src', /^data:image\/jpeg/)
-  await expect(history.getByRole('link', { name: /Coffee/ }).locator('img')).toHaveCount(0)
+  // The photo sits in its 40px box, which a row without a photo doesn't have.
+  await expect(meal.locator('.meetup-thumb img.history-thumb')).toHaveAttribute('src', /^data:image\/jpeg/)
+  const coffee = history.getByRole('link', { name: /Coffee/ })
+  await expect(coffee.locator('img')).toHaveCount(0)
+  await expect(coffee.locator('.meetup-thumb')).toHaveCount(0)
 })
 
 test('history rows show the day’s first places, or its first line cut at 80 characters', async ({ page }) => {

@@ -5,27 +5,22 @@ import { Chip } from '../components/Chip'
 import { IconPlus } from '../components/icons'
 import { InsetGroup, Row, Section } from '../components/InsetGroup'
 import { LogButton } from '../components/LogButton'
+import { MeetupRow } from '../components/MeetupRow'
 import { MonthBars } from '../components/MonthBars'
 import { Page, type NavState } from '../components/Page'
 import { StatRow } from '../components/StatRow'
-import { useFirstPhotoThumb, useFriend, useFriends, useGroups, useMeetups, useMeetupTypes } from '../data/hooks'
+import { useFriend, useFriends, useGroups, useMeetupIdsWithPhotos, useMeetups, useMeetupTypes } from '../data/hooks'
 import { useToday } from '../hooks/useToday'
 import { describeNextBirthday, formatBirthday } from '../lib/birthdays'
 import { daysBetween, formatDate, formatMonthYear, yearOf } from '../lib/dates'
-import { daySnippet } from '../lib/dayText'
-import { formatNameList, formatSince } from '../lib/text'
+import { formatSince } from '../lib/text'
 import { useSheets } from '../sheets/sheetsContext'
 import { allTimeCountsByFriend, countsByFriendForYear, monthlyCounts } from '../stats/counts'
 import { groupByMonth } from '../stats/history'
 import { lastSeenByFriend } from '../stats/lastSeen'
+import { meetupNames } from '../stats/meetupHistory'
 import { FriendPreferences } from './FriendPreferences'
 import './FriendDetailScreen.css'
-
-/** A history row's picture: the meetup's first photo, when it has any. Each row reads only that thumbnail. */
-function HistoryThumb({ meetupId }: { meetupId: string }) {
-  const thumb = useFirstPhotoThumb(meetupId)
-  return thumb ? <img className="history-thumb" src={thumb} alt="" /> : null
-}
 
 export function FriendDetailScreen() {
   const { id } = useParams()
@@ -34,6 +29,7 @@ export function FriendDetailScreen() {
   const groups = useGroups()
   const meetups = useMeetups()
   const types = useMeetupTypes()
+  const withPhotos = useMeetupIdsWithPhotos()
   const today = useToday()
   const location = useLocation()
   const { openFriendSheet } = useSheets()
@@ -55,7 +51,7 @@ export function FriendDetailScreen() {
   }, [friend, meetups, today])
 
   if (friend === null) return <Navigate to="/" replace />
-  if (!friend || !friends || !groups || !types || !data) return null
+  if (!friend || !friends || !groups || !types || !withPhotos || !data) return null
 
   const groupName = groups.find((group) => group.id === friend.groupId)?.name
   const typeById = new Map(types.map((type) => [type.id, type] as const))
@@ -138,41 +134,18 @@ export function FriendDetailScreen() {
         ) : (
           data.history.map(({ month, meetups: monthMeetups }) => (
             <InsetGroup key={month} title={formatMonthYear(`${month}-01`)} level={3}>
-              {monthMeetups.map((meetup) => {
-                const type = typeById.get(meetup.typeId)
-                const others = meetup.friendIds
-                  .filter((friendId) => friendId !== friend.id)
-                  .map((friendId) => nameById.get(friendId))
-                  .filter((name): name is string => name !== undefined)
-                return (
-                  <Row
-                    key={meetup.id}
-                    to={`/meetups/${meetup.id}`}
-                    state={fromFriend}
-                    leading={
-                      <span className="emoji-badge" aria-hidden="true">
-                        {type?.emoji ?? '✨'}
-                      </span>
-                    }
-                    title={
-                      <>
-                        {type?.name ?? 'Meetup'}{meetup.date > today && ' '}
-                        {meetup.date > today && <span className="upcoming-badge">Upcoming</span>}
-                      </>
-                    }
-                    subtitle={[
-                      formatDate(meetup.date, today),
-                      others.length > 0 ? `with ${formatNameList(others)}` : null,
-                      meetup.activities.length > 0 ? meetup.activities.join(', ') : null,
-                      daySnippet(meetup.note),
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                    trailing={<HistoryThumb meetupId={meetup.id} />}
-                    chevron
-                  />
-                )
-              })}
+              {monthMeetups.map((meetup) => (
+                // "with" leaves out the friend this page is about.
+                <MeetupRow
+                  key={meetup.id}
+                  meetup={meetup}
+                  type={typeById.get(meetup.typeId)}
+                  names={meetupNames(meetup, nameById, friend.id)}
+                  today={today}
+                  state={fromFriend}
+                  hasPhoto={withPhotos.has(meetup.id)}
+                />
+              ))}
             </InsetGroup>
           ))
         )}

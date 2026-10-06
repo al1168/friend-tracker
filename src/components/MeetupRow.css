@@ -1,0 +1,23 @@
+/* A meetup row's first photo: a 40px Linen box from the first render, filled when the thumbnail arrives. */
+.meetup-thumb {
+  display: block;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.history-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  object-fit: cover;
+}
+
+/* Recent meetups stops a subtitle at two lines, like a Mail preview; WebKit ends the last line with "…". */
+.meetup-row__clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
