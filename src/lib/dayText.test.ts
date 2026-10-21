@@ -10,6 +10,7 @@ import {
   type DayTime,
   FEELINGS_MAX,
   isDayEmpty,
+  isPlaceLine,
   normalizeLineBreaks,
   readDay,
   TOO_LONG_FEELINGS,
@@ -191,6 +192,38 @@ describe('place lines', () => {
     expect(readDay('Then walked to dinner @seoulsaloon')).toEqual([
       { kind: 'prose', lines: [text('Then walked to dinner @seoulsaloon')] },
     ])
+  })
+})
+
+describe('isPlaceLine', () => {
+  /** The stops readDay makes from one line read on its own. */
+  const stopsFrom = (line: string) => readDay(line).flatMap((part) => (part.kind === 'timeline' ? part.stops : []))
+
+  it.each([
+    ['A', OWNER_DAY_TYPED],
+    ['B', OWNER_MESSAGE],
+  ])('is true for a line of golden fixture %s exactly when the grammar makes a stop from it', (_, note) => {
+    for (const line of note.split('\n')) expect(isPlaceLine(line), line).toBe(stopsFrom(line).length === 1)
+  })
+
+  it.each([
+    ['A', OWNER_DAY_TYPED, 8],
+    ['B', OWNER_MESSAGE, 8],
+  ])('finds as many place lines in golden fixture %s as readDay makes stops', (_, note, stops) => {
+    expect(note.split('\n').filter(isPlaceLine)).toHaveLength(stops)
+    expect(readDay(note).flatMap((part) => (part.kind === 'timeline' ? part.stops : []))).toHaveLength(stops)
+  })
+
+  it('reads "@ some place" and a place with a time as places, with spaces around them', () => {
+    for (const line of ['@ some place', '@Blue willow 3:30', '  @Cafe ', '@Blue willow 3:30, ', '@Bar 25:00']) {
+      expect(isPlaceLine(line), line).toBe(true)
+    }
+  })
+
+  it('never reads "@" alone, a time alone or an "@" after the start of a line as a place', () => {
+    for (const line of ['@', ' @ ', '@ 3:30', 'Then walked to dinner @seoulsaloon', '', 'Jessie paid', 'Plan:']) {
+      expect(isPlaceLine(line), line).toBe(false)
+    }
   })
 })
 

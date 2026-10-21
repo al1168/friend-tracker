@@ -1,14 +1,16 @@
-/* The box and a hidden copy of its text share one grid cell, so the box is as tall as its text. Both must lay out
-   text the same way: same font, padding, line height and wrapping. */
+/* The box and a copy of its text share one grid cell, so the box is as tall as its text. Both must lay out text the
+   same way: same font, padding, line height and wrapping. The field's Paper White is on the cell, and the box itself
+   is transparent, so a backdrop in the copy can show through. */
 .grow-field {
   display: grid;
+  border-radius: var(--radius-field);
+  background: var(--surface);
 }
-.grow-field::after {
-  content: attr(data-value);
+.grow-field__copy {
   visibility: hidden;
 }
 .grow-field__box,
-.grow-field::after {
+.grow-field__copy {
   grid-area: 1 / 1 / 2 / 2;
   min-width: 0;
   margin: 0;
@@ -28,9 +30,29 @@
   overflow: hidden;
   resize: none;
   border-radius: var(--radius-field);
-  background: var(--surface);
+  background: transparent;
   color: var(--ink);
 }
 .grow-field__box::placeholder {
   color: var(--ink-3);
+}
+
+/* The place tint (The day boxes): the copy shows beneath the box, with transparent glyphs, so only its tints show. */
+.grow-field--places .grow-field__copy {
+  visibility: visible;
+  color: transparent;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Peach Wash behind a place line's words. The side padding and the negative margin cancel out, so the tint reaches
+   a little past the words without moving them; padding above and below never changes the line's height. */
+.day-place {
+  margin: 0 -0.2em;
+  padding: 0.1em 0.2em;
+  border-radius: 0.35em;
+  background: var(--accent-soft);
+  color: inherit;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }

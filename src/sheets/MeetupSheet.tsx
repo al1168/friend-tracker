@@ -418,6 +418,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
         </h3>
         <GrowField
           minLines={4}
+          highlightPlaces
           aria-labelledby={dayId}
           aria-describedby={dayHintId}
           value={note}

@@ -441,6 +441,7 @@ function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
           <GrowField
             ref={dayRef}
             minLines={12}
+            highlightPlaces
             aria-labelledby={dayId}
             aria-describedby={hintId}
             value={fields.note}

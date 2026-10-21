@@ -46,6 +46,7 @@ test.describe('The day in the meetup sheets', () => {
     await sheet.getByRole('group', { name: 'Recent friends' }).getByRole('button', { name: 'Alex' }).click()
     await sheetDay(sheet).fill('@Cafe 10:30')
     await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
+    await expect(sheet).toBeHidden()
     await expect(page.getByRole('heading', { level: 1, name: 'The day' })).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'The day' })).toHaveValue('@Cafe 10:30')
   })
@@ -87,5 +88,64 @@ test.describe('The day in the meetup sheets', () => {
     await page.getByRole('alertdialog').getByRole('button', { name: 'Discard changes' }).click()
     await expect(sheet).toBeHidden()
     expect(await readMeetups(page)).toHaveLength(0)
+  })
+})
+
+/**
+ * Each tint sits behind its line of a The day box: centered on the line it marks (`lines`, from 0), and starting
+ * where the box's text starts, reaching 0.2em past it into the padding.
+ */
+async function expectTintsOnLines(box: Locator, tints: Locator, lines: number[]) {
+  const text = await box.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    const style = getComputedStyle(element)
+    return {
+      top: rect.top + parseFloat(style.paddingTop),
+      left: rect.left + parseFloat(style.paddingLeft),
+      lineHeight: parseFloat(style.lineHeight),
+      fontSize: parseFloat(style.fontSize),
+    }
+  })
+  await expect(tints).toHaveCount(lines.length)
+  for (const [index, line] of lines.entries()) {
+    const tint = await tints.nth(index).evaluate((element) => {
+      const [first] = element.getClientRects()
+      return { top: first.top, bottom: first.bottom, left: first.left }
+    })
+    const middle = (tint.top + tint.bottom) / 2
+    expect(Math.abs(middle - (text.top + (line + 0.5) * text.lineHeight)), `Tint ${index + 1} is on line ${line + 1}`).toBeLessThanOrEqual(1)
+    expect(Math.abs(tint.left - (text.left - 0.2 * text.fontSize)), `Tint ${index + 1} starts with the text`).toBeLessThanOrEqual(1)
+  }
+}
+
+test.describe('@ highlighting', () => {
+  const TYPED = ['@ some place', '@Blue willow 3:30', '@', 'Then dinner @seoulsaloon', '@ 3:30', 'Kung pao chicken'].join('\n')
+
+  test('tints each place line in the sheet box and on the day page, and nothing else', async ({ page }) => {
+    await page.goto('/')
+    await addFriend(page, 'Alex')
+    const sheet = await openLogMeetup(page)
+    await sheet.getByRole('group', { name: 'Recent friends' }).getByRole('button', { name: 'Alex' }).click()
+    const box = sheetDay(sheet)
+    await box.fill(TYPED)
+    const tints = sheet.locator('mark.day-place')
+    await expect(tints).toHaveText(['@ some place', '@Blue willow 3:30'])
+    await expectTintsOnLines(box, tints, [0, 1])
+    // Only a look: the copy behind the box is hidden from VoiceOver, and the box reads exactly as typed.
+    await expect(sheet.locator('.grow-field__copy')).toHaveAttribute('aria-hidden', 'true')
+    await expect(box).toHaveValue(TYPED)
+
+    await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
+    await expect(sheet).toBeHidden()
+    const dayBox = page.getByRole('textbox', { name: 'The day' })
+    await expect(dayBox).toHaveValue(TYPED)
+    const dayTints = page.locator('.day-page mark.day-place')
+    await expect(dayTints).toHaveText(['@ some place', '@Blue willow 3:30'])
+    await expectTintsOnLines(dayBox, dayTints, [0, 1])
+
+    // The tints follow the typing: a new place line gets one, and a line that stops being a place loses its own.
+    await dayBox.fill(TYPED.replace('@ some place', 'Some place') + '\n@Park')
+    await expect(dayTints).toHaveText(['@Blue willow 3:30', '@Park'])
+    await expectTintsOnLines(dayBox, dayTints, [1, 6])
   })
 })

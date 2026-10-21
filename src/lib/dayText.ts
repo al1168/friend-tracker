@@ -122,6 +122,15 @@ function readPlaceLine(line: string): PlaceLine | 'skip' | null {
   return place === '' ? null : { place, start, end }
 }
 
+/**
+ * Whether a line, read on its own, is a place line: one readDay makes a stop of. Spaces around it don't count;
+ * "@" alone, "@ 3:30" and an "@" after the start of a line aren't places. The day boxes tint these lines.
+ */
+export function isPlaceLine(line: string): boolean {
+  const place = readPlaceLine(line.trim())
+  return place !== null && place !== 'skip'
+}
+
 function minutesOf(hour: number, minute: number, half: 'am' | 'pm'): number {
   return (hour % 12) * 60 + minute + (half === 'pm' ? NOON : 0)
 }
