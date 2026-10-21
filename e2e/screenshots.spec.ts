@@ -124,16 +124,38 @@ async function captureAll(page: Page, prefix: string) {
   // Where the search field, the chips and the friend list land below Birthdays soon and Recent meetups.
   await captureFullList(page, `${DIR}/${prefix}-02-friends-full.png`)
 
-  // The Log sheet's footer, then the day page written through it.
+  // The Log sheet: the friend search over the keyboard, then Save at the top right over every friend's tile, then The
+  // day with a place line tinted, then the day page written through it.
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
+  const body = sheet.locator('.sheet__body')
+  const search = sheet.getByLabel('Search all friends')
+  await search.focus()
+  await openKeyboard(page)
+  await search.fill('a')
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-22-log-search.png` })
+  await search.fill('')
+  await closeKeyboard(page)
   for (const name of ['Mariya', 'Jessie', 'Brandon']) {
-    await sheet.getByLabel('Search all friends').fill(name)
+    await search.fill(name)
     await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name, exact: true }).click()
   }
   await sheet.getByRole('button', { name: 'Meal', exact: true }).click()
+  await search.blur()
+  await body.evaluate((element) => {
+    element.scrollTop = 0
+  })
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${DIR}/${prefix}-03-log-sheet.png` })
+  const sheetDay = sheet.getByRole('textbox', { name: 'The day' })
+  await sheetDay.fill('@Blue willow 3:30\nKung pao chicken, garlic string beans and jasmine dragon pearl tea\nJessie paid')
+  await sheetDay.blur()
+  await sheetDay.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-21-log-day.png` })
+  // The day page opens empty for the captures that follow.
+  await sheetDay.fill('')
   await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'The day' })).toBeVisible()
   await page.waitForTimeout(500)
