@@ -14,6 +14,25 @@ describe('recentFriends', () => {
     expect(recentFriends(friends, meetups, TODAY).map((f) => f.id)).toEqual(['alex', 'cal', 'dee', 'bea'])
   })
 
+  it('lists every friend when no limit is given, however many there are', () => {
+    const twelve = Array.from({ length: 12 }, (_, i) => friend(`f${i + 1}`, `Friend ${String(i + 1).padStart(2, '0')}`))
+    const seen = [meetup('m1', '2026-09-30', ['f12']), meetup('m2', '2026-09-01', ['f7'])]
+    expect(recentFriends(twelve, seen, TODAY).map((f) => f.id)).toEqual([
+      'f12',
+      'f7',
+      'f1',
+      'f2',
+      'f3',
+      'f4',
+      'f5',
+      'f6',
+      'f8',
+      'f9',
+      'f10',
+      'f11',
+    ])
+  })
+
   it('caps the list', () => {
     expect(recentFriends(friends, meetups, TODAY, 2).map((f) => f.id)).toEqual(['alex', 'cal'])
   })

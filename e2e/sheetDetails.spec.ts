@@ -1,5 +1,15 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { addFriend, editMeetup, logMeetup, openDay, openFriendPage, readMeetups, sheetSave } from './helpers.ts'
+import {
+  addFriend,
+  editMeetup,
+  friendRow,
+  logMeetup,
+  openDay,
+  openFriendPage,
+  readMeetups,
+  seedMeetups,
+  sheetSave,
+} from './helpers.ts'
 
 // Most tests add a friend and log a meetup first, so they get more time than most.
 test.describe.configure({ timeout: 60_000 })
@@ -21,7 +31,7 @@ test.describe('The day in the meetup sheets', () => {
     await page.goto('/')
     await addFriend(page, 'Mariya')
     const sheet = await openLogMeetup(page)
-    await sheet.getByRole('group', { name: 'Recent friends' }).getByRole('button', { name: 'Mariya' }).click()
+    await sheet.getByRole('group', { name: 'Friends', exact: true }).getByRole('button', { name: 'Mariya' }).click()
     await sheet.getByRole('button', { name: 'Meal', exact: true }).click()
     const day = sheetDay(sheet)
     await expect(day).toHaveAttribute('placeholder', 'What happened? Start a line with @ for a place.')
@@ -43,7 +53,7 @@ test.describe('The day in the meetup sheets', () => {
     await page.goto('/')
     await addFriend(page, 'Alex')
     const sheet = await openLogMeetup(page)
-    await sheet.getByRole('group', { name: 'Recent friends' }).getByRole('button', { name: 'Alex' }).click()
+    await sheet.getByRole('group', { name: 'Friends', exact: true }).getByRole('button', { name: 'Alex' }).click()
     await sheetDay(sheet).fill('@Cafe 10:30')
     await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
     await expect(sheet).toBeHidden()
@@ -125,7 +135,7 @@ test.describe('@ highlighting', () => {
     await page.goto('/')
     await addFriend(page, 'Alex')
     const sheet = await openLogMeetup(page)
-    await sheet.getByRole('group', { name: 'Recent friends' }).getByRole('button', { name: 'Alex' }).click()
+    await sheet.getByRole('group', { name: 'Friends', exact: true }).getByRole('button', { name: 'Alex' }).click()
     const box = sheetDay(sheet)
     await box.fill(TYPED)
     const tints = sheet.locator('mark.day-place')
@@ -147,5 +157,81 @@ test.describe('@ highlighting', () => {
     await dayBox.fill(TYPED.replace('@ some place', 'Some place') + '\n@Park')
     await expect(dayTints).toHaveText(['@Blue willow 3:30', '@Park'])
     await expectTintsOnLines(dayBox, dayTints, [1, 6])
+  })
+})
+
+/** Whether a friend's tile shows whole inside the strip's visible part. */
+function shownInStrip(tile: Locator): Promise<boolean> {
+  return tile.evaluate((element) => {
+    const strip = element.closest('[role="group"]')
+    if (!strip) throw new Error('Not in the strip')
+    const tileRect = element.getBoundingClientRect()
+    const stripRect = strip.getBoundingClientRect()
+    return tileRect.left >= stripRect.left - 0.5 && tileRect.right <= stripRect.right + 0.5
+  })
+}
+
+test.describe('swiping through friends', () => {
+  const NAMES = Array.from({ length: 12 }, (_, i) => `Friend ${String(i + 1).padStart(2, '0')}`)
+
+  test('Who has every friend: the strip swipes sideways to the 12th, which can be picked', async ({ page }) => {
+    await page.goto('/')
+    // None seen yet, so they come in name order.
+    await seedMeetups(page, { friends: NAMES.map((name, i) => friendRow(`f${i + 1}`, name)) })
+    const sheet = await openLogMeetup(page)
+    const strip = sheet.getByRole('group', { name: 'Friends', exact: true })
+    const tiles = strip.getByRole('button')
+    await expect(strip.locator('.friend-tile__name')).toHaveText(NAMES)
+    // Two rows, filled a column at a time: the first two friends share the first column.
+    const [first, second, third] = await Promise.all([0, 1, 2].map((i) => tiles.nth(i).boundingBox()))
+    if (!first || !second || !third) throw new Error('The tiles are not on screen')
+    expect(Math.abs(second.x - first.x), 'Friend 02 is under Friend 01').toBeLessThanOrEqual(1)
+    expect(second.y).toBeGreaterThan(first.y + first.height - 1)
+    expect(third.x).toBeGreaterThan(first.x + first.width)
+    // The first column starts on the sheet's 16px margin, and the fifth peeks in at the edge.
+    const sheetBox = await sheet.boundingBox()
+    if (!sheetBox) throw new Error('The sheet is not on screen')
+    expect(Math.abs(first.x - (sheetBox.x + 16)), 'On the margin').toBeLessThanOrEqual(1)
+    const fifth = await tiles.nth(8).boundingBox()
+    if (!fifth) throw new Error('The fifth column is not on screen')
+    expect(fifth.x, 'The fifth column starts on screen').toBeLessThan(sheetBox.x + sheetBox.width)
+    expect(fifth.x + fifth.width, 'and runs off it').toBeGreaterThan(sheetBox.x + sheetBox.width)
+
+    const twelfth = tiles.nth(11)
+    expect(await shownInStrip(twelfth)).toBe(false)
+    // A sideways swipe scrolls the strip (Playwright's mobile WebKit can't swipe or use a wheel, so it scrolls it).
+    await strip.evaluate((element) => element.scrollBy({ left: element.scrollWidth, behavior: 'instant' }))
+    await expect.poll(() => shownInStrip(twelfth)).toBe(true)
+    await twelfth.click()
+    await expect(twelfth).toHaveAttribute('aria-pressed', 'true')
+    await expect(sheet.getByRole('group', { name: 'Selected friends' })).toContainText('Friend 12')
+    await sheetSave(sheet).click()
+    await expect(page.getByRole('status')).toContainText('Logged with Friend 12')
+  })
+
+  test('a tile that takes keyboard focus scrolls into view', async ({ page }) => {
+    await page.goto('/')
+    await seedMeetups(page, { friends: NAMES.map((name, i) => friendRow(`f${i + 1}`, name)) })
+    const sheet = await openLogMeetup(page)
+    const twelfth = sheet.getByRole('group', { name: 'Friends', exact: true }).getByRole('button', { name: 'Friend 12' })
+    expect(await shownInStrip(twelfth)).toBe(false)
+    await twelfth.focus()
+    await expect.poll(() => shownInStrip(twelfth)).toBe(true)
+  })
+
+  test('with 8 friends or fewer, Who is a still grid of four across', async ({ page }) => {
+    await page.goto('/')
+    await seedMeetups(page, { friends: NAMES.slice(0, 8).map((name, i) => friendRow(`f${i + 1}`, name)) })
+    const sheet = await openLogMeetup(page)
+    const strip = sheet.getByRole('group', { name: 'Friends', exact: true })
+    const tiles = strip.getByRole('button')
+    await expect(strip.locator('.friend-tile__name')).toHaveText(NAMES.slice(0, 8))
+    // Filled a row at a time, as before: Friend 05 starts the second row.
+    const [first, second, fifth] = await Promise.all([0, 1, 4].map((i) => tiles.nth(i).boundingBox()))
+    if (!first || !second || !fifth) throw new Error('The tiles are not on screen')
+    expect(Math.abs(second.y - first.y)).toBeLessThanOrEqual(1)
+    expect(Math.abs(fifth.x - first.x)).toBeLessThanOrEqual(1)
+    expect(fifth.y).toBeGreaterThan(first.y)
+    expect(await strip.evaluate((element) => element.scrollWidth <= element.clientWidth), 'Nothing to swipe').toBe(true)
   })
 })

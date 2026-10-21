@@ -45,6 +45,9 @@ function blurOnEnter(event: KeyboardEvent<HTMLInputElement>) {
 
 const UNDO_FAILED = "Couldn't undo. Please try again."
 
+/** Up to this many friends fill a still grid four across; more make a strip two rows high that swipes sideways. */
+const STILL_GRID_MAX = 8
+
 export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
   const [initial] = useState(request)
   const editing = initial?.meetup
@@ -111,7 +114,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
 
   const friendById = useMemo(() => new Map((friends ?? []).map((f) => [f.id, f] as const)), [friends])
   const selected = friendIds.map((id) => friendById.get(id)).filter((f): f is Friend => f !== undefined)
-  const recent = useMemo(
+  const byLastSeen = useMemo(
     () => (friends && meetups ? recentFriends(friends, meetups, today) : []),
     [friends, meetups, today],
   )
@@ -268,27 +271,32 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
             ))}
           </div>
         )}
-        {recent.length > 0 && (
-          <div className="recent-friends" role="group" aria-label="Recent friends">
-            {recent.map((friend) => {
+        {byLastSeen.length > 0 && (
+          <div
+            className="friend-strip"
+            data-swipes={byLastSeen.length > STILL_GRID_MAX}
+            role="group"
+            aria-label="Friends"
+          >
+            {byLastSeen.map((friend) => {
               const on = friendIds.includes(friend.id)
               return (
                 <button
                   key={friend.id}
                   type="button"
-                  className="recent-friend"
+                  className="friend-tile"
                   aria-pressed={on}
                   onClick={() => toggleFriend(friend.id)}
                 >
-                  <span className="recent-friend__avatar">
+                  <span className="friend-tile__avatar">
                     <Avatar name={friend.name} photo={friend.photo} seed={friend.id} size={52} />
                     {on && (
-                      <span className="recent-friend__check">
+                      <span className="friend-tile__check">
                         <IconCheck size={14} strokeWidth={3} />
                       </span>
                     )}
                   </span>
-                  <span className="recent-friend__name">{friend.name}</span>
+                  <span className="friend-tile__name">{friend.name}</span>
                 </button>
               )
             })}

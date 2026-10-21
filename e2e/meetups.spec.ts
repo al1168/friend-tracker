@@ -39,7 +39,7 @@ test('Save is at the top right, dimmed until a friend is picked, and there is no
   if (!title || !bar) throw new Error('The header is not on screen')
   expect(Math.abs(title.x + title.width / 2 - (bar.x + bar.width / 2)), 'Within a pixel').toBeLessThanOrEqual(1)
 
-  await sheet.getByRole('group', { name: 'Recent friends' }).getByRole('button', { name: 'Alex' }).click()
+  await sheet.getByRole('group', { name: 'Friends', exact: true }).getByRole('button', { name: 'Alex' }).click()
   await expect(sheetSave(sheet)).toBeEnabled()
   await sheetSave(sheet).click()
   await expect(sheet).toBeHidden()
@@ -72,7 +72,7 @@ test('asks before discarding a started meetup', async ({ page }) => {
   await addFriend(page, 'Alex')
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
-  await sheet.getByRole('group', { name: 'Recent friends' }).getByRole('button', { name: 'Alex' }).click()
+  await sheet.getByRole('group', { name: 'Friends', exact: true }).getByRole('button', { name: 'Alex' }).click()
   await sheet.getByRole('button', { name: 'Cancel' }).click()
   await page.getByRole('alertdialog').getByRole('button', { name: 'Discard changes' }).click()
   await expect(sheet).toBeHidden()

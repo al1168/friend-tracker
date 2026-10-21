@@ -272,7 +272,7 @@ test('accessibility text size day page and memory', async ({ page }) => {
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
   for (const name of ['Mariya', 'Jessie', 'Brandon']) {
-    await sheet.getByRole('group', { name: 'Recent friends' }).getByRole('button', { name }).click()
+    await sheet.getByRole('group', { name: 'Friends', exact: true }).getByRole('button', { name }).click()
   }
   await sheet.getByRole('button', { name: 'Meal', exact: true }).click()
   await sheet.getByRole('button', { name: 'Save and write about the day' }).click()

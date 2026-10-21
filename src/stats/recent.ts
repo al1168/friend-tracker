@@ -3,8 +3,11 @@ import { compareNames } from '../lib/text'
 import type { Friend, Meetup } from '../types'
 import { lastSeenByFriend } from './lastSeen'
 
-/** Friends for one-tap picking: most recently seen first, then never-seen friends by name. */
-export function recentFriends(friends: Friend[], meetups: Meetup[], today: ISODate, limit = 8): Friend[] {
+/**
+ * Friends for one-tap picking: most recently seen first, then never-seen friends by name. Every friend, or the
+ * first `limit` of them.
+ */
+export function recentFriends(friends: Friend[], meetups: Meetup[], today: ISODate, limit?: number): Friend[] {
   const lastSeen = lastSeenByFriend(meetups, today)
   const seen = friends
     .filter((friend) => lastSeen.has(friend.id))

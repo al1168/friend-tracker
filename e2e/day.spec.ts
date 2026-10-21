@@ -652,7 +652,7 @@ test('the owner’s example, written on the walk home, reads back as their day',
   // 1. Friends tab, "+ Log meetup": Mariya, Jessie and Brandon under Recent, Meal, Today, Movie and Shopping.
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
-  const recent = sheet.getByRole('group', { name: 'Recent friends' })
+  const recent = sheet.getByRole('group', { name: 'Friends', exact: true })
   for (const name of FRIENDS) await recent.getByRole('button', { name }).click()
   await sheet.getByRole('button', { name: 'Meal', exact: true }).click()
   await expect(sheet.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-pressed', 'true')

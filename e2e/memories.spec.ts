@@ -22,7 +22,7 @@ test('logs a meetup with activities, one of them new, and two photos', async ({ 
   await addFriend(page, 'Alex')
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
-  await sheet.getByRole('group', { name: 'Recent friends' }).getByRole('button', { name: 'Alex' }).click()
+  await sheet.getByRole('group', { name: 'Friends', exact: true }).getByRole('button', { name: 'Alex' }).click()
   const activities = sheet.getByRole('group', { name: 'Activities' })
   // The starters, in order, then "+ New".
   await expect(activities.getByRole('button').first()).toHaveText('Board games')
