@@ -1,6 +1,6 @@
 # Sheet details, @ highlighting, swipeable friends and Save in the corner: design
 
-Date: 2026-10-21. Status: approved (the owner asked for best-practice decisions without approval stops: "Auto approve").
+Date: 2026-10-21. Status: approved (the owner asked for best-practice decisions without approval stops: "Auto approve"). Later the same day the owner approved two changes: no "Pick a friend" anywhere (see Save in the top right), and three additions from a hands-on UX review of the Log sheet (A, B and C below: a suggested meetup type, Who ordered by who you actually see, and The day box right after When).
 
 ## Owner feedback (verbatim)
 
@@ -16,16 +16,18 @@ Make logging a meetup complete and comfortable in one sheet: pick any friend wit
 
 ## Decisions
 
-- **The day box in the meetup sheets.** The Log meetup and Edit meetup sheets get a "The day" text box after Photos. It edits the meetup's `note` (the same text The day page edits) and saves with the meetup. No new data and no backup change.
+- **The day box in the meetup sheets.** The Log meetup and Edit meetup sheets get a "The day" text box right after When, before Activities and Photos, so it's easy to reach (addition C). It edits the meetup's `note` (the same text The day page edits) and saves with the meetup. No new data and no backup change.
 - **@ highlighting everywhere the day is typed.** While typing, every line the frozen grammar reads as a place (exactly the lines `readPlaceLine` in `src/lib/dayText.ts` accepts, so "@ some place" and "@Blue willow 3:30" both count, "@" alone does not) gets a soft highlight behind it. This applies in the sheet's The day box and on The day page. The highlight means "this line will show as a place in the timeline".
-- **Swipe through every friend.** The Who section's 8-friend grid becomes a horizontally swipeable strip of all friends, two rows high, in the same order as today (most recently seen first, then never seen, by name). Search stays below it.
+- **Swipe through every friend.** The Who section's 8-friend grid becomes a horizontally swipeable strip of all friends, two rows high, ordered by who you actually see (addition B, below). Search stays below it.
+- **A suggested meetup type (addition A).** A new meetup no longer always starts on the first type. Until the owner taps a type, the sheet suggests one from the picked friends' recent meetups, then from the owner's own habits, then the first type. Edit keeps the meetup's own type.
+- **Who you actually see comes first (addition B).** The friend tiles are ranked by how often you met in the last 90 days, then by the most recent meetup, then never-seen friends by name. Opened from a friend's page, the friends most often seen with that friend come first.
 - **Save in the top right.** The meetup sheets and the friend sheet put Save in the header's trailing slot (Cancel left, title centered, Save right), as iOS sheets do. The footer's block Save button goes away.
 - **"Save and write about the day" stays** in the Log sheet as a full-width secondary button at the end of the sheet body, for weather, mood and How it felt on The day page.
-- **Out of scope:** changing the frozen grammar, highlighting anything the grammar doesn't read as a place (an "@" in the middle of a sentence), times or paid lines highlighting, reordering friends, favorites, and the Groups/Types screens.
+- **Out of scope:** changing the frozen grammar, highlighting anything the grammar doesn't read as a place (an "@" in the middle of a sentence), times or paid lines highlighting, reordering friends by hand, favorites, and the Groups/Types screens.
 
 ## The day box in the meetup sheets
 
-- **Placement.** A new section after Photos: a label "The day" (`form-section__label`, the same look as Who, What, When) and a `GrowField` with `minLines={4}`.
+- **Placement.** A new section right after When, before Activities and Photos (addition C: easy to reach without scrolling past the activity chips and photos): a label "The day" (`form-section__label`, the same look as Who, What, When) and a `GrowField` with `minLines={4}`.
 - **Copy.** Placeholder "What happened? Start a line with @ for a place." The hint under the box, in Footnote Warm Ink Secondary, reads "Lines that start with @ show as places." It is linked with `aria-describedby`.
 - **Typing.** `autoCapitalize="sentences"`, `autoCorrect="on"`, `spellCheck`, `maxLength={DAY_MAX_TYPED}` (the same limit as The day page), and `enterKeyHint` left at its default so Return makes a new line.
 - **Saving.**
@@ -46,7 +48,14 @@ Make logging a meetup complete and comfortable in one sheet: pick any friend wit
 
 ## Swipeable friends in Who
 
-- **Order.** All friends, in `recentFriends` order without the 8 limit: most recently seen first, then never seen, by name. Selected friends keep showing as chips above, as now.
+- **Order (addition B).** All friends, with no limit:
+  1. Friends ranked by how many meetups you had with them in the last 90 days (more first).
+  2. Then by their most recent meetup (more recent first), so a friend seen only longer ago still comes before anyone never seen.
+  3. Then never-seen friends, by name.
+  - Only meetups dated today or earlier count, as for "Last seen".
+  - **Opened from a friend's page** (a preset friend): the friends most often seen together with that friend in the last 12 months come first (more meetups together first, then the most recent together), then everyone else in the general order. The preset friend stays selected, as now, and their own tile keeps its place in the general order.
+  - The order is taken when the sheet opens and doesn't move while friends are picked.
+  - Selected friends keep showing as chips above, as now.
 - **Layout.**
   - A horizontal scroller with two rows (`grid-auto-flow: column`, `grid-template-rows: repeat(2, auto)`). Columns are a little narrower than a quarter of the width, so the fifth column peeks in and shows there is more.
   - `overflow-x: auto`, `overscroll-behavior-x: contain`, `scroll-snap-type: x mandatory`, with each column snapping at its start.
@@ -57,6 +66,21 @@ Make logging a meetup complete and comfortable in one sheet: pick any friend wit
   - The group is named "Friends". Each tile stays a toggle button (`aria-pressed`) named by the friend's name, so VoiceOver swipes through every friend in order.
   - Keyboard focus scrolls the focused tile into view.
 - **Search** ("Search all friends") stays below the strip, unchanged.
+
+## A suggested meetup type (addition A)
+
+- **Today.** `typeId ?? types[0]`: every new log starts on Coffee, and a quick log silently saves the wrong type.
+- **The suggestion.** For a new meetup, until the owner taps a type, the effective type comes from a pure, unit-tested `suggestMeetupType(meetups, friendIds, types, today)` in `src/stats/`:
+  1. The most common type among the last 10 meetups that include any of the picked friends.
+  2. If there's none, the owner's most-used type across their last 30 meetups.
+  3. If there's none, the first type.
+  - "Last" is newest first by date, then by when it was logged, and only meetups dated today or earlier count.
+  - Ties go to the type used most recently.
+  - Type ids that no longer exist are ignored (those meetups don't count toward the 10 or the 30).
+- **It follows the friends.** It's worked out again whenever the picked friends change, until the owner taps a type chip; from then on their choice sticks.
+- **The chip shows.** When the suggestion changes, the suggested chip is scrolled into view in the What chip row, "nearest" style, moving only that row's horizontal scroll and never the sheet body.
+- **Edit** keeps the meetup's own type.
+- **Changes count** only when the owner taps a type that differs from the type the sheet opened with, so the suggestion alone never asks "Discard changes?".
 
 ## Room to search friends (owner feedback 5)
 
@@ -84,6 +108,7 @@ Make logging a meetup complete and comfortable in one sheet: pick any friend wit
 - Before a friend is picked, Save is a disabled button, so VoiceOver reads "Save, dimmed". No hint or `aria-describedby` goes with it.
 - The day box has a label and a hint description.
 - The friend strip keeps a sensible VoiceOver order.
+- The suggested type is an ordinary selected chip (`aria-pressed="true"`), so VoiceOver reads it as selected.
 - 44px targets everywhere, and Dynamic Type at the largest sizes: the header wraps the title, Save stays tappable, and the strip's tiles grow with their names.
 
 ## DESIGN.md
@@ -96,7 +121,8 @@ Make logging a meetup complete and comfortable in one sheet: pick any friend wit
 
 **Unit tests:**
 - the place-line predicate matches `readDay` for every golden fixture line (each line is a place exactly when the grammar makes a stop from it);
-- friend ordering without the limit;
+- friend ordering without the limit: the general order (meetups in the last 90 days, then the most recent, then never seen by name) and the order from a friend's page (most often seen with them in the last 12 months first);
+- `suggestMeetupType`: the picked friends' last 10 meetups, the owner's last 30, the first type, ties by the most recent use, deleted types ignored, future meetups ignored;
 - any pure helper the highlight uses (for example, splitting text into marked and unmarked runs, including trailing newlines and an empty last line).
 
 **E2E tests:**
@@ -105,6 +131,9 @@ Make logging a meetup complete and comfortable in one sheet: pick any friend wit
 - **Discard.** Cancel with typed text asks to discard.
 - **Highlight.** A `mark.day-place` appears for "@ some place" and "@Blue willow 3:30", not for "@", nor for a sentence with "@" in the middle. It's on both the sheet box and The day page.
 - **Swiping friends.** With 12 friends, the 12th is reachable by scrolling the strip horizontally and can be picked, and the strip has more than 8 tiles.
+- **Who order.** The strip follows the general order, and from a friend's page their usual companions come first. E2e tests that depended on the old order are updated.
+- **Suggested type.** A friend whose meetups are all Meals gets Meal preselected when logging from their page; picking friends moves the suggestion (its chip scrolled into view without moving the sheet) until a type is tapped, which then sticks.
+- **Placement.** The day box comes right after When.
 - **Header Save.**
   - It's disabled before a friend is picked (and no "Pick a friend" text shows anywhere), and saves after.
   - Every existing e2e that clicked the footer Save or "Pick a friend" is updated to the header Save.
