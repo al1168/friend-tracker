@@ -16,6 +16,11 @@ export interface MeetupInput {
   friendIds: string[]
   /** In the order picked. Cleaned like likes: empties and repeats are dropped. */
   activities: string[]
+  /**
+   * The day, as typed in the sheet's The day box: kept exactly as typed but for line breaks, like the day page
+   * keeps it. Left out, a new meetup starts with an empty day and an edit leaves the stored day alone.
+   */
+  note?: string
 }
 
 /** The day page's fields. Only the fields given are written. */
@@ -55,7 +60,9 @@ function clean(input: MeetupInput): MeetupInput {
   const activities = cleanItems(input.activities)
   const problem = activitiesProblem(activities)
   if (problem) throw new ValidationError(problem)
-  return { date: input.date, typeId: input.typeId, friendIds, activities }
+  const cleaned: MeetupInput = { date: input.date, typeId: input.typeId, friendIds, activities }
+  if (input.note !== undefined) cleaned.note = normalizeLineBreaks(input.note)
+  return cleaned
 }
 
 /**
@@ -123,10 +130,11 @@ async function applyPhotoChanges(meetupId: string, changes: PhotoChanges, create
 }
 
 export async function addMeetup(input: MeetupInput, photos: PhotoChanges = NO_PHOTO_CHANGES): Promise<Meetup> {
+  const { note = '', ...fields } = clean(input)
   const meetup: Meetup = {
     id: newId(),
-    ...clean(input),
-    note: '',
+    ...fields,
+    note,
     weather: [],
     mood: null,
     feelings: '',
@@ -141,15 +149,17 @@ export async function addMeetup(input: MeetupInput, photos: PhotoChanges = NO_PH
 }
 
 /**
- * Saves the sheet's fields and photo changes. It never reads or writes the day's fields, so an Edit
- * meetup save can't overwrite a day being written on the day page.
+ * Saves the sheet's fields and photo changes, in one transaction. Of the day's fields it writes only the note, and
+ * only when it's given (the sheet gives it when its The day box changed), so an Edit meetup save can't overwrite a
+ * day being written on the day page.
  */
 export async function updateMeetup(id: string, input: MeetupInput, photos: PhotoChanges = NO_PHOTO_CHANGES): Promise<void> {
-  const { date, typeId, friendIds, activities } = clean(input)
+  const fields = clean(input)
   checkPhotos(photos)
   await db.transaction('rw', db.meetups, db.meetupPhotos, async () => {
     if (!(await db.meetups.get(id))) throw new ValidationError('This meetup no longer exists.')
-    await db.meetups.update(id, { date, typeId, friendIds, activities })
+    // A plain copy: Dexie's update type takes an object literal's type, not the MeetupInput interface.
+    await db.meetups.update(id, { ...fields })
     await applyPhotoChanges(id, photos, new Date().toISOString())
   })
   forgetThumbs(photos.removeIds)

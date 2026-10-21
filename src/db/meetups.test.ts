@@ -142,6 +142,26 @@ describe('the day', () => {
     })
   })
 
+  it('is saved with a new meetup from the sheet, exactly as typed but for line breaks', async () => {
+    const meetup = await addMeetup({ ...base, note: '@Blue willow 3:30  \r\nJessie paid  ' })
+    expect(meetup.note).toBe('@Blue willow 3:30  \nJessie paid  ')
+    expect(await db.meetups.get(meetup.id)).toMatchObject({ note: '@Blue willow 3:30  \nJessie paid  ', mood: null })
+  })
+
+  it('is written by an Edit meetup save that gives it, and the rest of the day is left alone', async () => {
+    const meetup = await addMeetup(base)
+    await updateDay(meetup.id, day)
+    await updateMeetup(meetup.id, { ...base, date: '2026-09-05', note: 'Tacos\r\nThen karaoke ' })
+    expect(await db.meetups.get(meetup.id)).toMatchObject({ ...day, date: '2026-09-05', note: 'Tacos\nThen karaoke ' })
+  })
+
+  it('rolls back with the meetup when a photo write fails', async () => {
+    const meetup = await addMeetup({ ...base, note: 'Before' }, { add: [newPhoto('a')], removeIds: [], order: [] })
+    const sameIdAgain = { add: [newPhoto('a')], removeIds: [], order: [] }
+    await expect(updateMeetup(meetup.id, { ...base, note: 'After' }, sameIdAgain)).rejects.toThrow()
+    expect((await db.meetups.get(meetup.id))?.note).toBe('Before')
+  })
+
   it('is kept by delete and Undo', async () => {
     const alex = await addFriend(friendInput('Alex'))
     const meetup = await addMeetup({ ...base, friendIds: [alex.id] })

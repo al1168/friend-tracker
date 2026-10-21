@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router'
 import { useConfirmDiscard } from '../components/ActionSheet'
 import { Avatar } from '../components/Avatar'
 import { Chip } from '../components/Chip'
+import { GrowField } from '../components/GrowField'
 import { IconCalendar, IconCheck, IconClose, IconSearch } from '../components/icons'
 import { InsetGroup, Row } from '../components/InsetGroup'
 import type { NavState } from '../components/Page'
@@ -16,11 +17,13 @@ import {
   NO_PHOTO_CHANGES,
   restoreMeetup,
   updateMeetup,
+  type MeetupInput,
   type PhotoChanges,
 } from '../db/meetups'
 import { useToday } from '../hooks/useToday'
 import { activitySuggestions } from '../lib/activities'
 import { addDays, formatDate, isISODate, todayISO } from '../lib/dates'
+import { DAY_MAX_TYPED } from '../lib/dayText'
 import { isPlainEnter } from '../lib/keys'
 import { askToKeepData } from '../lib/persist'
 import { compareNames, formatNameList } from '../lib/text'
@@ -56,18 +59,22 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
   const whoId = useId()
   const whatId = useId()
   const whenId = useId()
+  const dayId = useId()
+  const dayHintId = useId()
 
   const [start] = useState(() => ({
     friendIds: editing?.friendIds ?? (initial?.presetFriendId ? [initial.presetFriendId] : []),
     typeId: editing?.typeId ?? null,
     date: editing?.date ?? todayISO(),
     activities: editing?.activities ?? [],
+    note: editing?.note ?? '',
   }))
   const [friendIds, setFriendIds] = useState<string[]>(start.friendIds)
   const [typeId, setTypeId] = useState<string | null>(start.typeId)
   const [date, setDate] = useState(start.date)
   const [activities, setActivities] = useState<string[]>(start.activities)
   const [activityDraft, setActivityDraft] = useState<string | null>(null)
+  const [note, setNote] = useState(start.note)
   const [query, setQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -125,6 +132,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
     date !== start.date ||
     activities.join('\n') !== start.activities.join('\n') ||
     !!activityDraft?.trim() ||
+    note !== start.note ||
     (photos !== null && photos.map((photo) => photo.id).join() !== startPhotoIds.join())
 
   function toggleFriend(id: string) {
@@ -150,7 +158,9 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
     try {
       // An activity typed into "+ New" but not added yet is saved too.
       const typed = activityDraft?.trim() ? [...activities, activityDraft] : activities
-      const input = { date, typeId: effectiveTypeId, friendIds, activities: typed }
+      const input: MeetupInput = { date, typeId: effectiveTypeId, friendIds, activities: typed }
+      // An edit writes The day only when it changed, so it can't overwrite a day written elsewhere since it opened.
+      if (!editing || note !== start.note) input.note = note
       const unchanged =
         !photos ||
         (photos.every((photo) => !photo.added) &&
@@ -401,6 +411,30 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
           open={request !== null}
         />
       )}
+
+      <section className="form-section" aria-labelledby={dayId}>
+        <h3 id={dayId} className="form-section__label">
+          The day
+        </h3>
+        <GrowField
+          minLines={4}
+          aria-labelledby={dayId}
+          aria-describedby={dayHintId}
+          value={note}
+          placeholder="What happened? Start a line with @ for a place."
+          autoCapitalize="sentences"
+          autoCorrect="on"
+          spellCheck
+          maxLength={DAY_MAX_TYPED}
+          onChange={(event) => {
+            setNote(event.target.value)
+            setError(null)
+          }}
+        />
+        <p id={dayHintId} className="field-hint">
+          Lines that start with @ show as places.
+        </p>
+      </section>
 
       {/* Log meetup only: dimmed whenever Save is. */}
       {!editing && (
