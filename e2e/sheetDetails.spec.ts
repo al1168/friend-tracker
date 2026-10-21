@@ -4,6 +4,7 @@ import {
   editMeetup,
   friendRow,
   logMeetup,
+  meetupRow,
   openDay,
   openFriendPage,
   readMeetups,
@@ -13,6 +14,13 @@ import {
 
 // Most tests add a friend and log a meetup first, so they get more time than most.
 test.describe.configure({ timeout: 60_000 })
+
+/** The local date `days` ago (negative for the future), as an ISO date. */
+function daysAgo(days: number): string {
+  const date = new Date()
+  date.setDate(date.getDate() - days)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
 
 /** In an open meetup sheet: The day box. */
 function sheetDay(sheet: Locator): Locator {
@@ -248,5 +256,41 @@ test.describe('swiping through friends', () => {
     expect(Math.abs(fifth.x - first.x)).toBeLessThanOrEqual(1)
     expect(fifth.y).toBeGreaterThan(first.y)
     expect(await strip.evaluate((element) => element.scrollWidth <= element.clientWidth), 'Nothing to swipe').toBe(true)
+  })
+})
+
+test.describe('who comes first in Who', () => {
+  // Bo: 3 meetups lately. Cy: 1, yesterday. Di and Ed: only months ago, together with each other and once Cy and Di.
+  // Ana: never.
+  const friends = ['Ana', 'Bo', 'Cy', 'Di', 'Ed'].map((name) => friendRow(name.toLowerCase(), name))
+  const meetups = [
+    meetupRow('b1', daysAgo(10), ['bo']),
+    meetupRow('b2', daysAgo(20), ['bo']),
+    meetupRow('b3', daysAgo(30), ['bo']),
+    meetupRow('c1', daysAgo(1), ['cy']),
+    meetupRow('d1', daysAgo(200), ['di', 'ed']),
+    meetupRow('d2', daysAgo(250), ['ed', 'di']),
+    meetupRow('d3', daysAgo(300), ['di', 'cy']),
+  ]
+
+  test('the friends you met most lately come first, then the most recently seen, then the rest by name', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await seedMeetups(page, { friends, meetups })
+    const sheet = await openLogMeetup(page)
+    const names = sheet.getByRole('group', { name: 'Friends', exact: true }).locator('.friend-tile__name')
+    await expect(names).toHaveText(['Bo', 'Cy', 'Di', 'Ed', 'Ana'])
+  })
+
+  test('from a friend’s page, the friends usually with them come first', async ({ page }) => {
+    await page.goto('/')
+    await seedMeetups(page, { friends, meetups })
+    await openFriendPage(page, 'Di')
+    const sheet = await openLogMeetup(page)
+    const strip = sheet.getByRole('group', { name: 'Friends', exact: true })
+    // Ed was with Di twice, Cy once; then everyone else as above, Di included and picked.
+    await expect(strip.locator('.friend-tile__name')).toHaveText(['Ed', 'Cy', 'Bo', 'Di', 'Ana'])
+    await expect(strip.getByRole('button', { name: 'Di' })).toHaveAttribute('aria-pressed', 'true')
   })
 })

@@ -27,7 +27,7 @@ import { DAY_MAX_TYPED } from '../lib/dayText'
 import { isPlainEnter } from '../lib/keys'
 import { askToKeepData } from '../lib/persist'
 import { compareNames, formatNameList } from '../lib/text'
-import { recentFriends } from '../stats/recent'
+import { friendsToPick } from '../stats/friendsToPick'
 import type { Friend } from '../types'
 import { MeetupActivities } from './MeetupActivities'
 import { MeetupPhotos, type DraftPhoto } from './MeetupPhotos'
@@ -114,9 +114,11 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
 
   const friendById = useMemo(() => new Map((friends ?? []).map((f) => [f.id, f] as const)), [friends])
   const selected = friendIds.map((id) => friendById.get(id)).filter((f): f is Friend => f !== undefined)
-  const byLastSeen = useMemo(
-    () => (friends && meetups ? recentFriends(friends, meetups, today) : []),
-    [friends, meetups, today],
+  // Who you see most first; from a friend's page, the friends usually with them. Picking friends never reorders it.
+  const presetFriendId = initial?.presetFriendId
+  const toPick = useMemo(
+    () => (friends && meetups ? friendsToPick(friends, meetups, today, presetFriendId) : []),
+    [friends, meetups, today, presetFriendId],
   )
   const results = useMemo(() => {
     const q = query.trim().toLocaleLowerCase()
@@ -271,14 +273,14 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
             ))}
           </div>
         )}
-        {byLastSeen.length > 0 && (
+        {toPick.length > 0 && (
           <div
             className="friend-strip"
-            data-swipes={byLastSeen.length > STILL_GRID_MAX}
+            data-swipes={toPick.length > STILL_GRID_MAX}
             role="group"
             aria-label="Friends"
           >
-            {byLastSeen.map((friend) => {
+            {toPick.map((friend) => {
               const on = friendIds.includes(friend.id)
               return (
                 <button
