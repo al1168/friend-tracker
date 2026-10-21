@@ -183,11 +183,11 @@ test.describe('@ highlighting', () => {
   })
 })
 
-/** Whether a friend's tile shows whole inside the strip's visible part. */
+/** Whether a friend's tile (or a type chip) shows whole, side to side, inside the strip (or row) that scrolls it. */
 function shownInStrip(tile: Locator): Promise<boolean> {
   return tile.evaluate((element) => {
     const strip = element.closest('[role="group"]')
-    if (!strip) throw new Error('Not in the strip')
+    if (!strip) throw new Error('Not in a group')
     const tileRect = element.getBoundingClientRect()
     const stripRect = strip.getBoundingClientRect()
     return tileRect.left >= stripRect.left - 0.5 && tileRect.right <= stripRect.right + 0.5
@@ -292,5 +292,101 @@ test.describe('who comes first in Who', () => {
     // Ed was with Di twice, Cy once; then everyone else as above, Di included and picked.
     await expect(strip.locator('.friend-tile__name')).toHaveText(['Ed', 'Cy', 'Bo', 'Di', 'Ana'])
     await expect(strip.getByRole('button', { name: 'Di' })).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+test.describe('the suggested meetup type', () => {
+  // Jamie's meetups are all Meals. Kim's are Drinks, the owner's most-used type. Lee's one meetup is a Trip, a type
+  // far along the What row.
+  const friends = [friendRow('jamie', 'Jamie'), friendRow('kim', 'Kim'), friendRow('lee', 'Lee')]
+  const meetups = [
+    ...[3, 10, 20].map((days, i) => meetupRow(`j${i}`, daysAgo(days), ['jamie'], { typeId: 'type-meal' })),
+    ...[2, 5, 8, 12, 15].map((days, i) => meetupRow(`k${i}`, daysAgo(days), ['kim'], { typeId: 'type-drinks' })),
+    meetupRow('l0', daysAgo(40), ['lee'], { typeId: 'type-trip' }),
+  ]
+
+  /** In an open meetup sheet: the What row's selected chip. */
+  function pickedType(sheet: Locator): Locator {
+    return sheet.getByRole('group', { name: 'What' }).locator('[aria-pressed="true"]')
+  }
+
+  test('a friend whose meetups are all Meals gets Meal when logging from their page', async ({ page }) => {
+    await page.goto('/')
+    await seedMeetups(page, { friends, meetups })
+    await openFriendPage(page, 'Jamie')
+    let sheet = await openLogMeetup(page)
+    await expect(pickedType(sheet)).toHaveCount(1)
+    await expect(pickedType(sheet)).toHaveText(/Meal/)
+    // A suggestion isn't a change: Cancel closes without asking.
+    await sheet.getByRole('button', { name: 'Cancel' }).click()
+    await expect(sheet).toBeHidden()
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
+
+    sheet = await openLogMeetup(page)
+    await expect(pickedType(sheet)).toHaveText(/Meal/)
+    await sheetSave(sheet).click()
+    await expect(sheet).toBeHidden()
+    expect((await readMeetups(page)).at(-1)).toMatchObject({ typeId: 'type-meal', friendIds: ['jamie'] })
+  })
+
+  test('the suggestion follows the friends picked until a type is tapped, which then sticks', async ({ page }) => {
+    await page.goto('/')
+    await seedMeetups(page, { friends, meetups })
+    const sheet = await openLogMeetup(page)
+    const strip = sheet.getByRole('group', { name: 'Friends', exact: true })
+    // No friend yet: the owner's most-used type.
+    await expect(pickedType(sheet)).toHaveText(/Drinks/)
+    await strip.getByRole('button', { name: 'Jamie' }).click()
+    await expect(pickedType(sheet)).toHaveText(/Meal/)
+    // With Kim too: 5 Drinks to 3 Meals.
+    await strip.getByRole('button', { name: 'Kim' }).click()
+    await expect(pickedType(sheet)).toHaveText(/Drinks/)
+
+    await sheet.getByRole('group', { name: 'What' }).getByRole('button', { name: 'Coffee', exact: true }).click()
+    await strip.getByRole('button', { name: 'Kim' }).click()
+    await expect(pickedType(sheet)).toHaveText(/Coffee/)
+    await sheetSave(sheet).click()
+    expect((await readMeetups(page)).at(-1)).toMatchObject({ typeId: 'type-coffee', friendIds: ['jamie'] })
+  })
+
+  test('a suggestion far along the What row scrolls into view there, and the sheet stays where it is', async ({ page }) => {
+    await page.goto('/')
+    await seedMeetups(page, { friends, meetups })
+    // From Kim's page, so the row of picked friends is already there and nothing above moves the sheet's content.
+    await openFriendPage(page, 'Kim')
+    const sheet = await openLogMeetup(page)
+    await sheet.evaluate((element) => Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)))
+    const what = sheet.getByRole('group', { name: 'What' })
+    const trip = what.getByRole('button', { name: 'Trip', exact: true })
+    await expect(pickedType(sheet)).toHaveText(/Drinks/)
+    expect(await shownInStrip(trip)).toBe(false)
+    // Scrolled to the end of the sheet, away from Who and What. The taps on the tiles are made in the page, so the
+    // test doesn't scroll the sheet to reach them.
+    const body = sheet.locator('.sheet__body')
+    await body.evaluate((element) => {
+      element.scrollTop = element.scrollHeight
+    })
+    const before = await body.evaluate((element) => element.scrollTop)
+    const strip = sheet.getByRole('group', { name: 'Friends', exact: true })
+    const tap = (name: string) => strip.getByRole('button', { name }).evaluate((element) => (element as HTMLElement).click())
+    await tap('Lee')
+    await expect(pickedType(sheet)).toHaveText(/Drinks/)
+    // Lee alone: his Trip.
+    await tap('Kim')
+    await expect(trip).toHaveAttribute('aria-pressed', 'true')
+    await expect.poll(() => shownInStrip(trip)).toBe(true)
+    expect(await body.evaluate((element) => element.scrollTop), 'The sheet did not move').toBe(before)
+  })
+
+  test('Edit keeps the meetup’s own type', async ({ page }) => {
+    await page.goto('/')
+    // A Coffee with Kim, whose other meetups are all Drinks.
+    await seedMeetups(page, { friends, meetups: [...meetups, meetupRow('kc', daysAgo(1), ['kim'], { typeId: 'type-coffee' })] })
+    await openFriendPage(page, 'Kim')
+    const sheet = await editMeetup(page, /Coffee/)
+    await expect(pickedType(sheet)).toHaveText(/Coffee/)
+    await sheet.getByRole('button', { name: 'Cancel' }).click()
+    await expect(sheet).toBeHidden()
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
   })
 })

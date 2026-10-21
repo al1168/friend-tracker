@@ -48,7 +48,8 @@ export async function logMeetup(
     await sheet.getByLabel('Search all friends').fill(name)
     await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name, exact: true }).click()
   }
-  if (options.type) await sheet.getByRole('button', { name: options.type, exact: true }).click()
+  // Always tapped, so the type never depends on the sheet's suggestion: Coffee unless `type` says otherwise.
+  await sheet.getByRole('button', { name: options.type ?? 'Coffee', exact: true }).click()
   if (options.date) await sheet.getByLabel('Pick date').fill(options.date)
   for (const activity of options.activities ?? []) await pickActivity(sheet, activity)
   if (options.photos) await addPhotos(sheet, options.photos)

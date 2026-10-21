@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { useConfirmDiscard } from '../components/ActionSheet'
 import { Avatar } from '../components/Avatar'
@@ -27,7 +27,9 @@ import { DAY_MAX_TYPED } from '../lib/dayText'
 import { isPlainEnter } from '../lib/keys'
 import { askToKeepData } from '../lib/persist'
 import { compareNames, formatNameList } from '../lib/text'
+import { revealOffset } from '../lib/viewport'
 import { friendsToPick } from '../stats/friendsToPick'
+import { suggestMeetupType } from '../stats/suggestType'
 import type { Friend } from '../types'
 import { MeetupActivities } from './MeetupActivities'
 import { MeetupPhotos, type DraftPhoto } from './MeetupPhotos'
@@ -84,6 +86,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
   const savingRef = useRef(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const errorRef = useRef<HTMLParagraphElement>(null)
+  const typeRowRef = useRef<HTMLDivElement>(null)
 
   // Photos change only in the sheet until Save. A saved meetup's photos load once, as ids and thumbnails.
   const storedPhotos = useMeetupPhotoThumbs(editing?.id)
@@ -108,7 +111,26 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
     if (error) errorRef.current?.scrollIntoView({ block: 'nearest' })
   }, [error])
 
-  const effectiveTypeId = typeId ?? types?.[0]?.id ?? null
+  // A new meetup starts on a suggested type, worked out again as friends are picked, until a type is tapped; from
+  // then on the tapped one sticks. An edit keeps its own type, which typeId starts as.
+  const suggestedTypeId = useMemo(
+    () => (types ? suggestMeetupType(meetups ?? [], friendIds, types, today) : null),
+    [meetups, friendIds, types, today],
+  )
+  const effectiveTypeId = typeId ?? suggestedTypeId
+  // A new suggestion's chip comes into view in the What row, as little as it takes, moving only the row's own
+  // sideways scroll and never the sheet (the row may be scrolled out of sight while friends are picked).
+  useLayoutEffect(() => {
+    const row = typeRowRef.current
+    const chip = row?.children[types?.findIndex((type) => type.id === suggestedTypeId) ?? -1]
+    if (typeId !== null || !row || !(chip instanceof HTMLElement)) return
+    const view = row.getBoundingClientRect()
+    const target = chip.getBoundingClientRect()
+    // Spans along the row: its visible part and the chip, with the row's side padding to spare.
+    const margin = parseFloat(getComputedStyle(row).paddingLeft) || 0
+    const offset = revealOffset({ top: view.left, bottom: view.right }, { top: target.left, bottom: target.right }, margin)
+    if (offset !== 0) row.scrollLeft += offset
+  }, [suggestedTypeId, typeId, types])
   const yesterday = addDays(today, -1)
   const isOtherDate = date !== today && date !== yesterday
 
@@ -129,11 +151,11 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
       .slice(0, 20)
   }, [friends, query])
 
-  const startTypeId = start.typeId ?? types?.[0]?.id ?? null
   const sameFriends = [...friendIds].sort().join() === [...start.friendIds].sort().join()
+  // Only a tapped type counts as a change: a suggestion alone never asks "Discard changes?".
   const dirty =
     !sameFriends ||
-    effectiveTypeId !== startTypeId ||
+    typeId !== start.typeId ||
     date !== start.date ||
     activities.join('\n') !== start.activities.join('\n') ||
     !!activityDraft?.trim() ||
@@ -348,7 +370,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
         <h3 id={whatId} className="form-section__label">
           What
         </h3>
-        <div className="chip-row" role="group" aria-labelledby={whatId}>
+        <div ref={typeRowRef} className="chip-row" role="group" aria-labelledby={whatId}>
           {(types ?? []).map((type) => (
             <Chip key={type.id} selected={type.id === effectiveTypeId} onClick={() => {
                 setTypeId(type.id)
