@@ -402,26 +402,6 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
         </div>
       </section>
 
-      <MeetupActivities
-        suggestions={suggestions}
-        selected={activities}
-        onChange={(next) => {
-          setActivities(next)
-          setError(null)
-        }}
-        draft={activityDraft}
-        onDraftChange={setActivityDraft}
-      />
-
-      {photos && (
-        <MeetupPhotos
-          photos={photos}
-          setPhotos={setPhotos}
-          onBusyChange={setAddingPhotos}
-          open={request !== null}
-        />
-      )}
-
       <section className="form-section" aria-labelledby={dayId}>
         <h3 id={dayId} className="form-section__label">
           The day
@@ -446,6 +426,26 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
           Lines that start with @ show as places.
         </p>
       </section>
+
+      <MeetupActivities
+        suggestions={suggestions}
+        selected={activities}
+        onChange={(next) => {
+          setActivities(next)
+          setError(null)
+        }}
+        draft={activityDraft}
+        onDraftChange={setActivityDraft}
+      />
+
+      {photos && (
+        <MeetupPhotos
+          photos={photos}
+          setPhotos={setPhotos}
+          onBusyChange={setAddingPhotos}
+          open={request !== null}
+        />
+      )}
 
       {/* Log meetup only: dimmed whenever Save is. */}
       {!editing && (

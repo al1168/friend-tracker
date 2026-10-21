@@ -27,6 +27,21 @@ async function openLogMeetup(page: Page): Promise<Locator> {
 }
 
 test.describe('The day in the meetup sheets', () => {
+  test('comes right after When, before Activities and Photos', async ({ page }) => {
+    await page.goto('/')
+    await addFriend(page, 'Alex')
+    const sheet = await openLogMeetup(page)
+    await expect(sheet.locator('.sheet__body .form-section__label')).toHaveText([
+      'Who',
+      'What',
+      'When',
+      'The day',
+      'Activities',
+      'Photos',
+    ])
+    await expect(sheet.locator('.sheet__body > :last-child')).toHaveText('Save and write about the day')
+  })
+
   test('logs a meetup with The day typed in the sheet, and its place shows on the Meetup page', async ({ page }) => {
     await page.goto('/')
     await addFriend(page, 'Mariya')
