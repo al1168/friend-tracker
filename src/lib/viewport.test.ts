@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { caretEdge, keyboardInset, keyboardIsUp, revealMargin, revealOffset } from './viewport'
+import { caretEdge, keyboardInset, keyboardIsUp, revealMargin, revealOffset, topOffset } from './viewport'
 
 describe('keyboardInset', () => {
   it('is zero with no keyboard', () => {
@@ -127,6 +127,29 @@ describe('revealOffset', () => {
     expect(revealOffset(port, { top: 40, bottom: 64 }, 12)).toBe(-72)
     // Already in view with room to spare: nothing to do.
     expect(revealOffset(port, { top: 150, bottom: 174 }, 0)).toBe(0)
+  })
+})
+
+describe('topOffset', () => {
+  const port = { top: 100, bottom: 400 }
+
+  it('scrolls a field below the top of the view up to `margin` under it', () => {
+    expect(topOffset(port, { top: 300, bottom: 344 }, 12)).toBe(188)
+  })
+
+  it('scrolls a field above the view back down to it', () => {
+    expect(topOffset(port, { top: 40, bottom: 84 }, 12)).toBe(-72)
+  })
+
+  it('leaves a field already there, within a pixel, where it is', () => {
+    expect(topOffset(port, { top: 112, bottom: 156 }, 12)).toBe(0)
+    expect(topOffset(port, { top: 112.4, bottom: 156.4 }, 12)).toBe(0)
+    expect(topOffset(port, { top: 111.6, bottom: 155.6 }, 12)).toBe(0)
+  })
+
+  it('rounds to whole pixels', () => {
+    expect(topOffset(port, { top: 200.6, bottom: 244.6 }, 12)).toBe(89)
+    expect(topOffset(port, { top: 50.4, bottom: 94.4 }, 12)).toBe(-62)
   })
 })
 

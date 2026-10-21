@@ -19,12 +19,12 @@ export interface TextBox {
 const DEFAULT_REVEAL_MARGIN = 12
 
 /**
- * The room to keep between a revealed field and the edges of the visible area: the field's own
- * `scroll-margin-bottom` (a computed length such as "17.25px"), so the CSS that also guides the browser's
- * own focus scrolling is the one source at every text size. 12px when it can't be read.
+ * The room to keep between a revealed field and the edges of the visible area: the field's own scroll margin
+ * (a computed length such as "17.25px"), so the CSS that also guides the browser's own focus scrolling is the
+ * one source at every text size. 12px when it can't be read.
  */
-export function revealMargin(scrollMarginBottom: string): number {
-  const margin = parseFloat(scrollMarginBottom)
+export function revealMargin(scrollMargin: string): number {
+  const margin = parseFloat(scrollMargin)
   return Number.isNaN(margin) ? DEFAULT_REVEAL_MARGIN : margin
 }
 
@@ -90,6 +90,16 @@ export function revealOffset(port: Span, target: Span, margin: number, caret: Ca
   if (above) return wholePixels(target.top - top)
   if (below) return wholePixels(target.bottom - bottom)
   return 0
+}
+
+/**
+ * How far to scroll a box whose visible area is `port` so that `target`'s top sits `margin` below the top of it,
+ * wherever the target is now: the friend search goes there so its results fill the room below. Positive scrolls
+ * down. Whole pixels, and 0 within a pixel, so a field already there is never nudged.
+ */
+export function topOffset(port: Span, target: Span, margin: number): number {
+  const offset = Math.round(target.top - (port.top + margin))
+  return offset === 0 ? 0 : offset
 }
 
 /** Rounds away from zero. */

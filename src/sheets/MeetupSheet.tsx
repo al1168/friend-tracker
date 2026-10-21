@@ -302,7 +302,9 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
             })}
           </div>
         )}
-        <label className="search">
+        {/* Goes to the top of the sheet when it takes focus or its text changes, so the results get the room
+            (useRevealFocusedField). */}
+        <label className="search" data-reveal="top">
           <IconSearch size={18} />
           <input
             ref={searchRef}

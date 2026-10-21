@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { addFriend, LARGE_TEXT, sheetSave } from './helpers.ts'
+import { addFriend, friendRow, LARGE_TEXT, seedMeetups, sheetSave } from './helpers.ts'
 import { closeKeyboard, fakeVisualViewport, KEYBOARD, nextFrames, openKeyboard, setVisualViewport, tapFocus } from './keyboard.ts'
 
 /** Where a field inside a sheet is, against the part of the sheet's body you can see (it ends at the keyboard). */
@@ -196,6 +196,87 @@ test('closing the keyboard leaves the sheet where it was scrolled', async ({ pag
 
   expect(await scrollTop(body), 'Nothing pulls the sheet back to Notes').toBe(0)
   await expect(notes).toBeFocused()
+})
+
+/** 12 friends with an "a" in every name. */
+const SEARCHABLE = ['Alex', 'Sam', 'Kim Park', 'Jordan', 'Maya', 'Theo Banks', 'Mariya', 'Jessica', 'Brandon', 'Priya', 'Lana', 'Zara']
+
+/** Opens Log meetup over the 12 friends, focuses "Search all friends", brings up the keyboard and types "a". */
+async function searchWithKeyboardUp(page: Page) {
+  await seedMeetups(page, { friends: SEARCHABLE.map((name, i) => friendRow(`f${i + 1}`, name)) })
+  await page.getByRole('button', { name: 'Log meetup' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
+  await sheet.evaluate((element) => Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)))
+  const input = sheet.getByLabel('Search all friends')
+  await tapFocus(input)
+  await openKeyboard(page)
+  await page.keyboard.type('a')
+  await nextFrames(page)
+  const rows = sheet.getByRole('group', { name: 'Search results' }).getByRole('button')
+  await expect(rows).toHaveCount(SEARCHABLE.length)
+  // The whole field, not just the text inside it.
+  return { sheet, input, field: sheet.locator('label.search'), rows }
+}
+
+/** How many result rows show above the keyboard: whole, and at least in part. */
+async function resultsShown(rows: Locator, visibleBottom: number) {
+  return rows.evaluateAll(
+    (elements, bottom) => ({
+      whole: elements.filter((row) => row.getBoundingClientRect().bottom <= bottom + 0.5).length,
+      started: elements.filter((row) => row.getBoundingClientRect().top < bottom).length,
+    }),
+    visibleBottom,
+  )
+}
+
+test('the friend search goes to the top of the sheet as you type, so its results fill the room above the keyboard', async ({
+  page,
+}) => {
+  const { sheet, input, field, rows } = await searchWithKeyboardUp(page)
+  const body = sheet.locator('.sheet__body')
+  await expect(sheet.locator('.sheet__footer')).toHaveCount(0)
+  let at = await placement(field)
+  expect(at.top - at.visibleTop, 'The field sits 12px below the header').toBeCloseTo(MARGIN, 0)
+  // This profile is Safari's 664px-tall page, 324px above the keyboard: three whole rows, and the fourth starting
+  // at the keyboard's edge (a Home Screen app has more room: see the next test).
+  const shown = await resultsShown(rows, at.visibleBottom)
+  expect(shown.whole, 'Three whole results above the keyboard').toBeGreaterThanOrEqual(3)
+  expect(shown.started, 'The results run on to the keyboard').toBeGreaterThanOrEqual(4)
+  await expect(input).toBeFocused()
+
+  // Scrolling the results by hand moves nothing, and neither does the app when the caret moves (the browser's own
+  // caret reveal aside, which this leaves out).
+  await body.evaluate((element) => {
+    element.scrollTop += 80
+  })
+  await nextFrames(page)
+  await nextFrames(page)
+  const scrolled = await scrollTop(body)
+  expect(scrolled, 'Scrolled by hand').toBeGreaterThan(0)
+  await page.evaluate(() => document.dispatchEvent(new Event('selectionchange')))
+  await nextFrames(page)
+  await nextFrames(page)
+  expect(await scrollTop(body)).toBe(scrolled)
+
+  // The next letter brings the field back to the top.
+  await page.keyboard.type('r')
+  await nextFrames(page)
+  at = await placement(field)
+  expect(at.top - at.visibleTop).toBeCloseTo(MARGIN, 0)
+  await expect(rows).toHaveCount(SEARCHABLE.filter((name) => name.toLowerCase().includes('ar')).length)
+})
+
+test.describe('as the Home Screen app', () => {
+  // The iPhone 13's whole 844px screen, with its 47px status bar and 34px home indicator.
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  test('the friend search shows at least four whole results above the keyboard', async ({ page }) => {
+    await page.addStyleTag({ content: ':root { --safe-top: 47px; --safe-bottom: 34px; }' })
+    const { field, rows } = await searchWithKeyboardUp(page)
+    const at = await placement(field)
+    expect(at.top - at.visibleTop, 'The field sits 12px below the header').toBeCloseTo(MARGIN, 0)
+    expect((await resultsShown(rows, at.visibleBottom)).whole).toBeGreaterThanOrEqual(4)
+  })
 })
 
 test('focusing a chip with the keyboard up leaves the scrolled sheet alone', async ({ page }) => {

@@ -1,6 +1,6 @@
 import { useEffect, type RefObject } from 'react'
 import { caretLineSpan } from '../lib/caret'
-import { caretEdge, keyboardIsUp, revealMargin, revealOffset, type CaretEdge, type Span } from '../lib/viewport'
+import { caretEdge, keyboardIsUp, revealMargin, revealOffset, topOffset, type CaretEdge, type Span } from '../lib/viewport'
 
 /** Input types that type no text and open no picker, so they bring up no keyboard. */
 const NO_KEYBOARD = new Set(['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit'])
@@ -14,6 +14,11 @@ function isEditable(element: Element | null): element is HTMLElement {
   )
 }
 
+/** The element marked `data-reveal="top"` around a field, if any (see useRevealFocusedField). */
+function topAligned(field: Element): HTMLElement | null {
+  return field.closest<HTMLElement>('[data-reveal="top"]')
+}
+
 /**
  * Keeps the focused field on screen inside a sheet's (or the day page's) scrolling body. iOS shows a tapped
  * field while the sheet is still full height; then the keyboard comes up and the sheet shrinks above it (see
@@ -21,6 +26,11 @@ function isEditable(element: Element | null): element is HTMLElement {
  * taller than the view shows the line with the caret instead, and follows it as you type and move the caret.
  * Only the body scrolls, and only when it shrinks, focus moves, or the caret's line is hidden: never the
  * locked page or the visual viewport, and never while someone is just scrolling.
+ *
+ * A field inside an element marked `data-reveal="top"` (the meetup sheet's friend search) goes to the top of the
+ * view instead, that element's top its scroll margin below the header, so what comes up under it (the search's
+ * results) gets all the room down to the keyboard. It goes there when it takes focus and whenever its text
+ * changes, keyboard or not, and when the body shrinks; moving its caret moves nothing.
  */
 export function useRevealFocusedField(active: boolean, bodyRef: RefObject<HTMLElement | null>) {
   useEffect(() => {
@@ -37,6 +47,12 @@ export function useRevealFocusedField(active: boolean, bodyRef: RefObject<HTMLEl
       if (!isEditable(field) || !body.contains(field)) return
       const top = body.getBoundingClientRect().top + body.clientTop
       const port = { top, bottom: top + body.clientHeight }
+      const box = topAligned(field)
+      if (box) {
+        const offset = topOffset(port, box.getBoundingClientRect(), revealMargin(getComputedStyle(field).scrollMarginTop))
+        if (offset !== 0) body.scrollTop += offset
+        return
+      }
       let target: Span = field.getBoundingClientRect()
       let caret: CaretEdge = 'start'
       if (field instanceof HTMLTextAreaElement) {
@@ -57,8 +73,8 @@ export function useRevealFocusedField(active: boolean, bodyRef: RefObject<HTMLEl
 
     // The body shrinks when the keyboard opens, as the sheet follows --keyboard-inset and
     // --viewport-height. This runs after that layout and before paint, so the field never shows hidden.
-    // Growing (the keyboard closing, the Save bar's note going away) reveals nothing, so it never pulls
-    // the sheet back to a field someone has scrolled away from.
+    // Growing (the keyboard closing) reveals nothing, so it never pulls the sheet back to a field someone has
+    // scrolled away from.
     let lastHeight: number | null = null
     const observer = new ResizeObserver(() => {
       const height = body.clientHeight
@@ -73,10 +89,19 @@ export function useRevealFocusedField(active: boolean, bodyRef: RefObject<HTMLEl
     // they left the field (or, in a tall box, the caret's line) out of view: one just in view, close to an edge,
     // is not nudged. Acting, it leaves the same margin as above. Scrolling moves no caret, so it is left alone.
     let frame = 0
-    const onChange = () => {
-      if (!keyboardIsUp(window.innerHeight, window.visualViewport)) return
+    const later = (run: () => void) => {
       cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => reveal(true))
+      frame = requestAnimationFrame(run)
+    }
+    const onChange = (event: Event) => {
+      const field = document.activeElement
+      if (field && body.contains(field) && topAligned(field)) {
+        // Its results come and go with each letter, so it goes back to the top on focus and on every change.
+        if (event.type !== 'selectionchange') later(() => reveal(false))
+        return
+      }
+      if (!keyboardIsUp(window.innerHeight, window.visualViewport)) return
+      later(() => reveal(true))
     }
     body.addEventListener('focusin', onChange)
     body.addEventListener('input', onChange)
