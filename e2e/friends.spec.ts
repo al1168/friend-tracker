@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { addFriend, ONE_PIXEL_PNG } from './helpers.ts'
+import { addFriend, ONE_PIXEL_PNG, sheetSave } from './helpers.ts'
 
 test('shows a welcome state with no friends', async ({ page }) => {
   await page.goto('/')
@@ -15,11 +15,23 @@ test('adds friends and lists them', async ({ page }) => {
   await expect(page.getByRole('link', { name: /Sam/ })).toBeVisible()
 })
 
+test('the friend sheet saves from the top right, with no footer', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Add friend' }).first().click()
+  const sheet = page.getByRole('dialog', { name: 'New friend' })
+  await expect(sheet.locator('.sheet__header').getByRole('button')).toHaveText(['Cancel', 'Save'])
+  await expect(sheet.locator('.sheet__footer')).toHaveCount(0)
+  await sheet.getByLabel('Name', { exact: true }).fill('Kim')
+  await sheetSave(sheet).click()
+  await expect(sheet).toBeHidden()
+  await expect(page.getByRole('status')).toContainText('Added Kim')
+})
+
 test('requires a name', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Add friend' }).first().click()
   const sheet = page.getByRole('dialog', { name: 'New friend' })
-  await sheet.getByRole('button', { name: 'Save' }).click()
+  await sheetSave(sheet).click()
   await expect(sheet.getByText('Please enter a name.')).toBeVisible()
 })
 
@@ -94,7 +106,7 @@ test('keeps a typed new group when saving', async ({ page }) => {
   await sheet.getByLabel('Name', { exact: true }).fill('Kim')
   await sheet.getByRole('button', { name: 'New group' }).click()
   await sheet.getByLabel('New group name').fill('Work')
-  await sheet.getByRole('button', { name: 'Save' }).click()
+  await sheetSave(sheet).click()
   await expect(sheet).toBeHidden()
   await expect(page.getByRole('link', { name: /Kim/ })).toContainText('Work')
 })
@@ -103,7 +115,7 @@ test('empty name is announced', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Add friend' }).first().click()
   const sheet = page.getByRole('dialog', { name: 'New friend' })
-  await sheet.getByRole('button', { name: 'Save' }).click()
+  await sheetSave(sheet).click()
   const input = sheet.getByLabel('Name', { exact: true })
   await expect(input).toHaveAttribute('aria-invalid', 'true')
   await expect(input).toHaveAccessibleDescription(/Please enter a name/)

@@ -13,6 +13,7 @@ import {
   photoGrid,
   pickActivity,
   readMeetupPhotos,
+  sheetSave,
   tinyPhoto,
 } from './helpers.ts'
 
@@ -31,7 +32,7 @@ test('logs a meetup with activities, one of them new, and two photos', async ({ 
   await expect(activities.getByRole('button', { name: 'New activity' })).toBeFocused()
   await addPhotos(sheet, [tinyPhoto('one.png'), tinyPhoto('two.png')])
   await expect(photoGrid(sheet).getByRole('img', { name: 'Photo 2' })).toHaveAttribute('src', /^data:image\/jpeg/)
-  await sheet.getByRole('button', { name: 'Save', exact: true }).click()
+  await sheetSave(sheet).click()
   await expect(sheet).toBeHidden()
 
   await openFriendPage(page, 'Alex')
@@ -139,7 +140,7 @@ test('Save removes a photo', async ({ page }) => {
   await openFriendPage(page, 'Alex')
   let sheet = await editMeetup(page, /Coffee/)
   await photoGrid(sheet).getByRole('button', { name: 'Remove photo 2' }).click()
-  await sheet.getByRole('button', { name: 'Save', exact: true }).click()
+  await sheetSave(sheet).click()
   await expect(sheet).toBeHidden()
 
   await openFriendPage(page, 'Alex')

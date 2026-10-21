@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { addFriend, dayFromToday, goToTab, setBirthday } from './helpers.ts'
+import { addFriend, dayFromToday, goToTab, setBirthday, sheetSave } from './helpers.ts'
 
 /** "March" for 3. */
 function monthName(month: number): string {
@@ -24,7 +24,7 @@ async function editFriend(page: Page): Promise<Locator> {
 }
 
 async function save(sheet: Locator) {
-  await sheet.getByRole('button', { name: 'Save' }).click()
+  await sheetSave(sheet).click()
   await expect(sheet).toBeHidden()
 }
 
@@ -71,7 +71,7 @@ test('checks the birthday on Save, and sets one when adding a friend', async ({ 
   const { month, day, year } = birthdaySelects(sheet)
 
   await month.selectOption('3')
-  await sheet.getByRole('button', { name: 'Save' }).click()
+  await sheetSave(sheet).click()
   await expect(sheet.getByText('Pick a month and a day.')).toBeVisible()
   await expect(day).toHaveAttribute('aria-invalid', 'true')
   await expect(day).toHaveAccessibleDescription('Pick a month and a day.')
@@ -82,7 +82,7 @@ test('checks the birthday on Save, and sets one when adding a friend', async ({ 
   await expect(day).toHaveAttribute('aria-invalid', 'false')
   await day.selectOption('29')
   await year.selectOption('2023')
-  await sheet.getByRole('button', { name: 'Save' }).click()
+  await sheetSave(sheet).click()
   await expect(sheet.getByText("That date doesn't exist.")).toBeVisible()
   await expect(year).toHaveAccessibleDescription("That date doesn't exist.")
 

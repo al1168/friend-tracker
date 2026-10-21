@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { addFriend, friendLink, LARGE_TEXT, logMeetup, tinyPhoto } from './helpers.ts'
+import { addFriend, friendLink, LARGE_TEXT, logMeetup, sheetSave, tinyPhoto } from './helpers.ts'
 
 test('shows a friend’s stats and history', async ({ page }) => {
   await page.goto('/')
@@ -64,7 +64,7 @@ test('logs from the friend page with them preselected', async ({ page }) => {
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
   await expect(sheet.getByRole('button', { name: 'Remove Alex' })).toBeVisible()
-  await sheet.getByRole('button', { name: 'Save', exact: true }).click()
+  await sheetSave(sheet).click()
   await expect(sheet).toBeHidden()
   await expect(page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Coffee/ })).toBeVisible()
 })
@@ -75,7 +75,7 @@ test('the meetup just logged scrolls clear of its toast and opens with one tap',
   await friendLink(page, 'Alex').click()
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
-  await sheet.getByRole('button', { name: 'Save', exact: true }).click()
+  await sheetSave(sheet).click()
   await expect(sheet).toBeHidden()
   const toast = page.getByRole('status')
   await expect(toast).toContainText('Logged with Alex')
@@ -105,7 +105,7 @@ test('at large text, the meetup just logged scrolls clear of a toast that wraps,
   await friendLink(page, name).click()
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
-  await sheet.getByRole('button', { name: 'Save', exact: true }).click()
+  await sheetSave(sheet).click()
   await expect(sheet).toBeHidden()
   const toast = page.getByRole('status')
   await expect(toast).toContainText(`Logged with ${name}`)
@@ -135,7 +135,7 @@ test('at large text, the room for a toast that wrapped stays after it goes, unti
   await friendLink(page, name).click()
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
-  await sheet.getByRole('button', { name: 'Save', exact: true }).click()
+  await sheetSave(sheet).click()
   await expect(sheet).toBeHidden()
   const toast = page.getByRole('status')
   await expect(toast).toContainText(`Logged with ${name}`)
@@ -172,7 +172,7 @@ test('edits a meetup from its page, then deletes it with undo', async ({ page })
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
   const editSheet = page.getByRole('dialog', { name: 'Edit meetup' })
   await editSheet.getByRole('button', { name: 'Drinks', exact: true }).click()
-  await editSheet.getByRole('button', { name: 'Save', exact: true }).click()
+  await sheetSave(editSheet).click()
   await expect(editSheet).toBeHidden()
   await expect(page.getByRole('heading', { level: 1, name: 'Drinks' })).toBeVisible()
 
@@ -193,7 +193,7 @@ test('edits and deletes a friend', async ({ page }) => {
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
   const sheet = page.getByRole('dialog', { name: 'Edit friend' })
   await sheet.getByLabel('Name', { exact: true }).fill('Alexandra')
-  await sheet.getByRole('button', { name: 'Save', exact: true }).click()
+  await sheetSave(sheet).click()
   await expect(sheet).toBeHidden()
   await expect(page.getByRole('heading', { level: 1, name: 'Alexandra' })).toBeVisible()
 

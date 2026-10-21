@@ -73,6 +73,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const searchRef = useRef<HTMLInputElement>(null)
+  const errorRef = useRef<HTMLParagraphElement>(null)
 
   // Photos change only in the sheet until Save. A saved meetup's photos load once, as ids and thumbnails.
   const storedPhotos = useMeetupPhotoThumbs(editing?.id)
@@ -92,6 +93,10 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
     }
   }, [request])
   const suggestions = useMemo(() => activitySuggestions(meetups ?? []), [meetups])
+  // Errors show at the top of the sheet, which may be scrolled away: bring one into view as it appears.
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [error])
 
   const effectiveTypeId = typeId ?? types?.[0]?.id ?? null
   const yesterday = addDays(today, -1)
@@ -225,35 +230,14 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
       open={request !== null}
       title={editing ? 'Edit meetup' : 'Log meetup'}
       onRequestClose={requestClose}
-      footer={
-        <>
-          {error && (
-            <p className="field-error" role="alert">
-              {error}
-            </p>
-          )}
-          {/* Never hidden for a missing friend (only while the keyboard is up), so Save never moves. */}
-          {!editing && (
-            <button
-              type="button"
-              className="text-button meetup-sheet__write"
-              onClick={() => void save(true)}
-              disabled={saveDisabled}
-            >
-              Save and write about the day
-            </button>
-          )}
-          <button
-            type="button"
-            className="button button--primary button--block"
-            onClick={() => void save()}
-            disabled={saveDisabled}
-          >
-            {friendIds.length === 0 ? 'Pick a friend' : 'Save'}
-          </button>
-        </>
-      }
+      action={{ label: 'Save', onClick: () => void save(), disabled: saveDisabled }}
     >
+      {error && (
+        <p ref={errorRef} className="field-error" role="alert">
+          {error}
+        </p>
+      )}
+
       <section className="form-section" aria-labelledby={whoId}>
         <h3 id={whoId} className="form-section__label">
           Who
@@ -416,6 +400,18 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
           onBusyChange={setAddingPhotos}
           open={request !== null}
         />
+      )}
+
+      {/* Log meetup only: dimmed whenever Save is. */}
+      {!editing && (
+        <button
+          type="button"
+          className="button button--secondary button--block"
+          onClick={() => void save(true)}
+          disabled={saveDisabled}
+        >
+          Save and write about the day
+        </button>
       )}
 
       {editing && (

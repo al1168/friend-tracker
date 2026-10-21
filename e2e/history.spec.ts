@@ -10,6 +10,7 @@ import {
   photoRow,
   seedAppLock,
   seedMeetups,
+  sheetSave,
 } from './helpers.ts'
 
 /** Mon, Oct 5, 2026, 12:00 PM on the phone's clock. */
@@ -355,7 +356,7 @@ test('a meetup opened from Meetups goes back to the same search', async ({ page 
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
   const sheet = page.getByRole('dialog', { name: 'Edit meetup' })
   await sheet.getByRole('button', { name: 'Drinks', exact: true }).click()
-  await sheet.getByRole('button', { name: 'Save', exact: true }).click()
+  await sheetSave(sheet).click()
   await expect(sheet).toBeHidden()
   await expect(page.getByRole('heading', { level: 1, name: 'Drinks' })).toBeVisible()
 

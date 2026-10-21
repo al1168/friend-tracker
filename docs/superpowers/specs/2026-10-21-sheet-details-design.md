@@ -70,7 +70,7 @@ Make logging a meetup complete and comfortable in one sheet: pick any friend wit
 - **The action.** A text button in Terracotta Ink, weight 600, 44 by 44px minimum, labeled "Save". It's disabled (45% opacity, `aria-disabled` handled as the codebase does) when saving isn't possible.
 - **Meetup sheets.**
   - Save is disabled until a friend is picked, while photos are being added, and while saving.
-  - The old "Pick a friend" label moves out of the button: when no friend is picked, the Who section shows a Footnote hint, "Pick at least one friend to save." The hint is hidden once a friend is picked.
+  - There is no "Pick a friend" label, button or hint anywhere (the owner, after this design: "I don't think there should be a pick friend button, it is implied when I click on their profile that I am picking that friend."). Save is always labeled "Save" and simply stays dimmed until a friend is picked, the standard iOS pattern; VoiceOver reads it as dimmed. Nothing else explains it.
   - Errors ("Couldn't save. Please try again." and validation messages) show at the top of the sheet body with `role="alert"`.
 - **Friend sheet.** Save moves to the header the same way. It's disabled while saving or processing a photo. A missing name still shows its existing error under Name and focuses the field.
 - **Footer.**
@@ -81,7 +81,7 @@ Make logging a meetup complete and comfortable in one sheet: pick any friend wit
 ## Accessibility
 
 - Header Save is a real `button`, named "Save", reachable after Cancel in focus order.
-- The no-friend hint is linked to Save with `aria-describedby` while it shows.
+- Before a friend is picked, Save is a disabled button, so VoiceOver reads "Save, dimmed". No hint or `aria-describedby` goes with it.
 - The day box has a label and a hint description.
 - The friend strip keeps a sensible VoiceOver order.
 - 44px targets everywhere, and Dynamic Type at the largest sizes: the header wraps the title, Save stays tappable, and the strip's tiles grow with their names.
@@ -106,7 +106,7 @@ Make logging a meetup complete and comfortable in one sheet: pick any friend wit
 - **Highlight.** A `mark.day-place` appears for "@ some place" and "@Blue willow 3:30", not for "@", nor for a sentence with "@" in the middle. It's on both the sheet box and The day page.
 - **Swiping friends.** With 12 friends, the 12th is reachable by scrolling the strip horizontally and can be picked, and the strip has more than 8 tiles.
 - **Header Save.**
-  - It's disabled with the hint before a friend is picked, and saves after.
+  - It's disabled before a friend is picked (and no "Pick a friend" text shows anywhere), and saves after.
   - Every existing e2e that clicked the footer Save or "Pick a friend" is updated to the header Save.
   - The friend sheet saves from the header too.
 - **Existing tests:** all existing e2e and unit tests stay green.

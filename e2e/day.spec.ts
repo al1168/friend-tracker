@@ -14,6 +14,7 @@ import {
   readMeetups,
   reopenAfterAWhile,
   seedAppLock,
+  sheetSave,
   tinyPhoto,
 } from './helpers.ts'
 
@@ -60,28 +61,26 @@ async function hideApp(page: Page) {
   })
 }
 
-test('the quick log is unchanged: no Note, and Save stays put while "Save and write about the day" waits for a friend', async ({
+test('the quick log: Save at the top right and "Save and write about the day" at the end both wait for a friend', async ({
   page,
 }) => {
   await page.goto('/')
   await addFriend(page, 'Alex')
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
-  await expect(sheet.getByLabel('Note')).toHaveCount(0)
   const write = sheet.getByRole('button', { name: 'Save and write about the day' })
-  const save = sheet.locator('.sheet__footer .button--block')
+  const save = sheetSave(sheet)
   await expect(write).toBeDisabled()
-  await expect(save).toHaveText('Pick a friend')
-  // Measure once the sheet has finished rising.
-  await sheet.evaluate((element) => Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)))
-  const before = await save.boundingBox()
+  await expect(save).toBeDisabled()
+  // A full-width button at the end of the sheet's body, not a footer.
+  await expect(sheet.locator('.sheet__body > :last-child')).toHaveText('Save and write about the day')
+  await expect(sheet.locator('.sheet__footer')).toHaveCount(0)
 
   await sheet.getByLabel('Search all friends').fill('Alex')
   await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name: 'Alex', exact: true }).click()
 
   await expect(write).toBeEnabled()
-  await expect(save).toHaveText('Save')
-  expect(await save.boundingBox(), 'Save did not move').toEqual(before)
+  await expect(save).toBeEnabled()
   await save.click()
   await expect(sheet).toBeHidden()
   await expect(page.getByRole('status')).toContainText('Logged with Alex')

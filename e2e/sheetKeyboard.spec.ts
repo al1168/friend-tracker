@@ -1,13 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { addFriend, LARGE_TEXT } from './helpers.ts'
+import { addFriend, LARGE_TEXT, sheetSave } from './helpers.ts'
 import { closeKeyboard, fakeVisualViewport, KEYBOARD, nextFrames, openKeyboard, setVisualViewport, tapFocus } from './keyboard.ts'
 
-/** Where a field inside a sheet is, against the part of the sheet's body you can see and its Save bar. */
+/** Where a field inside a sheet is, against the part of the sheet's body you can see (it ends at the keyboard). */
 async function placement(field: Locator) {
   return field.evaluate((element) => {
     const body = element.closest<HTMLElement>('.sheet__body')
-    const footer = element.closest('.sheet')?.querySelector('.sheet__footer')
-    if (!body || !footer) throw new Error('Not in a sheet with a footer')
+    if (!body) throw new Error('Not in a sheet')
     const top = body.getBoundingClientRect().top + body.clientTop
     const rect = element.getBoundingClientRect()
     return {
@@ -15,7 +14,6 @@ async function placement(field: Locator) {
       bottom: rect.bottom,
       visibleTop: top,
       visibleBottom: top + body.clientHeight,
-      footerTop: footer.getBoundingClientRect().top,
       focused: document.activeElement === element,
     }
   })
@@ -25,15 +23,16 @@ async function placement(field: Locator) {
 const MARGIN = 12
 
 /**
- * The field has focus and is all on screen: inside the sheet's visible scroll area, and above the Save bar
- * with `room` to spare.
+ * The field has focus and is all on screen: inside the sheet's visible scroll area, with `room` to spare above
+ * the end of it (the keyboard, or the bottom of the screen).
  */
 async function expectRevealed(field: Locator, name: string, { room = 0 } = {}) {
   const at = await placement(field)
   expect(at.focused, `${name} has focus`).toBe(true)
   expect(at.top, `The top of ${name} is inside the visible part of the sheet`).toBeGreaterThanOrEqual(at.visibleTop)
-  expect(at.bottom, `The bottom of ${name} is inside the visible part of the sheet`).toBeLessThanOrEqual(at.visibleBottom)
-  expect(at.bottom, `${name} is above the Save bar, with ${room}px to spare`).toBeLessThanOrEqual(at.footerTop - room)
+  expect(at.bottom, `The bottom of ${name} is inside the visible part of the sheet, with ${room}px to spare`).toBeLessThanOrEqual(
+    at.visibleBottom - room,
+  )
 }
 
 /** Scrolls to a field the way someone does before tapping it, and checks that its top shows. */
@@ -225,37 +224,40 @@ test('focusing a chip with the keyboard up leaves the scrolled sheet alone', asy
   expect(await scrollTop(body)).toBe(0)
 })
 
-test('"Save and write about the day" steps aside while the keyboard is up, and Save stays put', async ({ page }) => {
+test('with the keyboard up, Save stays at the top right and nothing rides on the keyboard', async ({ page }) => {
   const sheet = await openLogMeetup(page)
-  const write = sheet.getByRole('button', { name: 'Save and write about the day' })
-  const save = sheet.locator('.sheet__footer .button--block')
-  await expect(write).toBeVisible()
+  const save = sheetSave(sheet)
+  // Measure once the sheet has finished rising.
+  await sheet.evaluate((element) => Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)))
   await tapFocus(sheet.getByLabel('Search all friends'))
   const before = await save.boundingBox()
 
-  await openKeyboard(page)
+  const { height } = await openKeyboard(page)
 
-  await expect(write).toBeHidden()
-  const after = await save.boundingBox()
-  if (!before || !after) throw new Error('Save is not on screen')
-  expect(after.y + after.height, 'Save sits on the keyboard').toBeCloseTo(before.y + before.height - KEYBOARD, 0)
+  expect(await save.boundingBox(), 'Save did not move').toEqual(before)
+  await expect(save).toBeInViewport()
+  await expect(sheet.locator('.sheet__footer')).toHaveCount(0)
+  const bodyBottom = await sheet.locator('.sheet__body').evaluate((element) => element.getBoundingClientRect().bottom)
+  expect(bodyBottom, 'The body runs down to the keyboard').toBeCloseTo(height, 0)
   await closeKeyboard(page)
-  await expect(write).toBeVisible()
 })
 
-test('the Save bar gives up its home indicator room while the keyboard is up', async ({ page }) => {
+test('the end of the sheet stays clear of the home indicator, and gives that room up while the keyboard is up', async ({
+  page,
+}) => {
   // Play a phone with a home indicator: 34px of safe area at the bottom.
   await page.addStyleTag({ content: ':root { --safe-bottom: 34px; }' })
   const sheet = await openNewFriend(page)
-  const footer = sheet.locator('.sheet__footer')
+  // With no footer, the body is the bottom of the sheet.
+  const body = sheet.locator('.sheet__body')
   const html = page.locator('html')
-  const paddingBottom = () => footer.evaluate((element) => getComputedStyle(element).paddingBottom)
+  const paddingBottom = () => body.evaluate((element) => getComputedStyle(element).paddingBottom)
   await tapFocus(sheet.getByLabel('Name', { exact: true }))
-  expect(await paddingBottom(), 'Room for the home indicator under Save').toBe('46px')
+  expect(await paddingBottom(), 'Room for the home indicator under the last row').toBe('58px')
 
   const { height } = await openKeyboard(page)
   await expect(html).toHaveClass(/\bkeyboard-open\b/)
-  expect(await paddingBottom(), 'The keyboard covers the home indicator').toBe('12px')
+  expect(await paddingBottom(), 'The keyboard covers the home indicator').toBe('24px')
 
   // iOS pans the visual viewport down over the keyboard: still up.
   await setVisualViewport(page, { height, offsetTop: KEYBOARD })
@@ -263,7 +265,7 @@ test('the Save bar gives up its home indicator room while the keyboard is up', a
 
   await closeKeyboard(page)
   await expect(html).not.toHaveClass(/\bkeyboard-open\b/)
-  expect(await paddingBottom()).toBe('46px')
+  expect(await paddingBottom()).toBe('58px')
 
   // Closing the sheet with the keyboard up takes the class away with it.
   await openKeyboard(page)

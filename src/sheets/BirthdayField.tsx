@@ -25,7 +25,8 @@ export function BirthdayField({ value, error, today, rowRef, onChange }: Birthda
   const errorRef = useRef<HTMLParagraphElement>(null)
   const isSet = value.month !== null || value.day !== null || value.year !== null
 
-  // At large text sizes the error can sit under the sheet's Save footer; bring it into view.
+  // At large text sizes the error can sit below the visible part of the sheet (or under the keyboard); bring it
+  // into view.
   useEffect(() => {
     if (error) errorRef.current?.scrollIntoView({ block: 'nearest' })
   }, [error])

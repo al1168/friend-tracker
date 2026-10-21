@@ -9,15 +9,25 @@ const EXIT_MS = 260
 const DISMISS_DISTANCE = 120
 const DISMISS_VELOCITY = 0.6 // px per ms
 
+/** The header's trailing text button, such as Save. */
+export interface SheetAction {
+  label: string
+  onClick: () => void
+  /** Dimmed and unpressable (VoiceOver reads it as dimmed). */
+  disabled?: boolean
+}
+
 interface SheetProps {
   open: boolean
   title: string
   onRequestClose: () => void | Promise<void>
+  /** On the right of the header, across from Cancel, as iOS sheets put Save. */
+  action?: SheetAction
   footer?: ReactNode
   children: ReactNode
 }
 
-export function Sheet({ open, title, onRequestClose, footer, children }: SheetProps) {
+export function Sheet({ open, title, onRequestClose, action, footer, children }: SheetProps) {
   const [mounted, setMounted] = useState(open)
   if (open && !mounted) setMounted(true)
   const closing = mounted && !open
@@ -111,16 +121,36 @@ export function Sheet({ open, title, onRequestClose, footer, children }: SheetPr
           onPointerCancel={onPointerCancel}
         >
           <span className="sheet__grabber" aria-hidden="true" />
+          {/* Each side holds its button over an invisible copy of the other side's label, so both sides are as
+              wide as the wider one: the title stays centered and can wrap at large text sizes. */}
           <div className="sheet__bar">
-            <button type="button" className="text-button sheet__cancel" onClick={() => void onRequestClose()}>
-              Cancel
-            </button>
+            <span className="sheet__side">
+              <button type="button" className="text-button sheet__cancel" onClick={() => void onRequestClose()}>
+                Cancel
+              </button>
+              {action && (
+                <span className="text-button sheet__action sheet__ghost" aria-hidden="true">
+                  {action.label}
+                </span>
+              )}
+            </span>
             <h2 id={titleId} className="sheet__title">
               {title}
             </h2>
-            {/* As wide as Cancel, so the title stays centered and can wrap at large text sizes. */}
-            <span className="text-button sheet__spacer" aria-hidden="true">
-              Cancel
+            <span className="sheet__side sheet__side--end">
+              {action && (
+                <button
+                  type="button"
+                  className="text-button sheet__action"
+                  onClick={action.onClick}
+                  disabled={action.disabled}
+                >
+                  {action.label}
+                </button>
+              )}
+              <span className="text-button sheet__ghost" aria-hidden="true">
+                Cancel
+              </span>
             </span>
           </div>
         </div>

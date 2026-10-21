@@ -62,12 +62,28 @@
   align-items: center;
   padding: 0 var(--space-2);
 }
-.sheet__cancel {
-  justify-self: start;
+/* A side stacks its button and the invisible copy of the other side's label in one cell. */
+.sheet__side {
+  display: grid;
+  justify-items: start;
 }
-.sheet__spacer {
+.sheet__side--end {
+  justify-items: end;
+}
+.sheet__side > * {
+  grid-area: 1 / 1;
+}
+.sheet__ghost {
   visibility: hidden;
   pointer-events: none;
+}
+/* Save: a Terracotta Ink text button in the header's trailing slot. */
+.sheet__action {
+  font-weight: 600;
+}
+.sheet__action:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .sheet__title {
   margin: 0;
@@ -86,12 +102,16 @@
   gap: var(--space-6);
   padding: var(--space-3) var(--space-4) var(--space-6);
 }
-/* Without a footer the body is the bottom of the sheet: keep its last row out of the home indicator. */
+/* Without a footer the body is the bottom of the sheet: keep its last row out of the home indicator. The keyboard
+   covers the home indicator, so while it's up the body needs no room for it. */
 .sheet__body:last-child {
   padding-bottom: calc(var(--space-6) + var(--safe-bottom));
 }
+.keyboard-open .sheet__body:last-child {
+  padding-bottom: var(--space-6);
+}
 /* The browser's own scrolling to a focused field leaves the same room as the app's (useRevealFocusedField),
-   so a field it brings up from under the Save bar doesn't end flush against it. */
+   so a field it brings up from under the keyboard doesn't end flush against it. */
 .sheet__body :is(input, textarea, select) {
   scroll-margin-block: var(--space-3);
 }

@@ -180,11 +180,7 @@ export function FriendSheet({ request, onClose }: FriendSheetProps) {
       open={request !== null}
       title={editing ? 'Edit friend' : 'New friend'}
       onRequestClose={requestClose}
-      footer={
-        <button type="button" className="button button--primary button--block" onClick={save} disabled={saving || processingPhoto}>
-          Save
-        </button>
-      }
+      action={{ label: 'Save', onClick: () => void save(), disabled: saving || processingPhoto }}
     >
       <div className="friend-form__photo">
         <button

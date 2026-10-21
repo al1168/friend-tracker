@@ -7,6 +7,11 @@ export const ONE_PIXEL_PNG =
 /** Roughly the iPhone's largest standard text size, for page.addStyleTag. */
 export const LARGE_TEXT = 'html { font: 23px/1.35 -apple-system, system-ui, sans-serif !important; }'
 
+/** The Save button at the top right of an open meetup or friend sheet's header. */
+export function sheetSave(sheet: Locator): Locator {
+  return sheet.locator('.sheet__header').getByRole('button', { name: 'Save', exact: true })
+}
+
 export async function goToTab(page: Page, name: 'Friends' | 'Stats' | 'Settings') {
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name }).click()
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
@@ -28,7 +33,7 @@ export async function addFriend(page: Page, name: string, group?: string, birthd
     }
   }
   if (birthday) await setBirthday(sheet, birthday)
-  await sheet.getByRole('button', { name: 'Save' }).click()
+  await sheetSave(sheet).click()
   await expect(sheet).toBeHidden()
 }
 
@@ -48,7 +53,7 @@ export async function logMeetup(
   for (const activity of options.activities ?? []) await pickActivity(sheet, activity)
   if (options.photos) await addPhotos(sheet, options.photos)
   if (!options.note) {
-    await sheet.getByRole('button', { name: 'Save', exact: true }).click()
+    await sheetSave(sheet).click()
     await expect(sheet).toBeHidden()
     return
   }

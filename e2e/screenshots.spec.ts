@@ -13,6 +13,7 @@ import {
   reopenAfterAWhile,
   seedAppLock,
   setBirthday,
+  sheetSave,
   stubFaceId,
   stubPush,
 } from './helpers.ts'
@@ -74,7 +75,7 @@ async function seed(page: Page) {
   await page.getByRole('region', { name: 'Birthday', exact: true }).getByRole('button', { name: 'Add birthday' }).click()
   const sheet = page.getByRole('dialog', { name: 'Edit friend' })
   await setBirthday(sheet, { ...inForty, year: inForty.year - 32 })
-  await sheet.getByRole('button', { name: 'Save' }).click()
+  await sheetSave(sheet).click()
   await expect(sheet).toBeHidden()
   await addToList(page, 'Likes', 'Ramen, Board games, Hiking')
   // Long enough to show an item wrapping inside its chip.
