@@ -16,7 +16,7 @@ import { useToday } from '../hooks/useToday'
 import { clockStyle, describeStopTime, typedClock } from '../lib/clock'
 import { formatDate } from '../lib/dates'
 import { changeBetween, insertAtCaret, insertPaidLine, insertPlaceLine, lineCaret, type DayEdit } from '../lib/dayEdit'
-import { DAY_MAX_TYPED, FEELINGS_MAX, readDay } from '../lib/dayText'
+import { BOX_FULL, DAY_MAX_TYPED, FEELINGS_MAX, readDay } from '../lib/dayText'
 import { feelingsApply } from '../lib/moods'
 import { payerLabel } from '../lib/payers'
 import { formatNameList } from '../lib/text'
@@ -277,7 +277,7 @@ function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
 
   /** "This box is full." under The day, or said again when it already shows. */
   function sayDayFull() {
-    if (fieldsRef.current.note.length >= DAY_MAX_TYPED || dayRefused) announce('This box is full.')
+    if (fieldsRef.current.note.length >= DAY_MAX_TYPED || dayRefused) announce(BOX_FULL)
     else setDayRefused(true)
   }
 
@@ -465,7 +465,7 @@ function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
           />
           {(fields.note.length >= DAY_MAX_TYPED || dayRefused) && (
             <p className="field-hint" role="alert">
-              This box is full.
+              {BOX_FULL}
             </p>
           )}
         </section>
@@ -507,7 +507,7 @@ function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
             />
             {(fields.feelings.length >= FEELINGS_MAX || feelingsRefused) && (
               <p className="field-hint" role="alert">
-                This box is full.
+                {BOX_FULL}
               </p>
             )}
           </section>

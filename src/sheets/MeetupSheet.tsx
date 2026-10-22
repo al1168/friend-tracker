@@ -23,7 +23,7 @@ import {
 import { useToday } from '../hooks/useToday'
 import { activitySuggestions } from '../lib/activities'
 import { addDays, formatDate, isISODate, todayISO } from '../lib/dates'
-import { DAY_MAX_TYPED } from '../lib/dayText'
+import { BOX_FULL, DAY_MAX_TYPED } from '../lib/dayText'
 import { isPlainEnter } from '../lib/keys'
 import { askToKeepData } from '../lib/persist'
 import { compareNames, formatNameList } from '../lib/text'
@@ -108,9 +108,10 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
     }
   }, [request])
   const suggestions = useMemo(() => activitySuggestions(meetups ?? []), [meetups])
-  // Errors show at the top of the sheet, which may be scrolled away: bring one into view as it appears.
+  // Errors show at the top of the sheet, which may be scrolled away: bring the body back to its top as one appears.
+  // Only the body scrolls, never the locked page around it.
   useEffect(() => {
-    if (error) errorRef.current?.scrollIntoView({ block: 'nearest' })
+    if (error) errorRef.current?.closest('.sheet__body')?.scrollTo({ top: 0 })
   }, [error])
 
   // A new meetup starts on a suggested type, worked out again as friends are picked, until a type is tapped; from
@@ -197,6 +198,8 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
     if (friendIds.length === 0 || !effectiveTypeId) return
     savingRef.current = true
     setSaving(true)
+    // Cleared first, so the same error again is a new alert: shown, scrolled to and said again.
+    setError(null)
     try {
       // An activity typed into "+ New" but not added yet is saved too.
       const typed = activityDraft?.trim() ? [...activities, activityDraft] : activities
@@ -253,6 +256,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
 
   async function remove() {
     if (!editing) return
+    setError(null)
     let deleted
     try {
       deleted = await deleteMeetup(editing.id)
@@ -464,6 +468,12 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
             setError(null)
           }}
         />
+        {/* As on The day page: shown and said once the box stops taking more. */}
+        {note.length >= DAY_MAX_TYPED && (
+          <p className="field-hint" role="alert">
+            {BOX_FULL}
+          </p>
+        )}
         <p id={dayHintId} className="field-hint">
           Lines that start with @ show as places.
         </p>

@@ -130,6 +130,73 @@ test.describe('The day in the meetup sheets', () => {
     await expect(sheet).toBeHidden()
     expect(await readMeetups(page)).toHaveLength(0)
   })
+  test('says when the box is full, as the day page does', async ({ page }) => {
+    await page.goto('/')
+    await addFriend(page, 'Alex')
+    const sheet = await openLogMeetup(page)
+    const day = sheetDay(sheet)
+    await day.fill('x'.repeat(9_999))
+    await expect(sheet.getByRole('alert')).toHaveCount(0)
+    await day.press('End')
+    await page.keyboard.type('yz')
+    await expect(day).toHaveValue(`${'x'.repeat(9_999)}y`)
+    const full = sheet.getByRole('alert')
+    await expect(full).toHaveText('This box is full.')
+    await expect(full).toHaveClass('field-hint')
+    // Room again, and it goes.
+    await day.press('Backspace')
+    await expect(sheet.getByRole('alert')).toHaveCount(0)
+  })
+})
+
+test.describe('errors in the meetup sheets', () => {
+  test('one that comes again shows again, and brings only the sheet back to its top', async ({ page }) => {
+    await page.goto('/')
+    await addFriend(page, 'Alex')
+    await logMeetup(page, ['Alex'])
+    await openFriendPage(page, 'Alex')
+    const sheet = await editMeetup(page, /Coffee/)
+    // Deleted from under the open sheet, straight from IndexedDB, so each Save fails the same way.
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          const request = indexedDB.open('friend-tracker')
+          request.onerror = () => reject(request.error)
+          request.onsuccess = () => {
+            const database = request.result
+            const transaction = database.transaction('meetups', 'readwrite')
+            transaction.objectStore('meetups').clear()
+            transaction.oncomplete = () => {
+              database.close()
+              resolve()
+            }
+            transaction.onerror = () => reject(transaction.error)
+          }
+        }),
+    )
+    const body = sheet.locator('.sheet__body')
+    const scrollTop = () => body.evaluate((element) => element.scrollTop)
+    const toEnd = async () => {
+      await body.evaluate((element) => {
+        element.scrollTop = element.scrollHeight
+      })
+      expect(await scrollTop()).toBeGreaterThan(0)
+    }
+
+    await toEnd()
+    await sheetSave(sheet).click()
+    const alert = sheet.getByRole('alert')
+    await expect(alert).toHaveText('This meetup no longer exists.')
+    await expect.poll(scrollTop, { message: 'The body is back at its very top' }).toBe(0)
+    expect(await page.evaluate(() => [window.scrollX, window.scrollY]), 'The page itself never moved').toEqual([0, 0])
+
+    // The same error again is a new alert, so VoiceOver says it again, and it's brought into view again.
+    await alert.evaluate((element) => element.setAttribute('data-said', ''))
+    await toEnd()
+    await sheetSave(sheet).click()
+    await expect(sheet.locator('[role="alert"]:not([data-said])')).toHaveText('This meetup no longer exists.')
+    await expect.poll(scrollTop).toBe(0)
+  })
 })
 
 /**

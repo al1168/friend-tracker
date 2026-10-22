@@ -8,6 +8,8 @@ import type { Meetup } from '../types'
 /** The day box stops typing here. A longer day from before, or from a backup, is kept and still editable. */
 export const DAY_MAX_TYPED = 10_000
 export const FEELINGS_MAX = 4_000
+/** Shown under a The day or How it felt box that takes no more. */
+export const BOX_FULL = 'This box is full.'
 export const TOO_LONG_FEELINGS = 'Keep how it felt under 4,000 characters.'
 
 export type DayLine =
