@@ -1,5 +1,18 @@
-import { expect, test } from '@playwright/test'
-import { addFriend, logMeetup, openDay, openFriendPage, readMeetups, tinyPhoto } from './helpers.ts'
+import { expect, test, type Page } from '@playwright/test'
+import {
+  addFriend,
+  brokenPhoto,
+  friendRow,
+  logMeetup,
+  meetupRow,
+  openDay,
+  openFriendPage,
+  photoRow,
+  readMeetupPhotos,
+  readMeetups,
+  seedMeetups,
+  tinyPhoto,
+} from './helpers.ts'
 
 /** Today as the app writes it in the current year ("Sat, Oct 3"). */
 function todayLabel(): string {
@@ -57,9 +70,13 @@ test('hides what a meetup does not have, and marks one that is upcoming', async 
   await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
   await expect(page.getByText('Upcoming', { exact: true })).toBeVisible()
   await expect(page.getByRole('list', { name: 'With' }).getByRole('link')).toContainText(['Alex'])
-  for (const name of ['Activities', 'The day', 'How it felt', 'Photos']) {
+  for (const name of ['Activities', 'The day', 'How it felt']) {
     await expect(page.getByRole('region', { name, exact: true })).toHaveCount(0)
   }
+  // Photos always shows, here with only its Add photos tile.
+  const photos = page.getByRole('region', { name: 'Photos' })
+  await expect(photos.getByRole('button')).toHaveText(['Add photos'])
+  await expect(photos.getByRole('img')).toHaveCount(0)
   await expect(page.getByRole('link', { name: /^Write about the day/ })).toHaveAccessibleName(
     'Write about the day Places, what happened, how it felt',
   )
@@ -126,6 +143,90 @@ test('shows the weather in the hero and how it felt, and never in the history', 
   const row = page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Meal/ })
   await expect(row).not.toContainText('Rainy')
   await expect(row).not.toContainText('Good')
+})
+
+/** Opens the Meetup page of a Coffee with Alex logged today. */
+async function openCoffee(page: Page) {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await logMeetup(page, ['Alex'])
+  await page.getByRole('region', { name: 'Recent meetups' }).getByRole('link', { name: /^Coffee/ }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
+}
+
+test('the sections come in the order Activities, Photos, The day, How it felt, then the day row', async ({ page }) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await logMeetup(page, ['Alex'], { type: 'Meal', activities: ['Karaoke'], note: 'Tacos' })
+  await openFriendPage(page, 'Alex')
+  await page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Meal/ }).click()
+  await openDay(page)
+  await page.getByRole('group', { name: 'Mood' }).getByRole('button', { name: 'Good' }).click()
+  await page.getByRole('button', { name: 'Meal' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
+
+  await expect(page.locator('.page__body > .section > .group-title')).toHaveText([
+    'Activities',
+    'Photos',
+    'The day',
+    'How it felt',
+  ])
+  // The day row comes last.
+  await expect(page.locator('.page__body > .inset-group').last()).toContainText('Edit the day')
+})
+
+test('adds photos right from the Meetup page, and Undo takes the batch back', async ({ page }) => {
+  await openCoffee(page)
+  const photos = page.getByRole('region', { name: 'Photos' })
+  const thumbnails = photos.getByRole('img')
+  await expect(photos.getByRole('button', { name: 'Add photos' })).toBeVisible()
+
+  await page.locator('input[type="file"]').setInputFiles([tinyPhoto('one.png'), tinyPhoto('two.png')])
+
+  // Saved at once, with no Edit sheet.
+  await expect(thumbnails).toHaveCount(2)
+  await expect(thumbnails.nth(1)).toHaveAccessibleName('Photo 2 of 2')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect.poll(async () => (await readMeetupPhotos(page)).length).toBe(2)
+  const toast = page.getByRole('status')
+  await expect(toast).toContainText('Added 2 photos')
+  await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeEnabled()
+  // The last tile is still Add photos.
+  await expect(photos.getByRole('button').last()).toHaveAccessibleName('Add photos')
+
+  await toast.getByRole('button', { name: 'Undo' }).click()
+  await expect(thumbnails).toHaveCount(0)
+  await expect.poll(async () => (await readMeetupPhotos(page)).length).toBe(0)
+})
+
+test('a photo that cannot be read is skipped with a hint, and the rest are added', async ({ page }) => {
+  await openCoffee(page)
+  const photos = page.getByRole('region', { name: 'Photos' })
+  await page.locator('input[type="file"]').setInputFiles([tinyPhoto('one.png'), brokenPhoto()])
+  await expect(photos.getByRole('img')).toHaveCount(1)
+  await expect(photos.getByRole('alert')).toHaveText("1 photo couldn't be added.")
+  await expect(page.getByRole('status')).toContainText('Added 1 photo')
+})
+
+test('with 19 photos, choosing 3 adds 1 and says a meetup can have up to 20', async ({ page }) => {
+  await page.goto('/')
+  const meetup = meetupRow('coffee', '2026-10-01', ['alex'])
+  const nineteen = Array.from({ length: 19 }, (_, i) => ({ ...photoRow(`p${i}`, 'coffee'), order: i }))
+  await seedMeetups(page, { friends: [friendRow('alex', 'Alex')], meetups: [meetup], photos: nineteen })
+  await page.goto('/#/meetups/coffee')
+  const photos = page.getByRole('region', { name: 'Photos' })
+  await expect(photos.getByRole('img')).toHaveCount(19)
+
+  await page.locator('input[type="file"]').setInputFiles([tinyPhoto('a.png'), tinyPhoto('b.png'), tinyPhoto('c.png')])
+
+  await expect(photos.getByRole('img')).toHaveCount(20)
+  await expect(photos.getByRole('alert')).toHaveText('A meetup can have up to 20 photos.')
+  await expect(page.getByRole('status')).toContainText('Added 1 photo')
+  expect((await readMeetupPhotos(page)).find((photo) => !photo.id.startsWith('p'))?.order).toBe(19)
+
+  // Full: the tile says so instead of opening the picker.
+  await photos.getByRole('button', { name: 'Add photos' }).click()
+  await expect(photos.getByRole('alert')).toHaveText('A meetup can have up to 20 photos.')
 })
 
 test('redirects to Friends for an unknown meetup', async ({ page }) => {

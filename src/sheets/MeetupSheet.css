@@ -143,34 +143,6 @@
 .photo-tile__remove:active .photo-tile__remove-glyph {
   transform: scale(0.9);
 }
-/* The dashed outline marks an empty slot to fill, not a container. */
-.photo-add {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  width: 100%;
-  height: 100%;
-  padding: var(--space-2);
-  border: 1.5px dashed var(--ink-3);
-  border-radius: var(--radius-field);
-  background: var(--surface-2);
-  color: var(--ink-2);
-  font-size: var(--text-footnote);
-  font-weight: 600;
-  line-height: 1.25;
-  text-align: center;
-  overflow-wrap: anywhere;
-  transition: background-color var(--dur-fast);
-}
-.photo-add:active {
-  background: var(--surface-pressed);
-}
-.photo-add[aria-disabled='true'] {
-  cursor: progress;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .friend-tile__check {
     animation: fade-in var(--dur) linear;

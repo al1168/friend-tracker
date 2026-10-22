@@ -114,6 +114,12 @@
   overflow-wrap: anywhere;
 }
 
+/* Photos: the grid, then the adder's hint under it. */
+.meetup-photos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
 /* A thumbnail opens the photo viewer. */
 .photo-tile__open {
   display: block;

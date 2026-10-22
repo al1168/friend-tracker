@@ -5,6 +5,7 @@ import { ValidationError } from './errors'
 import { addFriend, deleteFriend } from './friends'
 import {
   addMeetup,
+  addMeetupPhoto,
   deleteMeetup,
   firstPhotoThumb,
   forgetPhotoThumbs,
@@ -12,6 +13,7 @@ import {
   meetupIdsWithPhotosAmong,
   photoCount,
   photoThumbs,
+  removeMeetupPhotos,
   restoreMeetup,
   updateDay,
   updateMeetup,
@@ -503,6 +505,119 @@ describe('the thumbnail cache', () => {
     expect(await firstPhotoThumb(read[0])).toBe('data:image/jpeg;base64,THUMB1')
     expect(reads).toHaveBeenCalledTimes(2)
     reads.mockRestore()
+  })
+})
+
+describe('addMeetupPhoto', () => {
+  it('puts the photo after the last one, reading only index keys', async () => {
+    const meetup = await addMeetup(base, { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: [] })
+    const gets = vi.spyOn(db.meetupPhotos, 'get')
+    const bulkGets = vi.spyOn(db.meetupPhotos, 'bulkGet')
+    expect(await addMeetupPhoto(meetup.id, newPhoto('c'))).toBe(true)
+    expect(gets).not.toHaveBeenCalled()
+    expect(bulkGets).not.toHaveBeenCalled()
+    gets.mockRestore()
+    bulkGets.mockRestore()
+    expect(await photoIds(meetup.id)).toEqual(['a', 'b', 'c'])
+    expect(await db.meetupPhotos.get('c')).toMatchObject({ ...newPhoto('c'), meetupId: meetup.id, order: 2 })
+  })
+
+  it('goes after the highest order, gaps and all, and starts a meetup without photos at 0', async () => {
+    const meetup = await addMeetup(base)
+    expect(await addMeetupPhoto(meetup.id, newPhoto('a'))).toBe(true)
+    expect(await db.meetupPhotos.get('a')).toMatchObject({ order: 0 })
+    await db.meetupPhotos.update('a', { order: 5 })
+    await addMeetupPhoto(meetup.id, newPhoto('b'))
+    expect(await db.meetupPhotos.get('b')).toMatchObject({ order: 6 })
+    expect(await photoIds(meetup.id)).toEqual(['a', 'b'])
+  })
+
+  it('refuses a 21st photo and a photo that is not an image, and adds nothing to a deleted meetup', async () => {
+    const twenty = Array.from({ length: 20 }, (_, i) => newPhoto(`p${i}`))
+    const full = await addMeetup(base, { add: twenty, removeIds: [], order: [] })
+    await expect(addMeetupPhoto(full.id, newPhoto('one-more'))).rejects.toThrow('A meetup can have up to 20 photos.')
+    expect(await db.meetupPhotos.count()).toBe(20)
+
+    const other = await addMeetup(base)
+    const bad = { ...newPhoto('bad'), full: 'https://example.com/a.jpg' }
+    await expect(addMeetupPhoto(other.id, bad)).rejects.toThrow("A photo couldn't be saved.")
+
+    await deleteMeetup(other.id)
+    expect(await addMeetupPhoto(other.id, newPhoto('late'))).toBe(false)
+    expect(await db.meetupPhotos.get('late')).toBeUndefined()
+  })
+
+  it('keeps the new thumbnail, so the grid that shows it next reads no image', async () => {
+    const meetup = await addMeetup(base, { add: [newPhoto('a')], removeIds: [], order: [] })
+    expect(await photoThumbs(meetup.id)).toHaveLength(1)
+    await addMeetupPhoto(meetup.id, newPhoto('b'))
+    const bulkGets = vi.spyOn(db.meetupPhotos, 'bulkGet')
+    expect((await photoThumbs(meetup.id)).map((photo) => photo.id)).toEqual(['a', 'b'])
+    expect(bulkGets).not.toHaveBeenCalled()
+    bulkGets.mockRestore()
+  })
+})
+
+describe('removeMeetupPhotos', () => {
+  it('deletes only the listed photos of that meetup, and forgets their thumbnails', async () => {
+    const meetup = await addMeetup(base, { add: [newPhoto('a'), newPhoto('b'), newPhoto('c')], removeIds: [], order: [] })
+    const other = await addMeetup(base, { add: [newPhoto('x')], removeIds: [], order: [] })
+    expect(await photoThumbs(meetup.id)).toHaveLength(3)
+
+    await removeMeetupPhotos(meetup.id, ['b', 'c', 'x', 'gone'])
+
+    expect(await photoIds(meetup.id)).toEqual(['a'])
+    expect(await photoIds(other.id)).toEqual(['x'])
+    // Ids are never reused in the app; reusing one here shows the cache let go of the old thumbnail.
+    const again = { ...newPhoto('b'), thumb: 'data:image/jpeg;base64,THUMBagain' }
+    await db.meetupPhotos.add({ ...again, meetupId: meetup.id, order: 1, createdAt: '2026-09-01T12:00:00.000Z' })
+    expect((await photoThumbs(meetup.id)).map((photo) => photo.thumb)).toEqual([
+      'data:image/jpeg;base64,THUMBa',
+      'data:image/jpeg;base64,THUMBagain',
+    ])
+  })
+
+  it('reads no image', async () => {
+    const meetup = await addMeetup(base, { add: [newPhoto('a')], removeIds: [], order: [] })
+    const gets = vi.spyOn(db.meetupPhotos, 'get')
+    const bulkGets = vi.spyOn(db.meetupPhotos, 'bulkGet')
+    await removeMeetupPhotos(meetup.id, ['a'])
+    expect(gets).not.toHaveBeenCalled()
+    expect(bulkGets).not.toHaveBeenCalled()
+    gets.mockRestore()
+    bulkGets.mockRestore()
+    expect(await db.meetupPhotos.count()).toBe(0)
+  })
+})
+
+describe('photoThumbs', () => {
+  it('gives ids and thumbnails in order, and reads each photo once', async () => {
+    const meetup = await addMeetup(base, { add: [newPhoto('a'), newPhoto('b')], removeIds: [], order: ['b', 'a'] })
+    const bulkGets = vi.spyOn(db.meetupPhotos, 'bulkGet')
+    expect(await photoThumbs(meetup.id)).toEqual([
+      { id: 'b', thumb: 'data:image/jpeg;base64,THUMBb' },
+      { id: 'a', thumb: 'data:image/jpeg;base64,THUMBa' },
+    ])
+    expect(bulkGets).toHaveBeenCalledTimes(1)
+    await photoThumbs(meetup.id)
+    expect(bulkGets, 'A second call reads no record').toHaveBeenCalledTimes(1)
+
+    // A reorder changes only the order the ids come in.
+    await updateMeetup(meetup.id, base, { add: [], removeIds: [], order: ['a', 'b'] })
+    expect((await photoThumbs(meetup.id)).map((photo) => photo.id)).toEqual(['a', 'b'])
+    expect(bulkGets).toHaveBeenCalledTimes(1)
+
+    // A photo added by the sheet: only its record is read.
+    await updateMeetup(meetup.id, base, { add: [newPhoto('c')], removeIds: [], order: [] })
+    expect((await photoThumbs(meetup.id)).map((photo) => photo.id)).toEqual(['a', 'b', 'c'])
+    expect(bulkGets).toHaveBeenCalledTimes(2)
+    expect(bulkGets).toHaveBeenLastCalledWith(['c'])
+    bulkGets.mockRestore()
+  })
+
+  it('gives none for a meetup without photos', async () => {
+    const meetup = await addMeetup(base)
+    expect(await photoThumbs(meetup.id)).toEqual([])
   })
 })
 

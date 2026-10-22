@@ -4,19 +4,27 @@ import { Avatar } from '../components/Avatar'
 import { DayView } from '../components/DayView'
 import { InsetGroup, Row, Section } from '../components/InsetGroup'
 import { Page, type NavState } from '../components/Page'
+import { PhotoAddHint, PhotoAddTile } from '../components/PhotoAddTile'
 import { PhotoViewer } from '../components/PhotoViewer'
+import { useToast } from '../components/Toast'
 import { useFriends, useMeetup, useMeetupPhotoThumbs, useMeetupTypes } from '../data/hooks'
+import { addMeetupPhoto, removeMeetupPhotos } from '../db/meetups'
+import { usePhotoAdder } from '../hooks/usePhotoAdder'
 import { useToday } from '../hooks/useToday'
 import { formatDate } from '../lib/dates'
 import { isDayEmpty, readDay } from '../lib/dayText'
 import { feelingsApply, moodInfo } from '../lib/moods'
-import { displayText } from '../lib/text'
+import { askToKeepData } from '../lib/persist'
+import { MAX_PHOTOS } from '../lib/photos'
+import { displayText, plural } from '../lib/text'
 import { weatherInfo } from '../lib/weather'
 import { useSheets } from '../sheets/sheetsContext'
 import type { Friend } from '../types'
 import './MeetupScreen.css'
 
-/** The memory view of one meetup: what, when, who, what you did, the day, how it felt and the photos. */
+const UNDO_FAILED = "Couldn't undo. Please try again."
+
+/** The memory view of one meetup: what, when, who, what you did, the photos, the day and how it felt. */
 export function MeetupScreen() {
   const { id } = useParams()
   const meetup = useMeetup(id)
@@ -32,6 +40,28 @@ export function MeetupScreen() {
   // The photo open in the viewer, by position. Its thumbnail takes focus back when the viewer closes.
   const [viewing, setViewing] = useState<number | null>(null)
   const thumbnails = useRef<(HTMLButtonElement | null)[]>([])
+  const toast = useToast()
+  // While photos are being added, Edit waits, so the sheet never opens on a photo list about to change.
+  const [addingPhotos, setAddingPhotos] = useState(false)
+  // Add photos saves each photo the moment it's ready, and the live query shows it at once.
+  const adder = usePhotoAdder({
+    room: MAX_PHOTOS - (photos?.length ?? 0),
+    active: true,
+    onBusyChange: setAddingPhotos,
+    onPhoto: (photo) => (id ? addMeetupPhoto(id, photo) : false),
+    onDone: (ids) => {
+      if (!id || ids.length === 0) return
+      // Photos take real space, so ask Safari to keep the data when the phone runs low (best effort).
+      void askToKeepData()
+      toast({
+        message: `Added ${plural(ids.length, 'photo')}`,
+        actionLabel: 'Undo',
+        onAction: () => {
+          removeMeetupPhotos(id, ids).catch(() => toast({ message: UNDO_FAILED, tone: 'plain' }))
+        },
+      })
+    },
+  })
 
   // Deleted from the sheet (or never there): go back, like the friend page does for a deleted friend.
   useEffect(() => {
@@ -69,7 +99,12 @@ export function MeetupScreen() {
       back={{ label: 'Back', fallback: '/' }}
       pushed
       actions={
-        <button type="button" className="text-button" onClick={() => openMeetupSheet({ meetup })}>
+        <button
+          type="button"
+          className="text-button"
+          disabled={addingPhotos}
+          onClick={() => openMeetupSheet({ meetup })}
+        >
           Edit
         </button>
       }
@@ -129,6 +164,34 @@ export function MeetupScreen() {
         </Section>
       )}
 
+      {/* Always here, ending with Add photos; removing and reordering stay in the Edit sheet. */}
+      <Section title="Photos">
+        <div className="meetup-photos">
+          <ul className="photo-grid">
+            {photos.map((photo, index) => (
+              <li key={photo.id} className="photo-tile">
+                <button
+                  ref={(element) => {
+                    thumbnails.current[index] = element
+                  }}
+                  type="button"
+                  className="photo-tile__open"
+                  onClick={() => setViewing(index)}
+                >
+                  <img
+                    className="photo-tile__image"
+                    src={photo.thumb}
+                    alt={`Photo ${index + 1} of ${photos.length}`}
+                  />
+                </button>
+              </li>
+            ))}
+            <PhotoAddTile adder={adder} />
+          </ul>
+          <PhotoAddHint adder={adder} />
+        </div>
+      </Section>
+
       {dayParts.length > 0 && (
         <Section title="The day">
           <DayView parts={dayParts} people={people} />
@@ -168,31 +231,6 @@ export function MeetupScreen() {
           chevron
         />
       </InsetGroup>
-
-      {photos.length > 0 && (
-        <Section title="Photos">
-          <ul className="photo-grid">
-            {photos.map((photo, index) => (
-              <li key={photo.id} className="photo-tile">
-                <button
-                  ref={(element) => {
-                    thumbnails.current[index] = element
-                  }}
-                  type="button"
-                  className="photo-tile__open"
-                  onClick={() => setViewing(index)}
-                >
-                  <img
-                    className="photo-tile__image"
-                    src={photo.thumb}
-                    alt={`Photo ${index + 1} of ${photos.length}`}
-                  />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
 
       {viewing !== null && (
         <PhotoViewer

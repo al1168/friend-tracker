@@ -194,6 +194,48 @@ export async function deleteMeetup(id: string): Promise<DeletedMeetup | undefine
 }
 
 /**
+ * Adds one photo after a meetup's others, in one transaction: the Meetup page's Add photos tile saves each photo the
+ * moment it's ready. Reads only the [meetupId+order] index keys of the meetup's photos (how many, and the last order),
+ * never an image. Resolves false when the meetup is gone; refuses a 21st photo with TOO_MANY_PHOTOS. Its thumbnail is
+ * kept in memory, so the grid that shows it next reads no image either.
+ */
+export async function addMeetupPhoto(meetupId: string, photo: NewPhoto): Promise<boolean> {
+  if (!photo.id || !isValidPhotoData(photo)) throw new ValidationError(PHOTO_NOT_SAVED)
+  const added = await db.transaction('rw', db.meetups, db.meetupPhotos, async () => {
+    if (!(await db.meetups.get(meetupId))) return false
+    // Each key is [meetupId, order], in order: how many there are, and the last order.
+    const keys = await db.meetupPhotos
+      .where('[meetupId+order]')
+      .between([meetupId, -Infinity], [meetupId, Infinity])
+      .keys()
+    if (keys.length >= MAX_PHOTOS) throw new ValidationError(TOO_MANY_PHOTOS)
+    const last = keys.at(-1)
+    const order = Array.isArray(last) && typeof last[1] === 'number' ? last[1] + 1 : 0
+    const { id, full, thumb, width, height } = photo
+    await db.meetupPhotos.add({ id, meetupId, order, full, thumb, width, height, createdAt: new Date().toISOString() })
+    return true
+  })
+  if (added) cacheThumb(photo.id, photo.thumb)
+  return added
+}
+
+/**
+ * Undo for photos added on the Meetup page: deletes these photos of this meetup (others' are ignored) and forgets
+ * their thumbnails. Reads only the meetup's photo ids, never an image. The orders left with gaps are fine: an order
+ * is only ever compared.
+ */
+export async function removeMeetupPhotos(meetupId: string, ids: readonly string[]): Promise<void> {
+  const listed = new Set(ids)
+  const removed = await db.transaction('rw', db.meetupPhotos, async () => {
+    const own = (await db.meetupPhotos.where('meetupId').equals(meetupId).primaryKeys()) as string[]
+    const doomed = own.filter((id) => listed.has(id))
+    await db.meetupPhotos.bulkDelete(doomed)
+    return doomed
+  })
+  forgetThumbs(removed)
+}
+
+/**
  * Undo: puts a meetup and its photos back, dropping friends who were deleted since.
  * Does nothing if it would be empty or its type is gone.
  */
@@ -296,14 +338,35 @@ export async function meetupIdsWithPhotosAmong(meetupIds: readonly string[]): Pr
   return new Set(meetupIds.filter((_, i) => firsts[i] !== undefined))
 }
 
-/** A meetup's photos as ids and thumbnails, in order. Never returns a full image (see firstPhotoThumb). */
+/**
+ * A meetup's photos as ids and thumbnails, in order. The ids come key-only from [meetupId+order]; each thumbnail
+ * comes from the cache, and only the photos it doesn't hold are read (once each), so a live query that runs again
+ * after a photo is added reads that one photo, not them all. Never returns a full image (see firstPhotoThumb).
+ */
 export async function photoThumbs(meetupId: string): Promise<Pick<MeetupPhoto, 'id' | 'thumb'>[]> {
-  const ids = await db.meetupPhotos.where('meetupId').equals(meetupId).primaryKeys()
-  const rows = await db.meetupPhotos.bulkGet(ids)
-  return rows
-    .filter((row): row is MeetupPhoto => !!row)
-    .sort((a, b) => a.order - b.order)
-    .map(({ id, thumb }) => ({ id, thumb }))
+  const ids = (await db.meetupPhotos
+    .where('[meetupId+order]')
+    .between([meetupId, -Infinity], [meetupId, Infinity])
+    .primaryKeys()) as string[]
+  const thumbs = new Map<string, string>()
+  const missing: string[] = []
+  for (const id of ids) {
+    const thumb = cachedThumb(id)
+    if (thumb === undefined) missing.push(id)
+    else thumbs.set(id, thumb)
+  }
+  if (missing.length > 0) {
+    // IndexedDB can't read part of a record, so these read their full images too, and drop them at once.
+    for (const row of await db.meetupPhotos.bulkGet(missing)) {
+      if (!row) continue
+      cacheThumb(row.id, row.thumb)
+      thumbs.set(row.id, row.thumb)
+    }
+  }
+  return ids.flatMap((id) => {
+    const thumb = thumbs.get(id)
+    return thumb === undefined ? [] : [{ id, thumb }]
+  })
 }
 
 /** One photo with its full image, or null: the viewer reads only the photo it shows. */
