@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db, resetDatabase } from '../db/db'
+import { isQuotaExceeded } from '../db/errors'
 import { addFriend } from '../db/friends'
 import { getSetting, setSetting } from '../db/settings'
 import { addGroup } from '../db/groups'
@@ -18,6 +19,7 @@ import {
   replaceAllData,
   restoreBackup,
   restoreUndoExpired,
+  restoreUndoIds,
   undoRestore,
 } from './storage'
 
@@ -325,6 +327,88 @@ describe('restoring a backup, and undoing it', () => {
     expect(await firstPhotoThumb('m1')).toBe('data:image/jpeg;base64,RESTORED')
     await undoRestore()
     expect(await firstPhotoThumb('m1')).toBe('data:image/jpeg;base64,THUMBp1')
+  })
+
+  it('lets each part of the snapshot go as soon as it is put back, so an undo never needs twice the room', async () => {
+    await fillApp()
+    await db.meetupPhotos.bulkAdd(Array.from({ length: 25 }, (_, i) => meetupPhoto('q' + String(i).padStart(2, '0'), 'm1', i)))
+    const types = await db.meetupTypes.count()
+    await restoreBackup(BACKUP, NOW)
+    const putBack = [db.groups, db.meetupTypes, db.friends, db.meetups, db.meetupPhotos].map((table) => vi.spyOn(table, 'bulkAdd'))
+    const letGo = vi.spyOn(db.restoreUndo, 'bulkDelete')
+    expect(await undoRestore()).toBe(true)
+    // Every call in the order it was made: "put back 20", then "let go 20", and so on.
+    const steps = [
+      ...putBack.flatMap((spy) => spy.mock.calls.map(([rows], i) => ({ at: spy.mock.invocationCallOrder[i], step: 'put back ' + rows.length }))),
+      ...letGo.mock.calls.map(([keys], i) => ({ at: letGo.mock.invocationCallOrder[i], step: 'let go ' + keys.length })),
+    ]
+      .sort((a, b) => a.at - b.at)
+      .map(({ step }) => step)
+    for (const spy of [...putBack, letGo]) spy.mockRestore()
+    // Groups, types, friends, meetups, then the 28 photos 20 at a time: each let go right after it's put back.
+    expect(steps).toEqual(
+      [1, types, 1, 2, 20, 8].flatMap((count) => ['put back ' + count, 'let go ' + count]),
+    )
+    expect(await db.restoreUndo.count()).toBe(0)
+  })
+
+  it('reads only the keys of the friends and meetups the snapshot keeps', async () => {
+    await fillApp()
+    const before = await readAllData()
+    await restoreBackup(BACKUP, NOW)
+    const toArray = vi.spyOn(db.Collection.prototype, 'toArray')
+    const ids = await restoreUndoIds()
+    expect(toArray).not.toHaveBeenCalled()
+    toArray.mockRestore()
+    expect([...ids.friendIds].sort()).toEqual(before.friends.map((f) => f.id).sort())
+    expect([...ids.meetupIds].sort()).toEqual(before.meetups.map((m) => m.id).sort())
+    // With no snapshot, none.
+    await undoRestore()
+    expect(await restoreUndoIds()).toEqual({ friendIds: [], meetupIds: [] })
+  })
+
+  describe('when there is no room for the snapshot', () => {
+    const add = IDBObjectStore.prototype.add
+    afterEach(() => {
+      IDBObjectStore.prototype.add = add
+    })
+
+    /** Makes IndexedDB refuse every row written to restoreUndo, as a full phone would. */
+    function fillThePhone() {
+      IDBObjectStore.prototype.add = function (this: IDBObjectStore, ...args: Parameters<IDBObjectStore['add']>) {
+        if (this.name === 'restoreUndo') throw new DOMException('The quota has been exceeded.', 'QuotaExceededError')
+        return add.apply(this, args)
+      }
+    }
+
+    it('fails with an error that says so, and changes nothing', async () => {
+      await fillApp()
+      const before = await readAllData()
+      fillThePhone()
+      const failure = await restoreBackup(BACKUP, NOW).then(
+        () => null,
+        (error: unknown) => error,
+      )
+      expect(failure).not.toBeNull()
+      expect(isQuotaExceeded(failure)).toBe(true)
+      expect(sortById(await readAllData())).toEqual(sortById(before))
+      expect(await db.restoreUndo.count()).toBe(0)
+      expect(await getSetting('restoreUndo')).toBeNull()
+    })
+
+    it('restores without undo when asked, dropping an older snapshot too', async () => {
+      await fillApp()
+      await restoreBackup({ ...BACKUP, meetupPhotos: [] }, NOW)
+      expect(await db.restoreUndo.count()).toBeGreaterThan(0)
+      fillThePhone()
+      await expect(restoreBackup(BACKUP, NOW)).rejects.toSatisfy(isQuotaExceeded)
+
+      expect(await restoreBackup(BACKUP, NOW, { keepUndo: false })).toEqual({ undoable: false })
+      expect(sortById(await readAllData())).toEqual(sortById(BACKUP))
+      expect(await db.restoreUndo.count()).toBe(0)
+      expect(await getSetting('restoreUndo')).toBeNull()
+      expect(await undoRestore()).toBe(false)
+    })
   })
 
   it('never puts the snapshot in a backup, and keeps the settings', async () => {

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { addFriend, friendLink, goToTab, logMeetup, readMeetupPhotos, readMeetups, tinyPhoto } from './helpers.ts'
 
 /** Forces the download path for a backup: the share sheet can't be driven in tests. */
@@ -16,6 +16,11 @@ async function exportFile(page: Page): Promise<string> {
   const path = await (await download).path()
   await expect(page.getByText('Last backup: today')).toBeVisible()
   return path
+}
+
+/** A confirm's message, one fact a line. */
+async function messageLines(confirm: Locator): Promise<string[]> {
+  return (await confirm.locator('.action-sheet__message').evaluate((element) => element.textContent ?? '')).split('\n')
 }
 
 /** The Settings tab in the tab bar, by its exact name. */
@@ -165,30 +170,132 @@ test('Undo on the "Backup restored" toast puts everything back', async ({ page }
   await expect(friendLink(page, 'Alex')).toBeVisible()
 })
 
-test('"Undo restore" in Settings asks first, puts everything back, and then goes', async ({ page }) => {
+test('"Undo restore" in Settings asks first, says what would go, puts everything back, and then goes', async ({
+  page,
+}) => {
+  // Backs up, logs, restores and logs again: more than most.
+  test.setTimeout(60_000)
   const backupPath = await backUpThenAddMore(page)
   await restore(page, backupPath)
   // The toast goes with the page; Settings still offers the undo.
   await goToTab(page, 'Friends')
   await expect(friendLink(page, 'Kim')).toHaveCount(0)
+  // A meetup logged after the restore isn't in what the undo puts back.
+  await logMeetup(page, ['Alex'], { type: 'Drinks' })
   await goToTab(page, 'Settings')
 
   const row = page.getByRole('button', { name: 'Undo restore', exact: true })
   await expect(row).toHaveAccessibleDescription('Puts back the data from before Wed, Oct 21. Kept until Wed, Oct 28.')
   await row.click()
   const confirm = page.getByRole('alertdialog', { name: 'Undo the restore?' })
-  const message = await confirm.locator('.action-sheet__message').evaluate((element) => element.textContent)
-  expect(message?.split('\n')).toEqual([
+  expect(await messageLines(confirm)).toEqual([
     'Before Wed, Oct 21: 2 friends, 2 meetups, 3 photos.',
-    'In the app now: 1 friend, 1 meetup, 1 photo.',
+    'In the app now: 1 friend, 2 meetups, 1 photo.',
+    "1 meetup in the app now isn't in what's put back.",
     'Everything in the app now will be replaced.',
   ])
   await confirm.getByRole('button', { name: 'Undo restore' }).click()
 
   await expect(page.getByRole('status')).toContainText('Restore undone')
   await expect(row).toHaveCount(0)
-  await expect.poll(async () => (await readMeetups(page)).length).toBe(2)
+  await expect.poll(async () => (await readMeetups(page)).map((meetup) => meetup.typeId).sort()).toEqual([
+    'type-coffee',
+    'type-meal',
+  ])
   expect(await readMeetupPhotos(page)).toHaveLength(3)
+})
+
+test('a second restore says the first one can’t be undone after it', async ({ page }) => {
+  const backupPath = await backUpThenAddMore(page)
+  await restore(page, backupPath)
+
+  await page.locator('input[type="file"]').setInputFiles(backupPath)
+  const confirm = page.getByRole('alertdialog', { name: 'Replace all data with this backup?' })
+  expect((await messageLines(confirm)).at(-1)).toBe("The restore of Wed, Oct 21 can't be undone after this.")
+  await confirm.getByRole('button', { name: 'Cancel' }).click()
+  await expect(confirm).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Undo restore', exact: true })).toBeVisible()
+})
+
+/** Makes the page's IndexedDB refuse every row written to restoreUndo, as a full phone would. */
+async function fillThePhone(page: Page) {
+  await page.evaluate(() => {
+    const add = IDBObjectStore.prototype.add
+    IDBObjectStore.prototype.add = function (this: IDBObjectStore, ...args: Parameters<IDBObjectStore['add']>) {
+      if (this.name === 'restoreUndo') throw new DOMException('The quota has been exceeded.', 'QuotaExceededError')
+      return add.apply(this, args)
+    }
+  })
+}
+
+test('with no room to keep a copy for undo, it asks before restoring without one', async ({ page }) => {
+  test.setTimeout(60_000)
+  const backupPath = await backUpThenAddMore(page)
+  await goToTab(page, 'Settings')
+  await fillThePhone(page)
+  const askWithoutUndo = page.getByRole('alertdialog', { name: 'Restore without undo?' })
+
+  // Cancel: nothing changed.
+  await page.locator('input[type="file"]').setInputFiles(backupPath)
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Replace all data' }).click()
+  await expect(askWithoutUndo).toBeVisible()
+  expect(await messageLines(askWithoutUndo)).toEqual([
+    "There isn't room on this iPhone to keep a copy for undo. Nothing was changed.",
+    "Everything in the app now will be replaced, and it can't be undone.",
+  ])
+  await askWithoutUndo.getByRole('button', { name: 'Cancel' }).click()
+  await expect(askWithoutUndo).toHaveCount(0)
+  await expect(page.locator('.toast')).toHaveCount(0)
+  expect(await readMeetups(page)).toHaveLength(2)
+
+  // Restore without undo: the backup is in, with nothing kept and no Undo.
+  await page.locator('input[type="file"]').setInputFiles(backupPath)
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Replace all data' }).click()
+  await askWithoutUndo.getByRole('button', { name: 'Restore without undo' }).click()
+  await expect(page.getByRole('status')).toContainText('Backup restored')
+  await expect(page.getByRole('status').getByRole('button')).toHaveCount(0)
+  expect(await readMeetups(page)).toHaveLength(1)
+  await expect(page.getByRole('button', { name: 'Undo restore', exact: true })).toHaveCount(0)
+  expect(await countRestoreUndo(page)).toBe(0)
+})
+
+test('a restore that ends after you leave Settings shows no toast on the page you went to', async ({ page }) => {
+  test.setTimeout(60_000)
+  const backupPath = await backUpThenAddMore(page)
+  await goToTab(page, 'Settings')
+  // Another connection holds the friends store, so the restore waits for it: a slow restore on a full phone.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open('friend-tracker')
+        request.onerror = () => reject(request.error)
+        request.onsuccess = () => {
+          const database = request.result
+          const transaction = database.transaction('friends', 'readwrite')
+          const store = transaction.objectStore('friends')
+          const hold = () => {
+            if ((window as { releaseFriends?: boolean }).releaseFriends) return
+            store.get('nobody').onsuccess = hold
+          }
+          hold()
+          transaction.oncomplete = () => database.close()
+          resolve()
+        }
+      }),
+  )
+  await page.locator('input[type="file"]').setInputFiles(backupPath)
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Replace all data' }).click()
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Friends' }).click()
+  await expect(page).toHaveURL(/#\/$/)
+
+  await page.evaluate(() => {
+    ;(window as { releaseFriends?: boolean }).releaseFriends = true
+  })
+  await expect.poll(async () => (await readMeetups(page)).length).toBe(1)
+  await expect(friendLink(page, 'Kim')).toHaveCount(0)
+  await expect(friendLink(page, 'Alex')).toBeVisible()
+  await page.waitForTimeout(500)
+  await expect(page.locator('.toast')).toHaveCount(0)
 })
 
 test('a restore can be undone for 7 days, then its snapshot is gone', async ({ page }) => {
@@ -288,8 +395,7 @@ test('the import confirm compares the backup with the app', async ({ page }) => 
   await page.locator('input[type="file"]').setInputFiles(backupPath)
 
   const confirm = page.getByRole('alertdialog', { name: 'Replace all data with this backup?' })
-  const message = await confirm.locator('.action-sheet__message').evaluate((element) => element.textContent)
-  expect(message?.split('\n')).toEqual([
+  expect(await messageLines(confirm)).toEqual([
     'Backup from Wed, Sep 2: 1 friend, 1 meetup.',
     'In the app now: 2 friends, 3 meetups.',
     "1 friend and 2 meetups in the app now aren't in this backup.",

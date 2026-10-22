@@ -1,4 +1,4 @@
-import Dexie from 'dexie'
+import Dexie, { type EntityTable } from 'dexie'
 import { db, type DataTable, type RestoreUndoRow } from '../db/db'
 import { forgetPhotoThumbs } from '../db/meetups'
 import { getSetting, setSetting, type RestoreUndoInfo } from '../db/settings'
@@ -93,13 +93,22 @@ async function keepForUndo(): Promise<number> {
  * groups, meetup types, meetups and their photos) in restoreUndo, replacing any older snapshot, so either both happen
  * or neither. Into an app with no friends and no meetups (a new phone) there's nothing to keep: it keeps none, drops
  * any older one, and the restore can't be undone. Settings data is never part of it, as it's never part of a backup.
+ *
+ * With `keepUndo: false` it keeps nothing either, and drops any older snapshot: for when there wasn't room for one
+ * (the restore failed with a quota error, isQuotaExceeded) and the owner chose "Restore without undo".
  */
-export async function restoreBackup(data: BackupData, now: Date): Promise<{ undoable: boolean }> {
+export async function restoreBackup(
+  data: BackupData,
+  now: Date,
+  { keepUndo = true }: { keepUndo?: boolean } = {},
+): Promise<{ undoable: boolean }> {
   const undoable = await db.transaction('rw', [...dataTables(), db.restoreUndo, db.settings], async () => {
     await db.restoreUndo.clear()
     const [friends, meetups] = await Promise.all([db.friends.count(), db.meetups.count()])
     const kept: RestoreUndoInfo | null =
-      friends > 0 || meetups > 0 ? { takenAt: now.toISOString(), friends, meetups, photos: await keepForUndo() } : null
+      keepUndo && (friends > 0 || meetups > 0)
+        ? { takenAt: now.toISOString(), friends, meetups, photos: await keepForUndo() }
+        : null
     await setSetting('restoreUndo', kept)
     await writeAllData(data)
     return kept !== null
@@ -108,33 +117,59 @@ export async function restoreBackup(data: BackupData, now: Date): Promise<{ undo
   return { undoable }
 }
 
-/** The rows restoreUndo keeps of one table (photos: up to `limit` after `afterId`). */
-function keptRows(table: DataTable, afterId: string | null = null, limit = Infinity): Promise<RestoreUndoRow[]> {
-  const rows = db.restoreUndo
+/** The rows of one table restoreUndo keeps, as a range of its [table+id] keys (photos: those after `afterId`). */
+function keptRange(table: DataTable, afterId: string | null = null) {
+  return db.restoreUndo
     .where('[table+id]')
     .between([table, afterId ?? Dexie.minKey], [table, Dexie.maxKey], afterId === null, true)
+}
+
+/** The rows restoreUndo keeps of one table (photos: up to `limit` after `afterId`). */
+function keptRows(table: DataTable, afterId: string | null = null, limit = Infinity): Promise<RestoreUndoRow[]> {
+  const rows = keptRange(table, afterId)
   return (Number.isFinite(limit) ? rows.limit(limit) : rows).toArray()
 }
 
 /**
+ * The ids of the friends and meetups a restore's snapshot keeps, read from its keys alone (no row, so no photo), so
+ * the "Undo the restore?" confirm can say what in the app now isn't in what's put back. None without a snapshot.
+ */
+export async function restoreUndoIds(): Promise<{ friendIds: string[]; meetupIds: string[] }> {
+  return db.transaction('r', db.restoreUndo, async () => {
+    const ids = async (table: DataTable) =>
+      (await keptRange(table).primaryKeys()).map((key) => (key as [DataTable, string])[1])
+    const [friendIds, meetupIds] = await Promise.all([ids('friends'), ids('meetups')])
+    return { friendIds, meetupIds }
+  })
+}
+
+/** Puts kept rows back in their table, then lets them go from the snapshot at once, in the caller's transaction. */
+async function putBack<T extends { id: string }>(table: EntityTable<T, 'id'>, rows: RestoreUndoRow[]): Promise<void> {
+  await table.bulkAdd(rows.map(({ row }) => row as T))
+  await db.restoreUndo.bulkDelete(rows.map(({ table: name, id }): [DataTable, string] => [name, id]))
+}
+
+/**
  * Undoes the last restore: puts back exactly what the app held just before it, in one transaction, and lets the
- * snapshot go. Photos are copied back 20 at a time. Resolves false when there's no snapshot.
+ * snapshot go. Each part is deleted from the snapshot as soon as it's put back (photos 20 at a time), so the undo
+ * never needs room for the data twice over. Resolves false when there's no snapshot.
  */
 export async function undoRestore(): Promise<boolean> {
   const undone = await db.transaction('rw', [...dataTables(), db.restoreUndo, db.settings], async () => {
     if ((await getSetting('restoreUndo')) === null || (await db.restoreUndo.count()) === 0) return false
     await Promise.all(dataTables().map((table) => table.clear()))
-    await db.groups.bulkAdd((await keptRows('groups')).map(({ row }) => row as Group))
-    await db.meetupTypes.bulkAdd((await keptRows('meetupTypes')).map(({ row }) => row as MeetupType))
-    await db.friends.bulkAdd((await keptRows('friends')).map(({ row }) => row as Friend))
-    await db.meetups.bulkAdd((await keptRows('meetups')).map(({ row }) => row as Meetup))
+    await putBack<Group>(db.groups, await keptRows('groups'))
+    await putBack<MeetupType>(db.meetupTypes, await keptRows('meetupTypes'))
+    await putBack<Friend>(db.friends, await keptRows('friends'))
+    await putBack<Meetup>(db.meetups, await keptRows('meetups'))
     let lastId: string | null = null
     for (;;) {
       const batch = await keptRows('meetupPhotos', lastId, PHOTO_BATCH)
       if (batch.length === 0) break
-      await db.meetupPhotos.bulkAdd(batch.map(({ row }) => row as MeetupPhoto))
+      await putBack<MeetupPhoto>(db.meetupPhotos, batch)
       lastId = batch[batch.length - 1].id
     }
+    // Anything left that no table names.
     await db.restoreUndo.clear()
     await setSetting('restoreUndo', null)
     return true

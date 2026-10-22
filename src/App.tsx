@@ -1,4 +1,5 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router'
+import { BackupDotProvider } from './backup/BackupDotProvider'
 import { RestoreUndoCleanup } from './backup/RestoreUndoCleanup'
 import { ActionSheetProvider } from './components/ActionSheet'
 import { PlaceMemoryProvider } from './components/PlaceMemory'
@@ -30,21 +31,24 @@ export default function App() {
                 <ScrollManager />
                 <ReminderSync />
                 <RestoreUndoCleanup />
-                <main className="app">
-                  <Routes>
-                    <Route path="/" element={<FriendsScreen />} />
-                    <Route path="/friends/:id" element={<FriendDetailScreen />} />
-                    <Route path="/meetups" element={<MeetupsScreen />} />
-                    <Route path="/meetups/:id" element={<MeetupScreen />} />
-                    <Route path="/meetups/:id/day" element={<DayScreen />} />
-                    <Route path="/stats" element={<StatsScreen />} />
-                    <Route path="/settings" element={<SettingsScreen />} />
-                    <Route path="/settings/groups" element={<GroupsScreen />} />
-                    <Route path="/settings/types" element={<MeetupTypesScreen />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                  </Routes>
-                </main>
-                <TabBar />
+                {/* One backup dot query, shared by the tab bar and Settings. */}
+                <BackupDotProvider>
+                  <main className="app">
+                    <Routes>
+                      <Route path="/" element={<FriendsScreen />} />
+                      <Route path="/friends/:id" element={<FriendDetailScreen />} />
+                      <Route path="/meetups" element={<MeetupsScreen />} />
+                      <Route path="/meetups/:id" element={<MeetupScreen />} />
+                      <Route path="/meetups/:id/day" element={<DayScreen />} />
+                      <Route path="/stats" element={<StatsScreen />} />
+                      <Route path="/settings" element={<SettingsScreen />} />
+                      <Route path="/settings/groups" element={<GroupsScreen />} />
+                      <Route path="/settings/types" element={<MeetupTypesScreen />} />
+                      <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                  </main>
+                  <TabBar />
+                </BackupDotProvider>
               </MeetupIdsWithPhotosProvider>
             </PlaceMemoryProvider>
           </SheetsProvider>

@@ -18,7 +18,7 @@ const TABS = [
 
 export function TabBar() {
   const location = useLocation()
-  // The day page fills the screen, so it has no tab bar, and the tabs' query never runs there.
+  // The day page fills the screen, so it has no tab bar (and BackupDotProvider reads nothing there).
   if (isDayPage(location.pathname)) return null
   return <TabBarItems location={location} />
 }
@@ -27,7 +27,8 @@ function TabBarItems({ location }: { location: Location }) {
   const { pathname } = location
   const originTab = (location.state as NavState | null)?.tab
   // A quiet suggestion to back up: a dot on the Settings icon, and VoiceOver hears "Settings, backup suggested" (a
-  // name that starts with the tab's own word, so Voice Control's "Tap Settings" still works).
+  // name that starts with the tab's own word, so Voice Control's "Tap Settings" still works). The answer is shared
+  // with Settings through BackupDotProvider.
   const backupDot = useBackupDot() === true
   return (
     <nav className="tabbar" aria-label="Main">
