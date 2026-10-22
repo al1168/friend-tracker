@@ -50,7 +50,7 @@ describe('createBackup and parseBackup', () => {
   it('accepts a backup it created', () => {
     const file = createBackup(sample, new Date('2026-10-02T09:00:00Z'))
     expect(file).toMatchObject({ app: 'friend-tracker', version: 5, exportedAt: '2026-10-02T09:00:00.000Z' })
-    expect(parseBackup(jsonCopy(file))).toEqual({ ok: true, data: sample })
+    expect(parseBackup(jsonCopy(file))).toEqual({ ok: true, data: sample, exportedAt: '2026-10-02T09:00:00.000Z' })
   })
 
   it('drops fields it does not know about', () => {
@@ -60,7 +60,17 @@ describe('createBackup and parseBackup', () => {
       ;(list(f, 'friends')[1].birthday as Record<string, unknown>).sign = 'Pisces'
       list(f, 'meetupPhotos')[0].caption = 'Hi'
     })
-    expect(parseBackup(file)).toEqual({ ok: true, data: sample })
+    expect(parseBackup(file)).toEqual({ ok: true, data: sample, exportedAt: '2026-10-02T09:00:00.000Z' })
+  })
+
+  it('gives no date for a file whose exportedAt is missing, not a string or not a date, and still accepts it', () => {
+    for (const exportedAt of [undefined, 1_700_000_000_000, null, 'yesterday', '']) {
+      const file = broken((f) => {
+        if (exportedAt === undefined) delete f.exportedAt
+        else f.exportedAt = exportedAt
+      })
+      expect(parseBackup(file), String(exportedAt)).toEqual({ ok: true, data: sample, exportedAt: null })
+    }
   })
 })
 
@@ -210,7 +220,7 @@ describe('parseBackup reads version 5 backups', () => {
     const file = jsonCopy(createBackup(withDay, new Date('2026-10-04T05:00:00Z')))
     expect(file.version).toBe(5)
     const result = parseBackup(file)
-    expect(result).toEqual({ ok: true, data: withDay })
+    expect(result).toEqual({ ok: true, data: withDay, exportedAt: '2026-10-04T05:00:00.000Z' })
     if (result.ok) {
       expect(result.data.meetups[2].note).toBe(OWNER_DAY_TYPED)
       expect(result.data.meetups[2].activities).toEqual(['Movie', 'Shopping'])

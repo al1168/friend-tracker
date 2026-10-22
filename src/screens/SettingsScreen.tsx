@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { exportBackup, shareBackupFile } from '../backup/exportBackup'
+import { describeImport } from '../backup/importSummary'
 import { meetupsSinceBackup } from '../backup/nudge'
 import { parseBackupFile, readAllData, replaceAllData } from '../backup/storage'
 import { useBackupDot } from '../backup/useBackupDot'
@@ -10,7 +11,7 @@ import { useToast } from '../components/Toast'
 import { useFriends, useGroups, useMeetups, useMeetupTypes, usePhotoCount, useSetting } from '../data/hooks'
 import { setSetting } from '../db/settings'
 import { useToday } from '../hooks/useToday'
-import { describeBackup, plural } from '../lib/text'
+import { describeBackup } from '../lib/text'
 import { AppLockSection } from '../lock/AppLockSection'
 import { usePasskeyAvailable } from '../lock/usePasskeyAvailable'
 import { RemindersSection } from '../reminders/RemindersSection'
@@ -96,10 +97,17 @@ export function SettingsScreen() {
       return
     }
     setImportError(null)
-    const { data } = result
+    const { data, exportedAt } = result
+    const app = {
+      friends: friends.length,
+      meetups: meetups.length,
+      photos: photoCount,
+      friendIds: friends.map((friend) => friend.id),
+      meetupIds: meetups.map((meetup) => meetup.id),
+    }
     const confirmed = await confirm({
       title: 'Replace all data with this backup?',
-      message: `It has ${plural(data.friends.length, 'friend')} and ${plural(data.meetups.length, 'meetup')}. Everything in the app now will be replaced.`,
+      message: describeImport(data, exportedAt, app, today),
       confirmLabel: 'Replace all data',
       destructive: true,
     })

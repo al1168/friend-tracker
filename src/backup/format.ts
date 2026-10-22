@@ -22,7 +22,8 @@ export interface BackupFile extends BackupData {
   exportedAt: string
 }
 
-export type ParseResult = { ok: true; data: BackupData } | { ok: false; error: string }
+/** A file that imports, with when it was made (`exportedAt` when it's a time `Date.parse` reads, else null). */
+export type ParseResult = { ok: true; data: BackupData; exportedAt: string | null } | { ok: false; error: string }
 
 export function createBackup(data: BackupData, exportedAt: Date): BackupFile {
   return { app: 'friend-tracker', version: 5, exportedAt: exportedAt.toISOString(), ...data }
@@ -38,7 +39,8 @@ export function backupFileName(today: ISODate): string {
  */
 export function parseBackup(raw: unknown, today: ISODate = todayISO()): ParseResult {
   try {
-    return { ok: true, data: readBackup(raw, today) }
+    const data = readBackup(raw, today)
+    return { ok: true, data, exportedAt: exportedAtOf(raw as Obj) }
   } catch (error) {
     if (error instanceof BackupError) return { ok: false, error: error.message }
     throw error
@@ -46,6 +48,12 @@ export function parseBackup(raw: unknown, today: ISODate = todayISO()): ParseRes
 }
 
 class BackupError extends Error {}
+
+/** When the file says it was made. Never a reason to refuse it: older and edited files still import. */
+function exportedAtOf(file: Obj): string | null {
+  const value = file.exportedAt
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value)) ? value : null
+}
 
 type Obj = Record<string, unknown>
 

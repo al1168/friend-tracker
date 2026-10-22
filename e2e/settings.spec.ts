@@ -142,6 +142,38 @@ test('a quiet dot on the Settings tab suggests a backup once meetups are logged 
   await expect(page.locator('.tabbar__dot')).toHaveCount(0)
 })
 
+test('the import confirm compares the backup with the app', async ({ page }) => {
+  await downloadBackups(page)
+  await page.clock.setFixedTime(new Date(2026, 8, 2, 12))
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await logMeetup(page, ['Alex'])
+  const backupPath = await exportFile(page)
+
+  // Seven weeks on: one more friend and two more meetups.
+  await page.clock.setFixedTime(new Date(2026, 9, 21, 12))
+  await page.reload()
+  await goToTab(page, 'Friends')
+  await addFriend(page, 'Kim')
+  await logMeetup(page, ['Kim'])
+  await logMeetup(page, ['Alex', 'Kim'], { type: 'Meal' })
+  await goToTab(page, 'Settings')
+  await page.locator('input[type="file"]').setInputFiles(backupPath)
+
+  const confirm = page.getByRole('alertdialog', { name: 'Replace all data with this backup?' })
+  const message = await confirm.locator('.action-sheet__message').evaluate((element) => element.textContent)
+  expect(message?.split('\n')).toEqual([
+    'Backup from Wed, Sep 2: 1 friend, 1 meetup.',
+    'In the app now: 2 friends, 3 meetups.',
+    "1 friend and 2 meetups in the app now aren't in this backup.",
+    'Everything in the app now will be replaced.',
+  ])
+  // One line each.
+  await expect(confirm.locator('.action-sheet__message')).toHaveCSS('white-space', 'pre-line')
+  await confirm.getByRole('button', { name: 'Cancel' }).click()
+  await expect(confirm).toHaveCount(0)
+})
+
 test('rejects a file that is not a backup', async ({ page }) => {
   await page.goto('/#/settings')
   await page.locator('input[type="file"]').setInputFiles({

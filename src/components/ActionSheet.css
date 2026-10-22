@@ -53,10 +53,12 @@
   font-weight: 600;
   color: var(--ink-2);
 }
+/* A message may run to several short lines, one fact each (the import confirm). */
 .action-sheet__message {
   margin: var(--space-1) 0 0;
   font-size: var(--text-footnote);
   color: var(--ink-2);
+  white-space: pre-line;
 }
 .action-sheet__button {
   display: flex;
