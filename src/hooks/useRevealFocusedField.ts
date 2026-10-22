@@ -19,6 +19,11 @@ function topAligned(field: Element): HTMLElement | null {
   return field.closest<HTMLElement>('[data-reveal="top"]')
 }
 
+/** Whether a field is marked `data-reveal="start"`: The day page's The day box (see useRevealFocusedField). */
+function startAligned(field: Element): boolean {
+  return field.closest('[data-reveal="start"]') !== null
+}
+
 /**
  * Keeps the focused field on screen inside a sheet's (or the day page's) scrolling body. iOS shows a tapped
  * field while the sheet is still full height; then the keyboard comes up and the sheet shrinks above it (see
@@ -31,6 +36,12 @@ function topAligned(field: Element): HTMLElement | null {
  * the top of the view instead, that element's top its scroll margin below the header, so what comes up under it (the
  * search's results) gets all the room down to the keyboard. It goes there when it takes focus and whenever its text
  * changes, keyboard or not, and when the body shrinks; moving its caret moves nothing.
+ *
+ * A text box marked `data-reveal="start"` (The day page's The day) goes to the top once, when the keyboard comes up
+ * while it has focus: its top its scroll margin below the header, so the most of it shows, as long as the caret's line
+ * still shows there (a long day tapped near its end shows the caret's line instead). Typing and moving the caret then
+ * follow the caret as for any field. A helper row opening later (Who paid, Place) shrinks the body with the keyboard
+ * already up, so it never moves the box.
  */
 export function useRevealFocusedField(active: boolean, bodyRef: RefObject<HTMLElement | null>) {
   useEffect(() => {
@@ -42,11 +53,16 @@ export function useRevealFocusedField(active: boolean, bodyRef: RefObject<HTMLEl
      * browser's own focus scrolling and this agree at every text size); `onlyIfHidden` leaves it while all of
      * it shows.
      */
+    /** The part of the body on screen. */
+    const view = (): Span => {
+      const top = body.getBoundingClientRect().top + body.clientTop
+      return { top, bottom: top + body.clientHeight }
+    }
+
     const reveal = (onlyIfHidden: boolean) => {
       const field = document.activeElement
       if (!isEditable(field) || !body.contains(field)) return
-      const top = body.getBoundingClientRect().top + body.clientTop
-      const port = { top, bottom: top + body.clientHeight }
+      const port = view()
       const box = topAligned(field)
       if (box) {
         const offset = topOffset(port, box.getBoundingClientRect(), revealMargin(getComputedStyle(field).scrollMarginTop))
@@ -71,16 +87,41 @@ export function useRevealFocusedField(active: boolean, bodyRef: RefObject<HTMLEl
       if (offset !== 0) body.scrollTop += offset
     }
 
+    /**
+     * Scrolls a "start" box's top to its scroll margin under the top of the view, if the caret's line still shows
+     * there with its margin to spare. Says whether it did.
+     */
+    const alignStart = (field: HTMLElement): boolean => {
+      const port = view()
+      const style = getComputedStyle(field)
+      const wanted = topOffset(port, field.getBoundingClientRect(), revealMargin(style.scrollMarginTop))
+      // No further than the body can scroll.
+      const offset = Math.max(-body.scrollTop, Math.min(wanted, body.scrollHeight - body.clientHeight - body.scrollTop))
+      const line = field instanceof HTMLTextAreaElement ? caretLineSpan(field) : field.getBoundingClientRect()
+      const moved = { top: line.top - offset, bottom: line.bottom - offset }
+      if (revealOffset(port, moved, revealMargin(style.scrollMarginBottom)) !== 0) return false
+      if (offset !== 0) body.scrollTop += offset
+      return true
+    }
+
     // The body shrinks when the keyboard opens, as the sheet follows --keyboard-inset and
     // --viewport-height. This runs after that layout and before paint, so the field never shows hidden.
     // Growing (the keyboard closing) reveals nothing, so it never pulls the sheet back to a field someone has
     // scrolled away from.
     let lastHeight: number | null = null
+    // Whether the body has shrunk since the keyboard came up: only that first shrink can align a "start" box.
+    let shrankForKeyboard = false
     const observer = new ResizeObserver(() => {
       const height = body.clientHeight
       const shrank = lastHeight !== null && height < lastHeight
       lastHeight = height
-      if (shrank) reveal(false)
+      const keyboardUp = keyboardIsUp(window.innerHeight, window.visualViewport)
+      const keyboardCameUp = shrank && keyboardUp && !shrankForKeyboard
+      shrankForKeyboard = keyboardUp && (shrankForKeyboard || shrank)
+      if (!shrank) return
+      const field = document.activeElement
+      if (keyboardCameUp && isEditable(field) && body.contains(field) && startAligned(field) && alignStart(field)) return
+      reveal(false)
     })
     observer.observe(body)
 

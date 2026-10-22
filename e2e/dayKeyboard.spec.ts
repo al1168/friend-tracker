@@ -130,6 +130,83 @@ test('The day comes into view when the keyboard opens, before any typing', async
   await expectLineShown(page, await lineSpan(dayBox(page), 1), 'The first line of The day')
 })
 
+test('The day goes to the top when the keyboard comes up for it, its top 12px under the nav bar', async ({ page }) => {
+  await openDayPage(page)
+  await tapFocus(dayBox(page))
+
+  await openKeyboard(page)
+
+  const at = await layout(page)
+  const box = await dayBox(page).boundingBox()
+  if (!box) throw new Error('The day is not on screen')
+  expect(Math.abs(box.y - (at.visibleTop + MARGIN)), 'Its top is 12px under the nav bar').toBeLessThanOrEqual(2)
+  await expectLineShown(page, await lineSpan(dayBox(page), 1), 'The caret’s line')
+})
+
+test('a long day tapped at its end shows the caret’s line instead of its top', async ({ page }) => {
+  await openDayPage(page)
+  const box = dayBox(page)
+  await box.fill(Array.from({ length: 60 }, (_, i) => `Line ${i + 1}`).join('\n'))
+  await tapFocus(box)
+  await box.press('End')
+
+  await openKeyboard(page)
+
+  await expectLineShown(page, await lastLineSpan(box), 'Line 60')
+})
+
+test('adding a place from the Place row hands focus back without moving The day', async ({ page }) => {
+  await openDayPage(page)
+  await tapFocus(dayBox(page))
+  await openKeyboard(page)
+  const top = async () => {
+    const box = await dayBox(page).boundingBox()
+    if (!box) throw new Error('The day is not on screen')
+    return box.y
+  }
+  const before = await top()
+  const helpers = page.getByRole('group', { name: 'Writing helpers' })
+  const place = helpers.getByRole('textbox', { name: 'Place and time' })
+
+  await helpers.getByRole('button', { name: 'Place', exact: true }).click()
+  await place.fill('nonstopstyle 10:30')
+  await place.press('Enter')
+
+  await expect(dayBox(page)).toBeFocused()
+  await expect(dayBox(page)).toHaveValue('@nonstopstyle 10:30\n')
+  await nextFrames(page)
+  expect(Math.abs((await top()) - before), 'The day stays put').toBeLessThanOrEqual(1)
+})
+
+test('the Place field takes the whole bar, with Now, Add, Close and "Hide keyboard" on a line under it', async ({
+  page,
+}) => {
+  await openDayPage(page)
+  await tapFocus(dayBox(page))
+  await openKeyboard(page)
+  const helpers = page.getByRole('group', { name: 'Writing helpers' })
+
+  await helpers.getByRole('button', { name: 'Place', exact: true }).click()
+  const place = helpers.getByRole('textbox', { name: 'Place and time' })
+  await expect(place).toBeFocused()
+  await place.fill('nonstopstyle 10:30')
+
+  const field = await place.boundingBox()
+  const bar = await page.locator('.day-page__footer').boundingBox()
+  if (!field || !bar) throw new Error('The Place row is not on screen')
+  expect(Math.abs(field.width - (bar.width - 32)), 'As wide as the bar less its sides').toBeLessThanOrEqual(2)
+  const below = helpers.getByRole('button')
+  await expect(below).toHaveCount(4)
+  const names = await below.evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label') ?? button.textContent))
+  expect(names, 'In the order they show').toEqual([expect.stringMatching(/^Now, /), 'Add', 'Close', 'Hide keyboard'])
+  for (const button of await below.all()) {
+    const box = await button.boundingBox()
+    if (!box) throw new Error('A button is not on screen')
+    expect(box.y, 'On the line under the field').toBeGreaterThanOrEqual(field.y + field.height)
+    await expect(button).toBeInViewport({ ratio: 1 })
+  }
+})
+
 test('typing new lines at the end of a long day keeps the caret’s line above the helper bar', async ({ page }) => {
   await openDayPage(page)
   const box = dayBox(page)

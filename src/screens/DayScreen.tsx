@@ -6,8 +6,9 @@ import { Chip } from '../components/Chip'
 import { GrowField } from '../components/GrowField'
 import { IconChevronLeft } from '../components/icons'
 import { MoodTiles } from '../components/MoodTiles'
+import type { NavState } from '../components/Page'
 import { useFriends, useMeetup, useMeetupTypes } from '../data/hooks'
-import { updateDay } from '../db/meetups'
+import { deleteMeetup, updateDay } from '../db/meetups'
 import { useAutosave } from '../hooks/useAutosave'
 import { useKeyboardInset } from '../hooks/useKeyboardInset'
 import { useRevealFocusedField } from '../hooks/useRevealFocusedField'
@@ -17,6 +18,7 @@ import { clockStyle, describeStopTime, typedClock } from '../lib/clock'
 import { formatDate } from '../lib/dates'
 import { changeBetween, insertAtCaret, insertPaidLine, insertPlaceLine, lineCaret, type DayEdit } from '../lib/dayEdit'
 import { BOX_FULL, DAY_MAX_TYPED, FEELINGS_MAX, readDay } from '../lib/dayText'
+import { loggedUndoSpent, spendLoggedUndo } from '../lib/loggedUndo'
 import { feelingsApply } from '../lib/moods'
 import { formatNameList, shortName } from '../lib/text'
 import { cleanWeather, WEATHER } from '../lib/weather'
@@ -43,6 +45,7 @@ function sameValue(a: DayFields[keyof DayFields], b: DayFields[keyof DayFields])
 }
 
 const SAVE_FAILED = "Couldn't save just now. Your words are still here, and the app will try again."
+const UNDO_FAILED = "Couldn't undo. Please try again."
 
 /** Minutes past midnight now, refreshed every 10 seconds (the "Now" chip's name follows the clock). */
 function useMinutesNow(): number {
@@ -95,7 +98,7 @@ export function DayScreen() {
     [location.key, navigate],
   )
 
-  // Deleted (another tab) or never there: go back, like the Meetup page does.
+  // Deleted (Undo in the Logged note, another tab) or never there: go back, like the Meetup page does.
   useEffect(() => {
     if (meetup === null) leave('/')
   }, [meetup, leave])
@@ -104,18 +107,23 @@ export function DayScreen() {
   const typeName = types.find((type) => type.id === meetup.typeId)?.name ?? 'Meetup'
   const friendById = new Map(friends.map((friend) => [friend.id, friend] as const))
   const people = meetup.friendIds.map((friendId) => friendById.get(friendId)).filter((f): f is Friend => !!f)
-  return <DayPage key={meetup.id} meetup={meetup} people={people} typeName={typeName} onLeave={leave} />
+  const logged = (location.state as NavState | null)?.logged === true
+  return (
+    <DayPage key={meetup.id} meetup={meetup} people={people} typeName={typeName} logged={logged} onLeave={leave} />
+  )
 }
 
 interface DayPageProps {
   meetup: Meetup
   people: Friend[]
   typeName: string
+  /** Opened by "Save and write about the day", just after the meetup was logged: the body starts with the Logged note. */
+  logged: boolean
   /** Goes back (once, however often it's called), or to `fallback` when the page was opened directly. */
   onLeave: (fallback: string) => void
 }
 
-function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
+function DayPage({ meetup, people, typeName, logged, onLeave }: DayPageProps) {
   const today = useToday()
   const minutesNow = useMinutesNow()
   const confirmDiscard = useConfirmDiscard()
@@ -147,6 +155,11 @@ function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
   const [feelingsRefused, setFeelingsRefused] = useState(false)
   // Back was tapped and is on its way out (saving first): another tap does nothing.
   const leavingRef = useRef(false)
+  // The Logged note's Undo: offered until the first change on the page (markChanged), even one made before the app
+  // lock brought the page back.
+  const [undoOffered, setUndoOffered] = useState(() => logged && !loggedUndoSpent(meetup.id))
+  const [undoFailed, setUndoFailed] = useState(false)
+  const loggedWith = people.length > 0 ? `Logged with ${formatNameList(people.map((friend) => friend.name))}` : 'Logged'
 
   const { saver, status } = useAutosave<DayFields>((changes) => updateDay(meetup.id, changes), {
     beforeHide: commitPlaceDraft,
@@ -165,6 +178,12 @@ function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
   useLayoutEffect(() => {
     document.title = 'The day · Friend Tracker'
     titleRef.current?.focus({ preventScroll: true })
+  }, [])
+
+  // Then VoiceOver hears the Logged note once, through the page's announcer.
+  useEffect(() => {
+    if (logged) announce(`${loggedWith}.`)
+    // Once, as the page opens.
   }, [])
 
   useEffect(() => {
@@ -187,11 +206,33 @@ function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
   }, [meetup, saver])
 
   function setField<K extends keyof DayFields>(key: K, value: DayFields[K], now: boolean) {
+    markChanged()
     fieldsRef.current = { ...fieldsRef.current, [key]: value }
     setFields(fieldsRef.current)
     const change: Partial<DayFields> = { [key]: value }
     if (now) saver.changeNow(change)
     else saver.change(change)
+  }
+
+  /**
+   * The first change on the page (typing in either box, a weather chip, a face or any helper) ends the Logged note's
+   * Undo for good. The note stays; after this, the meetup goes with Edit, then "Delete meetup".
+   */
+  function markChanged() {
+    if (!logged) return
+    spendLoggedUndo(meetup.id)
+    setUndoOffered(false)
+    setUndoFailed(false)
+  }
+
+  /** Undo in the Logged note: nothing was written yet, so the meetup goes, and the page goes back with it. */
+  async function undoLogged() {
+    setUndoFailed(false)
+    try {
+      await deleteMeetup(meetup.id)
+    } catch {
+      setUndoFailed(true)
+    }
   }
 
   function setFocus(field: 'note' | 'feelings' | null) {
@@ -290,6 +331,7 @@ function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
   }
 
   function openPlace() {
+    markChanged()
     // The field has to be there to take focus inside this tap, so iOS raises (or keeps) the keyboard.
     flushSync(() => setRow('place'))
     placeRef.current?.focus()
@@ -328,6 +370,7 @@ function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
   }
 
   function openPaid() {
+    markChanged()
     setRow('paid')
     announce('Pick who paid.')
   }
@@ -398,6 +441,35 @@ function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
       </header>
 
       <div ref={bodyRef} className="day-page__body" onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 0)}>
+        {/* "Save and write about the day" confirms here, never with a toast over the box being written in. */}
+        {logged && (
+          <div className="day-logged">
+            <span className="check-circle" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M5 12.5l4.5 4.5L19 7.5" pathLength={1} />
+              </svg>
+            </span>
+            {undoFailed ? (
+              <p key="failed" className="day-logged__message" role="alert">
+                {UNDO_FAILED}
+              </p>
+            ) : (
+              <p key="logged" className="day-logged__message">
+                {loggedWith}
+              </p>
+            )}
+            {/* After the first change Undo is gone, but its room stays, so nothing below moves. */}
+            <button
+              type="button"
+              className="text-button day-logged__undo"
+              data-gone={!undoOffered}
+              onClick={() => void undoLogged()}
+            >
+              Undo
+            </button>
+          </div>
+        )}
+
         <p className="day-page__context">{context}</p>
 
         <section className="day-section" aria-labelledby={weatherId}>
@@ -421,8 +493,10 @@ function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
           <p id={hintId} className="day-section__hint">
             Start a line with @ for each place, with a time if you like. Lines under a place go with it.
           </p>
+          {/* When the keyboard comes up for it, its top goes just under the nav bar (useRevealFocusedField). */}
           <GrowField
             ref={dayRef}
+            data-reveal="start"
             minLines={12}
             highlightPlaces
             aria-labelledby={dayId}

@@ -45,9 +45,10 @@ function keepFocus(event: SyntheticEvent) {
 const keepFocusProps = { onPointerDown: keepFocus, onMouseDown: keepFocus }
 
 /**
- * The day page's helper bar, riding on the keyboard: "@ Place", "Now" (today only) and "Paid", or the Place field,
- * or the "Who paid?" chips. Close (for the Place and Who paid rows) and "Hide keyboard" (while the keyboard is up,
- * see DayScreen.css) are pinned at its end, outside the part that scrolls, so they're always on screen.
+ * The day page's helper bar, riding on the keyboard: "@ Place", "Now" (today only) and "Paid", or the Place field
+ * (across the whole bar, with "Now" and "Add" on a line under it), or the "Who paid?" chips. Close (for the Place and
+ * Who paid rows) and "Hide keyboard" (while the keyboard is up, see DayScreen.css) are pinned at its end, outside the
+ * part that scrolls, so they're always on screen.
  *
  * Every control's name starts with the word it shows, so Voice Control's "Tap Now" works: "Now" is named
  * "Now, 9:52 PM", and the "@" in "@ Place" is hidden from VoiceOver.
@@ -71,6 +72,22 @@ export function DayHelperBar(props: DayHelperBarProps) {
 
   return (
     <div className="day-helpers" role="group" aria-label="Writing helpers" data-row={shown ?? 'none'}>
+      {/* The Place field gets a line of its own, so a place and its time show whole as you type them. */}
+      {shown === 'place' && (
+        <input
+          ref={placeRef}
+          className="field day-place"
+          aria-label="Place and time"
+          placeholder="Place, then a time if you like"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="next"
+          value={placeDraft}
+          onChange={(event) => props.onPlaceDraftChange(event.target.value)}
+          onKeyDown={onPlaceKeyDown}
+        />
+      )}
       <div className="day-helpers__row">
         {shown === 'helpers' && (
           <>
@@ -96,19 +113,6 @@ export function DayHelperBar(props: DayHelperBarProps) {
 
         {shown === 'place' && (
           <>
-            <input
-              ref={placeRef}
-              className="field day-place"
-              aria-label="Place and time"
-              placeholder="Place, then a time if you like"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              enterKeyHint="next"
-              value={placeDraft}
-              onChange={(event) => props.onPlaceDraftChange(event.target.value)}
-              onKeyDown={onPlaceKeyDown}
-            />
             {now !== null && (
               <button
                 type="button"

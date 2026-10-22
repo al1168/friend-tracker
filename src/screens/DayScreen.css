@@ -62,6 +62,33 @@
 .day-page__body :is(input, textarea) {
   scroll-margin-block: var(--space-3);
 }
+/* The Logged note: a Paper White box with the toast's check, "Logged with Mariya and Jessie" and an Undo that lasts
+   until the first change on the page. Hidden once used up, Undo keeps its room, so the box keeps its height. */
+.day-logged {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
+  border-radius: var(--radius-group);
+  background: var(--surface);
+}
+.day-logged__message {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-2) 0;
+  font-size: var(--text-subhead);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.day-logged__undo {
+  flex: none;
+  font-weight: 600;
+}
+.day-logged__undo[data-gone='true'] {
+  visibility: hidden;
+}
 .day-page__context {
   margin: 0;
   color: var(--ink-2);
@@ -181,10 +208,18 @@ html:not(.keyboard-open) .day-page__footer[data-bare='true'] {
   opacity: 0.45;
   cursor: default;
 }
+/* The Place row: the field across the whole bar, then a line under it with Now at its start and Add, Close and
+   "Hide keyboard" at its end. The bar grows upward, like Who paid. */
+.day-helpers[data-row='place'] {
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
+}
 .day-place.field {
-  flex: 1;
-  min-width: 6em;
+  width: 100%;
   height: var(--tap);
+}
+.day-helpers[data-row='place'] .day-helpers__add {
+  margin-left: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {

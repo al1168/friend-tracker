@@ -292,6 +292,38 @@ textarea.field {
   background: var(--surface-pressed);
 }
 
+/* The success check: a 24px Peach circle whose check draws itself in over 420ms (a toast, the day page's Logged
+   note). With Reduce Motion it's simply drawn. */
+.check-circle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.check-circle svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.check-circle path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-check 420ms var(--ease-out-quart) 120ms forwards;
+}
+@keyframes draw-check {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 /* A future meetup (the friend page's history, the Meetup page). */
 .upcoming-badge {
   display: inline-block;
@@ -368,5 +400,9 @@ textarea.field {
 @media (prefers-reduced-motion: reduce) {
   .button:active:not(:disabled) {
     transform: none;
+  }
+  .check-circle path {
+    animation: none;
+    stroke-dashoffset: 0;
   }
 }

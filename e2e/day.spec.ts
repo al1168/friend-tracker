@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { OWNER_DAY_TYPED, OWNER_FEELINGS, OWNER_MESSAGE } from '../src/test/dayFixtures.ts'
 import {
   addFriend,
@@ -103,8 +103,14 @@ test('"Save and write about the day" logs the meetup and opens its day; Back lan
 
   await expect(sheet).toBeHidden()
   await expect(page.getByRole('heading', { level: 1, name: 'The day' })).toBeFocused()
-  // The day page shows no toast: nothing covers the box you're about to write in.
+  // The day page shows no toast: nothing covers the box you're about to write in. It says so in its own note, above
+  // the context line, and VoiceOver hears it once.
   await expect(page.locator('.toast')).toHaveCount(0)
+  const note = page.locator('.day-logged')
+  await expect(note).toContainText('Logged with Mariya')
+  await expect(note.getByRole('button', { name: 'Undo' })).toBeVisible()
+  await expect(page.locator('.day-page__body > :first-child')).toHaveClass('day-logged')
+  await expect(announcement(page)).toHaveText('Logged with Mariya.')
   await dayBox(page).fill('Tacos')
   await page.getByRole('button', { name: 'Meal' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
@@ -112,6 +118,72 @@ test('"Save and write about the day" logs the meetup and opens its day; Back lan
   // Opened from Mariya's page, the memory says her name on its back button.
   await page.getByRole('button', { name: 'Mariya' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Mariya' })).toBeVisible()
+})
+
+/** Adds Alex and logs a Coffee with "Save and write about the day", which opens its day page. */
+async function logAndWrite(page: Page) {
+  await addFriend(page, 'Alex')
+  await page.getByRole('button', { name: 'Log meetup' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
+  await sheet.getByLabel('Search all friends').fill('Alex')
+  await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name: 'Alex', exact: true }).click()
+  await sheet.getByRole('button', { name: 'Coffee', exact: true }).click()
+  await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'The day' })).toBeVisible()
+  // Once the sheet has slid away, its own The day box with it.
+  await expect(page.locator('.sheet-layer')).toHaveCount(0)
+}
+
+/** Where a box sits in the day page's body, wherever the body is scrolled. */
+function topInBody(box: Locator) {
+  return box.evaluate((element) => {
+    const body = element.closest('.day-page__body')
+    if (!body) throw new Error('Not in the day page')
+    return element.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop
+  })
+}
+
+test('Undo in the Logged note takes the meetup away before anything is written, back to Friends', async ({ page }) => {
+  await page.goto('/')
+  await logAndWrite(page)
+
+  await page.locator('.day-logged').getByRole('button', { name: 'Undo' }).click()
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
+  await expect.poll(async () => (await readMeetups(page)).length).toBe(0)
+  await expect(page.getByRole('region', { name: 'Recent meetups' })).toHaveCount(0)
+})
+
+test('after the first change the Logged note has no Undo, and nothing below it moves', async ({ page }) => {
+  await page.goto('/')
+  await logAndWrite(page)
+  const note = page.locator('.day-logged')
+  const before = await topInBody(dayBox(page))
+
+  await dayBox(page).focus()
+  await page.keyboard.type('T')
+
+  await expect(note).toContainText('Logged with Alex')
+  await expect(note.getByRole('button', { name: 'Undo' })).toHaveCount(0)
+  expect(Math.abs((await topInBody(dayBox(page))) - before), 'The day stays put').toBeLessThanOrEqual(1)
+  await expect.poll(async () => (await readMeetups(page))[0]?.note).toBe('T')
+})
+
+test('a weather chip is a change too, and the note comes back after the app lock without its Undo', async ({ page }) => {
+  await page.goto('/')
+  await seedAppLock(page, '135790')
+  await logAndWrite(page)
+  const note = page.locator('.day-logged')
+  await page.getByRole('group', { name: 'Weather' }).getByRole('button', { name: 'Rainy' }).click()
+  await expect(note.getByRole('button', { name: 'Undo' })).toHaveCount(0)
+  await expect.poll(async () => (await readMeetups(page))[0]?.weather).toEqual(['rainy'])
+
+  await reopenAfterAWhile(page)
+  await expect(lockHeading(page)).toBeVisible()
+  await enterPin(page, '135790')
+  await expect(page.getByRole('heading', { level: 1, name: 'The day' })).toBeVisible()
+  await expect(note).toContainText('Logged with Alex')
+  await expect(note.getByRole('button', { name: 'Undo' })).toHaveCount(0)
 })
 
 test('a toast belongs to its page: following a link clears it', async ({ page }) => {
@@ -668,8 +740,9 @@ test('the owner’s example, written on the walk home, reads back as their day',
   await pickActivity(sheet, 'Movie')
   await pickActivity(sheet, 'Shopping')
 
-  // 2. "Save and write about the day": the day page slides in, with no toast over it.
+  // 2. "Save and write about the day": the day page slides in, saying so in its note, with no toast over it.
   await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
+  await expect(page.locator('.day-logged')).toContainText('Logged with Mariya, Jessie and Brandon')
   await expect(page.locator('.toast')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Meal' })).toBeVisible()
   await expect(page.getByText('Sat, Oct 3 · with Mariya, Jessie and Brandon', { exact: true })).toBeVisible()
