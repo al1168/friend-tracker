@@ -3,6 +3,7 @@ import {
   addFriend,
   editMeetup,
   friendRow,
+  LARGE_TEXT,
   logMeetup,
   meetupRow,
   openDay,
@@ -133,7 +134,8 @@ test.describe('The day in the meetup sheets', () => {
 
 /**
  * Each tint sits behind its line of a The day box: centered on the line it marks (`lines`, from 0), and starting
- * where the box's text starts, reaching 0.2em past it into the padding.
+ * where the box's text starts. The tint takes no width of its own (it reaches 0.2em past the words with a shadow),
+ * so it can't make the copy behind the box wrap differently from the box.
  */
 async function expectTintsOnLines(box: Locator, tints: Locator, lines: number[]) {
   const text = await box.evaluate((element) => {
@@ -143,7 +145,6 @@ async function expectTintsOnLines(box: Locator, tints: Locator, lines: number[])
       top: rect.top + parseFloat(style.paddingTop),
       left: rect.left + parseFloat(style.paddingLeft),
       lineHeight: parseFloat(style.lineHeight),
-      fontSize: parseFloat(style.fontSize),
     }
   })
   await expect(tints).toHaveCount(lines.length)
@@ -154,8 +155,22 @@ async function expectTintsOnLines(box: Locator, tints: Locator, lines: number[])
     })
     const middle = (tint.top + tint.bottom) / 2
     expect(Math.abs(middle - (text.top + (line + 0.5) * text.lineHeight)), `Tint ${index + 1} is on line ${line + 1}`).toBeLessThanOrEqual(1)
-    expect(Math.abs(tint.left - (text.left - 0.2 * text.fontSize)), `Tint ${index + 1} starts with the text`).toBeLessThanOrEqual(1)
+    expect(Math.abs(tint.left - text.left), `Tint ${index + 1} starts with the text`).toBeLessThanOrEqual(1)
   }
+}
+
+/** How many lines `text` takes in a The day box, laid out by a textarea like the box (not by the copy behind it). */
+function linesInBox(box: Locator, text: string): Promise<number> {
+  return box.evaluate((element: HTMLTextAreaElement, text) => {
+    const twin = element.cloneNode() as HTMLTextAreaElement
+    twin.value = text
+    Object.assign(twin.style, { height: '0', minHeight: '0', visibility: 'hidden' })
+    element.after(twin)
+    const style = getComputedStyle(twin)
+    const lines = (twin.scrollHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)) / parseFloat(style.lineHeight)
+    twin.remove()
+    return Math.round(lines)
+  }, text)
 }
 
 test.describe('@ highlighting', () => {
@@ -187,6 +202,45 @@ test.describe('@ highlighting', () => {
     await dayBox.fill(TYPED.replace('@ some place', 'Some place') + '\n@Park')
     await expect(dayTints).toHaveText(['@Blue willow 3:30', '@Park'])
     await expectTintsOnLines(dayBox, dayTints, [1, 6])
+  })
+
+  test('with forced colors the copy behind the box hides, so the words never show twice, and still sizes it', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ forcedColors: 'active' })
+    await page.goto('/')
+    await addFriend(page, 'Alex')
+    const sheet = await openLogMeetup(page)
+    const box = sheetDay(sheet)
+    const copy = sheet.locator('.grow-field__copy')
+    await box.fill('@Blue willow 3:30')
+    await expect(copy).toHaveCSS('visibility', 'hidden')
+    const before = await box.evaluate((element) => element.getBoundingClientRect().height)
+    await box.fill(['@Blue willow 3:30', 'Kung pao chicken', 'Tea', 'Then a walk', 'Home by ten', 'Jessie paid'].join('\n'))
+    await expect.poll(() => box.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(before)
+  })
+
+  test('a place line that wraps leaves the next place line’s tint on its own words, at any text size', async ({ page }) => {
+    await page.goto('/')
+    await addFriend(page, 'Alex')
+    const sheet = await openLogMeetup(page)
+    const box = sheetDay(sheet)
+    const tints = sheet.locator('mark.day-place')
+    const long = '@The little noodle bar on the corner of Fifth and Main, by the old cinema 3:30'
+    await box.fill(`${long}\n@Park`)
+    await expect(tints).toHaveText([long, '@Park'])
+    for (const size of ['default', 'large'] as const) {
+      if (size === 'large') await page.addStyleTag({ content: LARGE_TEXT })
+      const wrapped = await linesInBox(box, long)
+      expect(wrapped, `At ${size} text the first place line wraps`).toBeGreaterThan(1)
+      // Each of its lines is tinted, from the start of the text.
+      const text = await box.evaluate((element) => element.getBoundingClientRect().left + parseFloat(getComputedStyle(element).paddingLeft))
+      const starts = await tints.first().evaluate((element) => [...element.getClientRects()].map((rect) => rect.left))
+      expect(starts).toHaveLength(wrapped)
+      for (const left of starts) expect(Math.abs(left - text)).toBeLessThanOrEqual(1)
+      // The second place line is on the line straight after it, in the box and in the copy alike.
+      await expectTintsOnLines(box, tints, [0, wrapped])
+    }
   })
 })
 

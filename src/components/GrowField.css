@@ -24,6 +24,13 @@
   overflow-wrap: break-word;
   word-break: normal;
 }
+/* iOS wraps a textarea's text with these two, so its copy does too (only iOS has -webkit-touch-callout). */
+@supports (-webkit-touch-callout: none) {
+  .grow-field__copy {
+    line-break: after-white-space;
+    -webkit-nbsp-mode: space;
+  }
+}
 .grow-field__box {
   width: 100%;
   min-height: calc(var(--min-lines) * 1.5em + 1.5rem);
@@ -45,14 +52,24 @@
   -webkit-user-select: none;
   user-select: none;
 }
-/* Peach Wash behind a place line's words. The side padding and the negative margin cancel out, so the tint reaches
-   a little past the words without moving them; padding above and below never changes the line's height. */
+/* Peach Wash behind a place line's words. It takes no width, so a long place line wraps in the copy exactly as in the
+   box: the tint reaches 0.2em past the words with a shadow on each side, not padding, and the padding above and below
+   never changes the line's height. Each line of a wrapped place line gets its own rounded tint. */
 .day-place {
-  margin: 0 -0.2em;
-  padding: 0.1em 0.2em;
+  padding: 0.1em 0;
   border-radius: 0.35em;
   background: var(--accent-soft);
+  box-shadow:
+    -0.2em 0 0 var(--accent-soft),
+    0.2em 0 0 var(--accent-soft);
   color: inherit;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
+}
+/* Forced colors paint the copy's transparent glyphs in the system's text color, over the box's own: hide the copy
+   (it still sizes the box), tints and all, so the text never shows twice. */
+@media (forced-colors: active) {
+  .grow-field--places .grow-field__copy {
+    visibility: hidden;
+  }
 }
