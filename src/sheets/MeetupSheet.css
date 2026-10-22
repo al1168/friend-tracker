@@ -3,10 +3,11 @@
    a still grid four across. More make a strip two rows high, filled a column at a time, that swipes sideways: it runs
    to the sheet's edges with its first column on the 16px margin (like the meetup type chips), and its columns are a
    little narrower than a quarter of the width, so the fifth peeks in to show there's more. Each column snaps to the
-   margin. */
+   margin. At large text a column is at least 4.25rem, so a first name fits a tile: the grid goes three across at the
+   largest standard size and two at accessibility sizes, and the strip shows fewer, wider columns (still peeking). */
 .friend-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(max(4.25rem, 22%), 1fr));
   gap: var(--space-3) var(--space-2);
 }
 /* The swiping strip scrolls as .snap-strip (base.css) does. The 4px it keeps above and below for a focused tile's ring
@@ -15,7 +16,7 @@
   grid-template-columns: none;
   grid-template-rows: repeat(2, auto);
   grid-auto-flow: column;
-  grid-auto-columns: calc((100% - 3 * var(--space-2)) / 4.4);
+  grid-auto-columns: max(calc((100% - 3 * var(--space-2)) / 4.4), 4.25rem);
   margin-block: calc(-1 * var(--space-1));
   scroll-snap-type: x mandatory;
 }
@@ -65,7 +66,8 @@
   color: var(--on-accent);
   animation: pop-in var(--dur) var(--ease-out-quart);
 }
-/* Up to two lines, so first and last names both show at large text sizes. */
+/* Up to two lines, so first and last names both show at large text sizes, broken between words (inside one only when
+   it's wider than the tile). */
 .friend-tile__name {
   display: -webkit-box;
   max-width: 100%;
@@ -73,7 +75,7 @@
   font-size: var(--text-footnote);
   line-height: 1.25;
   text-align: center;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;

@@ -43,10 +43,13 @@
   opacity: 0.5;
 }
 
+/* An inline-size container, so a row can tell when the group is narrow for its text (accessibility sizes; see
+   MeetupRow.css). The group's width never came from its rows, so this changes nothing else. */
 .inset-group__body {
   overflow: hidden;
   border-radius: var(--radius-group);
   background: var(--surface);
+  container: inset-group / inline-size;
 }
 .inset-group__footer {
   margin: var(--space-2) var(--space-4) 0;
@@ -122,13 +125,14 @@
   flex-direction: column;
   gap: 2px;
 }
+/* Lines break between words, and inside a word only when that word alone is wider than the line. */
 .row__title {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .row__subtitle {
   font-size: var(--text-subhead);
   color: var(--ink-2);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .row__trailing:empty {
   display: none;

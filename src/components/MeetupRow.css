@@ -15,6 +15,33 @@
   object-fit: cover;
 }
 
+/* At accessibility sizes (an inset group under 14.5em wide, in its own text size: above about 24.7px text on a 390pt
+   iPhone, and on every iPhone at the accessibility sizes), a row with a photo puts the photo under its text, so the
+   words keep about 52px more of the line. The badge and the chevron span both rows. */
+@container inset-group (width < 14.5em) {
+  .row:has(> .row__trailing > .meetup-thumb) {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'leading main chevron'
+      'leading thumb chevron';
+    row-gap: var(--space-2);
+  }
+  .row:has(> .row__trailing > .meetup-thumb) > .row__leading {
+    grid-area: leading;
+  }
+  .row:has(> .row__trailing > .meetup-thumb) > .row__main {
+    grid-area: main;
+  }
+  .row:has(> .row__trailing > .meetup-thumb) > .row__trailing {
+    grid-area: thumb;
+    justify-self: start;
+  }
+  .row:has(> .row__trailing > .meetup-thumb) > .row__chevron {
+    grid-area: chevron;
+  }
+}
+
 /* Recent meetups stops a subtitle at two lines, like a Mail preview; WebKit ends the last line with "…". */
 .meetup-row__clamp {
   display: -webkit-box;

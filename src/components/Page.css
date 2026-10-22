@@ -50,6 +50,11 @@
 .navbar[data-compact='true'] .navbar__title {
   opacity: 1;
 }
+/* While the large title (or a friend's hero) shows, the small title is invisible and takes no room, so the back label
+   and the actions get half the bar each: "Friends" shows whole at every text size. */
+.navbar:not([data-compact='true']) .navbar__title {
+  max-width: 0;
+}
 
 /* Same left edge as the search field and inset groups below it. */
 .page__title {
