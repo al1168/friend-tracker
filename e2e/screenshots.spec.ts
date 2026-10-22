@@ -358,7 +358,8 @@ for (const scheme of ['light', 'dark'] as const) {
     })
 
     test('all screens', async ({ page }) => {
-      test.setTimeout(120_000)
+      // The seed and the captures take about two minutes on a busy machine: room to spare.
+      test.setTimeout(180_000)
       await seed(page)
       await captureAll(page, scheme)
     })
@@ -374,14 +375,14 @@ for (const scheme of ['light', 'dark'] as const) {
 }
 
 test('large text', async ({ page }) => {
-  test.setTimeout(120_000)
+  test.setTimeout(180_000)
   await seed(page)
   await page.addStyleTag({ content: LARGE_TEXT })
   await captureAll(page, 'large-text', true)
 })
 
 test('accessibility text size day page and memory', async ({ page }) => {
-  test.setTimeout(120_000)
+  test.setTimeout(180_000)
   await page.goto('/')
   await page.getByRole('complementary', { name: 'Install the app' }).getByRole('button', { name: 'Dismiss' }).click()
   const longName = 'Maximiliana Alexandra Featherstonehaugh-Worthington'
