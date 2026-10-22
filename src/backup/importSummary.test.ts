@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { friend, meetup, meetupPhoto, meetupType } from '../test/fixtures'
 import type { BackupData } from './format'
-import { describeImport, type AppNow } from './importSummary'
+import { describeImport, describeRestoreKept, describeUndoRestore, type AppNow } from './importSummary'
 
 const TODAY = '2026-10-21'
 /** Exported on Wed, Sep 2, 2026, at 9 AM on the phone's clock. */
@@ -33,7 +33,7 @@ describe('describeImport', () => {
       'Backup from Wed, Sep 2: 15 friends, 30 meetups, 6 photos.',
       'In the app now: 15 friends, 39 meetups, 9 photos.',
       "9 meetups in the app now aren't in this backup.",
-      'Everything in the app now will be replaced.',
+      'Everything in the app now will be replaced. You can undo this in Settings for 7 days.',
     ])
   })
 
@@ -71,6 +71,27 @@ describe('describeImport', () => {
     expect(line(['f0', 'x1', 'x2'], ['m0'])).toBe("2 friends in the app now aren't in this backup.")
     expect(line(['x1'], ['m0'])).toBe("1 friend in the app now isn't in this backup.")
     // Nothing missing: straight on to the last line.
-    expect(line(['f0'], ['m0'])).toBe('Everything in the app now will be replaced.')
+    expect(line(['f0'], ['m0'])).toBe('Everything in the app now will be replaced. You can undo this in Settings for 7 days.')
+  })
+})
+
+describe('the undo of a restore', () => {
+  const kept = { takenAt: new Date(2026, 9, 21, 9).toISOString(), friends: 15, meetups: 39, photos: 9 }
+
+  it('says what it puts back, and until when', () => {
+    expect(describeRestoreKept(kept, TODAY)).toBe('Puts back the data from before Wed, Oct 21. Kept until Wed, Oct 28.')
+  })
+
+  it('compares what the app held before the restore with what it holds now', () => {
+    expect(describeUndoRestore(kept, { friends: 15, meetups: 30, photos: 6 }, TODAY).split('\n')).toEqual([
+      'Before Wed, Oct 21: 15 friends, 39 meetups, 9 photos.',
+      'In the app now: 15 friends, 30 meetups, 6 photos.',
+      'Everything in the app now will be replaced.',
+    ])
+    expect(describeUndoRestore({ ...kept, photos: 0 }, { friends: 1, meetups: 2, photos: 0 }, TODAY).split('\n')).toEqual([
+      'Before Wed, Oct 21: 15 friends, 39 meetups.',
+      'In the app now: 1 friend, 2 meetups.',
+      'Everything in the app now will be replaced.',
+    ])
   })
 })

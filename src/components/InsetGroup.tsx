@@ -74,6 +74,8 @@ interface RowProps {
   disabled?: boolean
   /** The id of text that describes this button row (for a disabled one: why it is). */
   describedBy?: string
+  /** A button row's subtitle is read as its description, after its name (the title). */
+  subtitleDescribes?: boolean
   chevron?: boolean
   accent?: boolean
   destructive?: boolean
@@ -92,11 +94,15 @@ export function Row({
   switchOn,
   disabled,
   describedBy,
+  subtitleDescribes,
   chevron,
   accent,
   destructive,
   ref,
 }: RowProps) {
+  const titleId = useId()
+  const subtitleId = useId()
+  const describing = subtitleDescribes === true && subtitle !== undefined
   const className = [
     'row',
     (to || onClick) && 'row--interactive',
@@ -110,8 +116,14 @@ export function Row({
     <>
       {leading && <span className="row__leading">{leading}</span>}
       <span className="row__main">
-        <span className="row__title">{title}</span>
-        {subtitle && <span className="row__subtitle">{subtitle}</span>}
+        <span className="row__title" id={describing ? titleId : undefined}>
+          {title}
+        </span>
+        {subtitle && (
+          <span className="row__subtitle" id={describing ? subtitleId : undefined}>
+            {subtitle}
+          </span>
+        )}
       </span>
       {trailing !== undefined && <span className="row__trailing">{trailing}</span>}
       {switchOn !== undefined && <span className="switch" data-on={switchOn} aria-hidden="true" />}
@@ -137,7 +149,8 @@ export function Row({
         className={className}
         onClick={onClick}
         disabled={disabled}
-        aria-describedby={describedBy}
+        aria-labelledby={describing ? titleId : undefined}
+        aria-describedby={describing ? subtitleId : describedBy}
         role={switchOn === undefined ? undefined : 'switch'}
         aria-checked={switchOn}
       >

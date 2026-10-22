@@ -744,6 +744,8 @@ test('the owner’s example, written on the walk home, reads back as their day',
   await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
   await expect(page.locator('.day-logged')).toContainText('Logged with Mariya, Jessie and Brandon')
   await expect(page.locator('.toast')).toHaveCount(0)
+  // The note shows at once, while the sheet is still sliding away with its own Meal chip.
+  await expect(page.locator('.sheet-layer')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Meal' })).toBeVisible()
   await expect(page.getByText('Sat, Oct 3 · with Mariya, Jessie and Brandon', { exact: true })).toBeVisible()
 

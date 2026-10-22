@@ -1,4 +1,5 @@
-import { formatDate, toISODate, type ISODate } from '../lib/dates'
+import type { RestoreUndoInfo } from '../db/settings'
+import { addDays, formatDate, toISODate, type ISODate } from '../lib/dates'
 import { plural } from '../lib/text'
 import type { BackupData } from './format'
 
@@ -20,6 +21,8 @@ export interface AppNow extends DataCounts {
 
 /** The last line of a confirm that replaces the app's data. */
 const REPLACED = 'Everything in the app now will be replaced.'
+/** How long a restore can be undone (RESTORE_UNDO_DAYS in storage.ts). */
+const UNDO_DAYS = 7
 
 /** "15 friends, 30 meetups, 6 photos", the photos only `withPhotos` (when either side has any). */
 function countList(counts: DataCounts, withPhotos: boolean): string {
@@ -60,7 +63,27 @@ export function describeImport(backup: BackupData, exportedAt: string | null, ap
   if (app.friends > 0 || app.meetups > 0) {
     const lost = lostLine(backup, app)
     if (lost) lines.push(lost)
-    lines.push(REPLACED)
+    lines.push(`${REPLACED} You can undo this in Settings for ${UNDO_DAYS} days.`)
   }
+  return lines.join('\n')
+}
+
+/** The local date a restore's snapshot was taken. */
+function takenOn(kept: RestoreUndoInfo): ISODate {
+  return toISODate(new Date(kept.takenAt))
+}
+
+/** The "Undo restore" row's subtitle: "Puts back the data from before Wed, Oct 21. Kept until Wed, Oct 28." */
+export function describeRestoreKept(kept: RestoreUndoInfo, today: ISODate): string {
+  const taken = takenOn(kept)
+  const until = addDays(taken, UNDO_DAYS)
+  return `Puts back the data from before ${formatDate(taken, today)}. Kept until ${formatDate(until, today)}.`
+}
+
+/** The "Undo the restore?" confirm's message: what the app held before the restore, what it holds now, and that it goes. */
+export function describeUndoRestore(kept: RestoreUndoInfo, app: DataCounts, today: ISODate): string {
+  const withPhotos = kept.photos > 0 || app.photos > 0
+  const lines = [`Before ${formatDate(takenOn(kept), today)}: ${countList(kept, withPhotos)}.`, appNowLine(app, withPhotos)]
+  if (app.friends > 0 || app.meetups > 0) lines.push(REPLACED)
   return lines.join('\n')
 }

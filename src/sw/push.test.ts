@@ -1,3 +1,4 @@
+import Dexie from 'dexie'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db, resetDatabase } from '../db/db'
 import { friend } from '../test/fixtures'
@@ -124,6 +125,31 @@ describe('onPush', () => {
     onPush(push.event, { registration, readFriends, now: () => NIGHT_BEFORE, timeoutMs: 20 })
     await push.settled()
     expect(registration.showNotification.mock.calls[0][0]).toBe('🎂 A birthday is coming up')
+  })
+
+  it('still names the friend when the worker is older than the database (version 3 code, version 4 data)', async () => {
+    await db.friends.add(withBirthday('alex', 'Alex', { month: 10, day: 14, year: 1990 }))
+    db.close()
+    // The worker as it was before version 4: it declares version 3 of the same database.
+    const old = new Dexie('friend-tracker')
+    old.version(3).stores({
+      friends: 'id, groupId',
+      groups: 'id',
+      meetupTypes: 'id, order',
+      meetups: 'id, date, typeId, *friendIds',
+      settings: 'key',
+      meetupPhotos: 'id, meetupId, [meetupId+order]',
+    })
+    const registration = fakeRegistration()
+    const push = pushEvent(jsonData({ kind: 'birthday' }))
+    try {
+      onPush(push.event, { registration, readFriends: () => old.table('friends').toArray(), now: () => NIGHT_BEFORE })
+      await push.settled()
+    } finally {
+      old.close()
+      await db.open()
+    }
+    expect(registration.showNotification.mock.calls[0][0]).toBe("🎂 Alex's birthday starts in 5 minutes")
   })
 
   it('shows the fallback when nobody has a birthday that night', async () => {

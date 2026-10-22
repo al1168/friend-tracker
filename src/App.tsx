@@ -1,4 +1,5 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router'
+import { RestoreUndoCleanup } from './backup/RestoreUndoCleanup'
 import { ActionSheetProvider } from './components/ActionSheet'
 import { PlaceMemoryProvider } from './components/PlaceMemory'
 import { ScrollManager } from './components/ScrollManager'
@@ -28,6 +29,7 @@ export default function App() {
               <MeetupIdsWithPhotosProvider>
                 <ScrollManager />
                 <ReminderSync />
+                <RestoreUndoCleanup />
                 <main className="app">
                   <Routes>
                     <Route path="/" element={<FriendsScreen />} />

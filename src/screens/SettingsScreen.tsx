@@ -1,21 +1,23 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { exportBackup, shareBackupFile } from '../backup/exportBackup'
-import { describeImport } from '../backup/importSummary'
+import { describeImport, describeRestoreKept, describeUndoRestore } from '../backup/importSummary'
 import { meetupsSinceBackup } from '../backup/nudge'
-import { parseBackupFile, readAllData, replaceAllData } from '../backup/storage'
+import { parseBackupFile, readAllData, restoreBackup, restoreUndoExpired, undoRestore } from '../backup/storage'
 import { useBackupDot } from '../backup/useBackupDot'
 import { useConfirm } from '../components/ActionSheet'
 import { InsetGroup, Row } from '../components/InsetGroup'
 import { Page } from '../components/Page'
 import { useToast } from '../components/Toast'
 import { useFriends, useGroups, useMeetups, useMeetupTypes, usePhotoCount, useSetting } from '../data/hooks'
-import { setSetting } from '../db/settings'
+import { setSetting, type RestoreUndoInfo } from '../db/settings'
 import { useToday } from '../hooks/useToday'
 import { describeBackup } from '../lib/text'
 import { AppLockSection } from '../lock/AppLockSection'
 import { usePasskeyAvailable } from '../lock/usePasskeyAvailable'
 import { RemindersSection } from '../reminders/RemindersSection'
 import './SettingsScreen.css'
+
+const UNDO_FAILED = "Couldn't undo. Please try again."
 
 export function SettingsScreen() {
   const friends = useFriends()
@@ -27,6 +29,7 @@ export function SettingsScreen() {
   const lastBackupAt = useSetting('lastBackupAt')
   const appLock = useSetting('appLock')
   const birthdayReminders = useSetting('birthdayReminders')
+  const restoreUndo = useSetting('restoreUndo')
   const passkeyAvailable = usePasskeyAvailable()
   const today = useToday()
   const toast = useToast()
@@ -44,7 +47,28 @@ export function SettingsScreen() {
 
   if (!friends || !groups || !meetupTypes || !meetups || lastBackupAt === undefined) return null
   if (appLock === undefined || passkeyAvailable === undefined || birthdayReminders === undefined) return null
-  if (photoCount === undefined) return null
+  if (photoCount === undefined || restoreUndo === undefined) return null
+  // Offered for 7 days after a restore, even before the snapshot is deleted at the next start.
+  const undoable = restoreUndo !== null && !restoreUndoExpired(restoreUndo, new Date()) ? restoreUndo : null
+
+  /** Undo for a restore: from the toast, or from "Undo restore" here. A failed one keeps the snapshot to try again. */
+  const undoTheRestore = async () => {
+    try {
+      if (await undoRestore()) toast({ message: 'Restore undone' })
+    } catch {
+      toast({ message: UNDO_FAILED, tone: 'plain' })
+    }
+  }
+
+  const confirmUndoRestore = async (kept: RestoreUndoInfo) => {
+    const confirmed = await confirm({
+      title: 'Undo the restore?',
+      message: describeUndoRestore(kept, { friends: friends.length, meetups: meetups.length, photos: photoCount }, today),
+      confirmLabel: 'Undo restore',
+      destructive: true,
+    })
+    if (confirmed) await undoTheRestore()
+  }
 
   // Shares a backup made earlier, from the fresh tap on the toast's Share action.
   const shareReadyBackup = async (file: File) => {
@@ -113,8 +137,12 @@ export function SettingsScreen() {
     })
     if (!confirmed) return
     try {
-      await replaceAllData(data)
-      toast({ message: 'Backup restored' })
+      const { undoable: canUndo } = await restoreBackup(data, new Date())
+      toast(
+        canUndo
+          ? { message: 'Backup restored', actionLabel: 'Undo', onAction: () => void undoTheRestore() }
+          : { message: 'Backup restored' },
+      )
     } catch {
       toast({ message: "Couldn't restore the backup. Nothing was changed.", tone: 'plain' })
     }
@@ -135,6 +163,15 @@ export function SettingsScreen() {
       >
         <Row title="Export backup" accent onClick={exportData} />
         <Row title="Import backup" accent onClick={() => fileInput.current?.click()} />
+        {undoable && (
+          <Row
+            title="Undo restore"
+            subtitle={describeRestoreKept(undoable, today)}
+            subtitleDescribes
+            accent
+            onClick={() => void confirmUndoRestore(undoable)}
+          />
+        )}
       </InsetGroup>
       <input
         ref={fileInput}

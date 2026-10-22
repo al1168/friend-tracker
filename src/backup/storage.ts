@@ -1,11 +1,24 @@
-import { db } from '../db/db'
+import Dexie from 'dexie'
+import { db, type DataTable, type RestoreUndoRow } from '../db/db'
 import { forgetPhotoThumbs } from '../db/meetups'
-import type { MeetupPhoto } from '../types'
+import { getSetting, setSetting, type RestoreUndoInfo } from '../db/settings'
+import type { Friend, Group, Meetup, MeetupPhoto, MeetupType } from '../types'
 import { parseBackup, type BackupData, type ParseResult } from './format'
+
+/** How long a restore can be undone. */
+export const RESTORE_UNDO_DAYS = 7
+const RESTORE_UNDO_MS = RESTORE_UNDO_DAYS * 24 * 60 * 60 * 1000
+/** Photos are copied for an undo this many at a time, so it holds at most this many full images at once. */
+const PHOTO_BATCH = 20
+
+/** The five tables a backup holds and a restore replaces, by name: never restoreUndo or settings. */
+function dataTables() {
+  return [db.friends, db.groups, db.meetupTypes, db.meetups, db.meetupPhotos]
+}
 
 /** Reads everything in one snapshot, every full photo included: only for backups and tests. */
 export async function readAllData(): Promise<BackupData> {
-  return db.transaction('r', [db.friends, db.groups, db.meetupTypes, db.meetups, db.meetupPhotos], async () => {
+  return db.transaction('r', dataTables(), async () => {
     const [friends, groups, meetupTypes, meetups, meetupPhotos] = await Promise.all([
       db.friends.toArray(),
       db.groups.toArray(),
@@ -22,24 +35,129 @@ export function readAllPhotos(): Promise<MeetupPhoto[]> {
   return db.meetupPhotos.toArray()
 }
 
-/** Replaces everything in one transaction. If anything fails, nothing changes. */
+/** Empties the five tables and writes `data` into them, inside the caller's transaction. */
+async function writeAllData(data: BackupData): Promise<void> {
+  await Promise.all(dataTables().map((table) => table.clear()))
+  await db.groups.bulkAdd(data.groups)
+  await db.meetupTypes.bulkAdd(data.meetupTypes)
+  await db.friends.bulkAdd(data.friends)
+  await db.meetups.bulkAdd(data.meetups)
+  await db.meetupPhotos.bulkAdd(data.meetupPhotos)
+}
+
+/** Replaces everything in one transaction. If anything fails, nothing changes. Keeps nothing to undo with. */
 export async function replaceAllData(data: BackupData): Promise<void> {
-  await db.transaction('rw', [db.friends, db.groups, db.meetupTypes, db.meetups, db.meetupPhotos], async () => {
-    await Promise.all([
-      db.friends.clear(),
-      db.groups.clear(),
-      db.meetupTypes.clear(),
-      db.meetups.clear(),
-      db.meetupPhotos.clear(),
-    ])
-    await db.groups.bulkAdd(data.groups)
-    await db.meetupTypes.bulkAdd(data.meetupTypes)
-    await db.friends.bulkAdd(data.friends)
-    await db.meetups.bulkAdd(data.meetups)
-    await db.meetupPhotos.bulkAdd(data.meetupPhotos)
-  })
+  await db.transaction('rw', dataTables(), () => writeAllData(data))
   // Every photo was replaced, so no thumbnail kept in memory can be trusted.
   forgetPhotoThumbs()
+}
+
+function undoRows(table: DataTable, rows: readonly { id: string }[]): RestoreUndoRow[] {
+  return rows.map((row) => ({ table, id: row.id, row }))
+}
+
+/**
+ * Copies what's in the five tables into restoreUndo, inside the caller's transaction, and says how many photos it
+ * copied. Friends, groups, types and meetups are small and copied whole (friends' photos are 400px avatars, and
+ * meetups hold no images); meetup photos are copied 20 at a time by primary key, so this holds at most 20 full images
+ * however many the app has.
+ */
+async function keepForUndo(): Promise<number> {
+  const [friends, groups, meetupTypes, meetups] = await Promise.all([
+    db.friends.toArray(),
+    db.groups.toArray(),
+    db.meetupTypes.toArray(),
+    db.meetups.toArray(),
+  ])
+  await db.restoreUndo.bulkAdd([
+    ...undoRows('friends', friends),
+    ...undoRows('groups', groups),
+    ...undoRows('meetupTypes', meetupTypes),
+    ...undoRows('meetups', meetups),
+  ])
+  let photos = 0
+  let lastId: string | null = null
+  for (;;) {
+    const batch: MeetupPhoto[] = await (lastId === null
+      ? db.meetupPhotos.orderBy(':id').limit(PHOTO_BATCH).toArray()
+      : db.meetupPhotos.where(':id').above(lastId).limit(PHOTO_BATCH).toArray())
+    if (batch.length === 0) return photos
+    await db.restoreUndo.bulkAdd(undoRows('meetupPhotos', batch))
+    photos += batch.length
+    lastId = batch[batch.length - 1].id
+  }
+}
+
+/**
+ * Restores a backup over everything in the app. First, in the same transaction, it keeps what it replaces (friends,
+ * groups, meetup types, meetups and their photos) in restoreUndo, replacing any older snapshot, so either both happen
+ * or neither. Into an app with no friends and no meetups (a new phone) there's nothing to keep: it keeps none, drops
+ * any older one, and the restore can't be undone. Settings data is never part of it, as it's never part of a backup.
+ */
+export async function restoreBackup(data: BackupData, now: Date): Promise<{ undoable: boolean }> {
+  const undoable = await db.transaction('rw', [...dataTables(), db.restoreUndo, db.settings], async () => {
+    await db.restoreUndo.clear()
+    const [friends, meetups] = await Promise.all([db.friends.count(), db.meetups.count()])
+    const kept: RestoreUndoInfo | null =
+      friends > 0 || meetups > 0 ? { takenAt: now.toISOString(), friends, meetups, photos: await keepForUndo() } : null
+    await setSetting('restoreUndo', kept)
+    await writeAllData(data)
+    return kept !== null
+  })
+  forgetPhotoThumbs()
+  return { undoable }
+}
+
+/** The rows restoreUndo keeps of one table (photos: up to `limit` after `afterId`). */
+function keptRows(table: DataTable, afterId: string | null = null, limit = Infinity): Promise<RestoreUndoRow[]> {
+  const rows = db.restoreUndo
+    .where('[table+id]')
+    .between([table, afterId ?? Dexie.minKey], [table, Dexie.maxKey], afterId === null, true)
+  return (Number.isFinite(limit) ? rows.limit(limit) : rows).toArray()
+}
+
+/**
+ * Undoes the last restore: puts back exactly what the app held just before it, in one transaction, and lets the
+ * snapshot go. Photos are copied back 20 at a time. Resolves false when there's no snapshot.
+ */
+export async function undoRestore(): Promise<boolean> {
+  const undone = await db.transaction('rw', [...dataTables(), db.restoreUndo, db.settings], async () => {
+    if ((await getSetting('restoreUndo')) === null || (await db.restoreUndo.count()) === 0) return false
+    await Promise.all(dataTables().map((table) => table.clear()))
+    await db.groups.bulkAdd((await keptRows('groups')).map(({ row }) => row as Group))
+    await db.meetupTypes.bulkAdd((await keptRows('meetupTypes')).map(({ row }) => row as MeetupType))
+    await db.friends.bulkAdd((await keptRows('friends')).map(({ row }) => row as Friend))
+    await db.meetups.bulkAdd((await keptRows('meetups')).map(({ row }) => row as Meetup))
+    let lastId: string | null = null
+    for (;;) {
+      const batch = await keptRows('meetupPhotos', lastId, PHOTO_BATCH)
+      if (batch.length === 0) break
+      await db.meetupPhotos.bulkAdd(batch.map(({ row }) => row as MeetupPhoto))
+      lastId = batch[batch.length - 1].id
+    }
+    await db.restoreUndo.clear()
+    await setSetting('restoreUndo', null)
+    return true
+  })
+  if (undone) forgetPhotoThumbs()
+  return undone
+}
+
+/** Whether a restore's snapshot is past its 7 days: Settings stops offering it even before it's deleted. */
+export function restoreUndoExpired(kept: RestoreUndoInfo, now: Date): boolean {
+  const taken = Date.parse(kept.takenAt)
+  return Number.isNaN(taken) || now.getTime() - taken >= RESTORE_UNDO_MS
+}
+
+/** Deletes a restore's snapshot once it's 7 days old (and any rows no setting names). Runs on every app start. */
+export async function forgetOldRestore(now: Date): Promise<void> {
+  await db.transaction('rw', db.restoreUndo, db.settings, async () => {
+    const kept = await getSetting('restoreUndo')
+    if (kept !== null && !restoreUndoExpired(kept, now)) return
+    if (kept === null && (await db.restoreUndo.count()) === 0) return
+    await db.restoreUndo.clear()
+    await setSetting('restoreUndo', null)
+  })
 }
 
 export async function parseBackupFile(file: Blob): Promise<ParseResult> {

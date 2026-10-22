@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { addFriend, friendLink, goToTab, logMeetup } from './helpers.ts'
+import { addFriend, friendLink, goToTab, logMeetup, readMeetupPhotos, readMeetups, tinyPhoto } from './helpers.ts'
 
 /** Forces the download path for a backup: the share sheet can't be driven in tests. */
 async function downloadBackups(page: Page) {
@@ -94,10 +94,137 @@ test('exports and imports a backup', async ({ page }) => {
   await page.locator('input[type="file"]').setInputFiles(backupPath)
   await page.getByRole('alertdialog').getByRole('button', { name: 'Replace all data' }).click()
   await expect(page.getByRole('status')).toContainText('Backup restored')
+  await expect(page.getByRole('status').getByRole('button', { name: 'Undo' })).toBeVisible()
 
+  // The toast belongs to Settings: going to Friends clears it.
   await goToTab(page, 'Friends')
+  await expect(page.locator('.toast')).toHaveCount(0)
   await expect(friendLink(page, 'Alex')).toBeVisible()
   await expect(friendLink(page, 'Kim')).toHaveCount(0)
+})
+
+/** The rows kept to undo a restore, counted straight from IndexedDB. */
+async function countRestoreUndo(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      new Promise<number>((resolve, reject) => {
+        const request = indexedDB.open('friend-tracker')
+        request.onerror = () => reject(request.error)
+        request.onsuccess = () => {
+          const database = request.result
+          const count = database.transaction('restoreUndo').objectStore('restoreUndo').count()
+          count.onsuccess = () => {
+            database.close()
+            resolve(count.result)
+          }
+          count.onerror = () => reject(count.error)
+        }
+      }),
+  )
+}
+
+/**
+ * On Wed, Oct 21: Alex and a Coffee with a photo, backed up; then Kim and a Meal with her, which the backup doesn't
+ * have. Returns the backup file.
+ */
+async function backUpThenAddMore(page: Page): Promise<string> {
+  await downloadBackups(page)
+  await page.clock.setFixedTime(new Date(2026, 9, 21, 10))
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await logMeetup(page, ['Alex'], { photos: [tinyPhoto('one.png')] })
+  const backupPath = await exportFile(page)
+  await goToTab(page, 'Friends')
+  await addFriend(page, 'Kim')
+  await logMeetup(page, ['Kim'], { type: 'Meal', photos: [tinyPhoto('two.png'), tinyPhoto('three.png')] })
+  return backupPath
+}
+
+/** Imports a backup file from Settings, confirming. */
+async function restore(page: Page, backupPath: string) {
+  await goToTab(page, 'Settings')
+  await page.locator('input[type="file"]').setInputFiles(backupPath)
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Replace all data' }).click()
+  await expect(page.getByRole('status')).toContainText('Backup restored')
+}
+
+test('Undo on the "Backup restored" toast puts everything back', async ({ page }) => {
+  const backupPath = await backUpThenAddMore(page)
+  await restore(page, backupPath)
+  expect(await readMeetups(page)).toHaveLength(1)
+
+  await page.getByRole('status').getByRole('button', { name: 'Undo' }).click()
+
+  await expect(page.getByRole('status')).toContainText('Restore undone')
+  await expect.poll(async () => (await readMeetups(page)).length).toBe(2)
+  expect(await readMeetupPhotos(page)).toHaveLength(3)
+  expect(await countRestoreUndo(page)).toBe(0)
+  await expect(page.getByRole('button', { name: 'Undo restore' })).toHaveCount(0)
+  await goToTab(page, 'Friends')
+  await expect(friendLink(page, 'Kim')).toBeVisible()
+  await expect(friendLink(page, 'Alex')).toBeVisible()
+})
+
+test('"Undo restore" in Settings asks first, puts everything back, and then goes', async ({ page }) => {
+  const backupPath = await backUpThenAddMore(page)
+  await restore(page, backupPath)
+  // The toast goes with the page; Settings still offers the undo.
+  await goToTab(page, 'Friends')
+  await expect(friendLink(page, 'Kim')).toHaveCount(0)
+  await goToTab(page, 'Settings')
+
+  const row = page.getByRole('button', { name: 'Undo restore', exact: true })
+  await expect(row).toHaveAccessibleDescription('Puts back the data from before Wed, Oct 21. Kept until Wed, Oct 28.')
+  await row.click()
+  const confirm = page.getByRole('alertdialog', { name: 'Undo the restore?' })
+  const message = await confirm.locator('.action-sheet__message').evaluate((element) => element.textContent)
+  expect(message?.split('\n')).toEqual([
+    'Before Wed, Oct 21: 2 friends, 2 meetups, 3 photos.',
+    'In the app now: 1 friend, 1 meetup, 1 photo.',
+    'Everything in the app now will be replaced.',
+  ])
+  await confirm.getByRole('button', { name: 'Undo restore' }).click()
+
+  await expect(page.getByRole('status')).toContainText('Restore undone')
+  await expect(row).toHaveCount(0)
+  await expect.poll(async () => (await readMeetups(page)).length).toBe(2)
+  expect(await readMeetupPhotos(page)).toHaveLength(3)
+})
+
+test('a restore can be undone for 7 days, then its snapshot is gone', async ({ page }) => {
+  const backupPath = await backUpThenAddMore(page)
+  await restore(page, backupPath)
+  expect(await countRestoreUndo(page)).toBeGreaterThan(0)
+
+  // Six days on, still offered.
+  await page.clock.setFixedTime(new Date(2026, 9, 27, 10))
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Undo restore', exact: true })).toBeVisible()
+
+  // Seven days on, the next start lets it go.
+  await page.clock.setFixedTime(new Date(2026, 9, 28, 10))
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Import backup' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Undo restore', exact: true })).toHaveCount(0)
+  await expect.poll(() => countRestoreUndo(page)).toBe(0)
+})
+
+test('a restore into a fresh app has nothing to undo', async ({ page }) => {
+  const backupPath = await backUpThenAddMore(page)
+  await page.evaluate(() => indexedDB.deleteDatabase('friend-tracker'))
+  await page.reload()
+  await expect(page.getByText('Add the people you want to keep up with.')).toBeVisible()
+
+  await goToTab(page, 'Settings')
+  await page.locator('input[type="file"]').setInputFiles(backupPath)
+  const confirm = page.getByRole('alertdialog')
+  await expect(confirm).toContainText('No friends or meetups in the app yet.')
+  await expect(confirm).not.toContainText('undo')
+  await confirm.getByRole('button', { name: 'Replace all data' }).click()
+  await expect(page.getByRole('status')).toContainText('Backup restored')
+  await expect(page.getByRole('status').getByRole('button')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Undo restore', exact: true })).toHaveCount(0)
+  expect(await countRestoreUndo(page)).toBe(0)
 })
 
 test('a quiet dot on the Settings tab suggests a backup once meetups are logged after one 30 days old', async ({
@@ -166,7 +293,7 @@ test('the import confirm compares the backup with the app', async ({ page }) => 
     'Backup from Wed, Sep 2: 1 friend, 1 meetup.',
     'In the app now: 2 friends, 3 meetups.',
     "1 friend and 2 meetups in the app now aren't in this backup.",
-    'Everything in the app now will be replaced.',
+    'Everything in the app now will be replaced. You can undo this in Settings for 7 days.',
   ])
   // One line each.
   await expect(confirm.locator('.action-sheet__message')).toHaveCSS('white-space', 'pre-line')

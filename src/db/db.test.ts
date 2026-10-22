@@ -44,7 +44,7 @@ describe('upgrade from version 1', () => {
     expect(await db.friends.get('f1')).toEqual({ ...v1Friend, likes: [], dislikes: [], birthday: null })
     expect(await db.friends.get('f2')).toEqual({ ...nullListsFriend, likes: [], dislikes: [], birthday: null })
     // Dexie stores the version times 10. Read it from the native database to prove the upgrades ran.
-    expect(db.backendDB().version).toBe(30)
+    expect(db.backendDB().version).toBe(40)
   })
 })
 
@@ -102,13 +102,14 @@ describe('upgrade from version 2', () => {
 
     // Dexie stores the version times 10. Read it from the native database to prove the upgrade ran.
     const native = db.backendDB()
-    expect(native.version).toBe(30)
+    expect(native.version).toBe(40)
     expect([...native.objectStoreNames].sort()).toEqual([
       'friends',
       'groups',
       'meetupPhotos',
       'meetupTypes',
       'meetups',
+      'restoreUndo',
       'settings',
     ])
     const photoIndexes = native.transaction('meetupPhotos').objectStore('meetupPhotos').indexNames
@@ -126,6 +127,112 @@ describe('upgrade from version 2', () => {
     expect(await getSetting('birthdayReminders')).toEqual(v2Reminders)
   })
 })
+
+/** Version 3 of the database's stores, as the app (and its service worker) declared them before version 4. */
+const V3_STORES = {
+  friends: 'id, groupId',
+  groups: 'id',
+  meetupTypes: 'id, order',
+  meetups: 'id, date, typeId, *friendIds',
+  settings: 'key',
+  meetupPhotos: 'id, meetupId, [meetupId+order]',
+}
+
+describe('upgrade from version 3', () => {
+  it('adds the restoreUndo store and changes nothing else', async () => {
+    const v3Friend = {
+      id: 'f1',
+      name: 'Alex',
+      groupId: null,
+      photo: null,
+      notes: '',
+      likes: [],
+      dislikes: [],
+      birthday: { month: 3, day: 14, year: null },
+      createdAt: '2026-01-01T00:00:00.000Z',
+    }
+    const v3Meetup = {
+      id: 'm1',
+      date: '2026-09-01',
+      typeId: 'type-coffee',
+      friendIds: ['f1'],
+      note: '@Blue willow 3:30',
+      activities: ['Karaoke'],
+      weather: ['rainy'],
+      mood: 'okay',
+      feelings: 'Good',
+      createdAt: '2026-09-01T12:00:00.000Z',
+    }
+    const v3Photo = {
+      id: 'p1',
+      meetupId: 'm1',
+      order: 0,
+      full: 'data:image/jpeg;base64,FULL',
+      thumb: 'data:image/jpeg;base64,THUMB',
+      width: 4,
+      height: 3,
+      createdAt: '2026-09-01T12:00:00.000Z',
+    }
+    // Build the database as version 3 of the app left it, under the app's own name.
+    db.close()
+    await Dexie.delete('friend-tracker')
+    const v3 = new Dexie('friend-tracker')
+    v3.version(3).stores(V3_STORES)
+    try {
+      await v3.table('friends').add(v3Friend)
+      await v3.table('meetups').add(v3Meetup)
+      await v3.table('meetupPhotos').add(v3Photo)
+      await v3.table('settings').put({ key: 'lastBackupAt', value: '2026-10-02T10:00:00.000Z' })
+    } finally {
+      v3.close()
+    }
+
+    await db.open()
+
+    const native = db.backendDB()
+    expect(native.version).toBe(40)
+    const store = native.transaction('restoreUndo').objectStore('restoreUndo')
+    expect(store.keyPath).toEqual(['table', 'id'])
+    expect([...store.indexNames]).toEqual([])
+    expect(await db.restoreUndo.count()).toBe(0)
+    expect(await db.friends.get('f1')).toEqual(v3Friend)
+    expect(await db.meetups.get('m1')).toEqual(v3Meetup)
+    expect(await db.meetupPhotos.get('p1')).toEqual(v3Photo)
+    expect(await getSetting('lastBackupAt')).toBe('2026-10-02T10:00:00.000Z')
+    expect(await getSetting('restoreUndo')).toBeNull()
+  })
+
+  it('code still on version 3 (the service worker before it updates, a second tab) reads a version 4 database', async () => {
+    await db.friends.add({ ...friendRecord('f1', 'Alex'), birthday: { month: 10, day: 14, year: null } })
+    await db.restoreUndo.add({ table: 'friends', id: 'gone', row: friendRecord('gone', 'Gone') })
+    db.close()
+    const old = new Dexie('friend-tracker')
+    old.version(3).stores(V3_STORES)
+    try {
+      // Dexie 4 opens a database newer than it declares (no VersionError), and reads its stores as before.
+      expect((await old.table('friends').toArray()).map((row: Friend) => row.name)).toEqual(['Alex'])
+      expect(old.backendDB().version).toBe(40)
+    } finally {
+      old.close()
+      await db.open()
+    }
+  })
+})
+
+/** A complete friend record, as the database holds one. */
+function friendRecord(id: string, name: string): Friend {
+  return {
+    id,
+    name,
+    groupId: null,
+    photo: null,
+    notes: '',
+    likes: [],
+    dislikes: [],
+    birthday: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  }
+}
 
 describe('meetups read from the database', () => {
   /** Writes rows the way version 3 of the database holds them, without the reading hook or the app's types. */

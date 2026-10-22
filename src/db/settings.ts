@@ -2,6 +2,14 @@ import { LOCK_OFF, NO_FAILURES, type AppLock, type LockFailures } from '../lock/
 import { REMINDERS_OFF, type BirthdayReminders } from '../reminders/types'
 import { db } from './db'
 
+/** What the last restore kept so it can be undone: when, and what the app held then (src/backup/storage.ts). */
+export interface RestoreUndoInfo {
+  takenAt: string
+  friends: number
+  meetups: number
+  photos: number
+}
+
 export interface Settings {
   lastBackupAt: string | null
   /** When Settings was last opened while its tab showed the backup dot (src/backup/nudge.ts). */
@@ -10,6 +18,8 @@ export interface Settings {
   appLock: AppLock
   appLockFailures: LockFailures
   birthdayReminders: BirthdayReminders
+  /** The snapshot a restore kept, while restoreUndo holds one. */
+  restoreUndo: RestoreUndoInfo | null
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -19,6 +29,7 @@ export const DEFAULT_SETTINGS: Settings = {
   appLock: LOCK_OFF,
   appLockFailures: NO_FAILURES,
   birthdayReminders: REMINDERS_OFF,
+  restoreUndo: null,
 }
 
 export async function getSetting<K extends keyof Settings>(key: K): Promise<Settings[K]> {

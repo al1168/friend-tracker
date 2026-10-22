@@ -1,4 +1,4 @@
-import Dexie, { type EntityTable } from 'dexie'
+import Dexie, { type EntityTable, type Table } from 'dexie'
 import { isMood } from '../lib/moods'
 import { cleanWeather } from '../lib/weather'
 import type { Friend, Group, Meetup, MeetupPhoto, MeetupType } from '../types'
@@ -9,6 +9,16 @@ export interface SettingRow {
   value: unknown
 }
 
+/** The tables a backup holds, and a restore replaces. */
+export type DataTable = 'friends' | 'groups' | 'meetupTypes' | 'meetups' | 'meetupPhotos'
+
+/** One row of what the app held just before a backup was restored, so the restore can be undone. */
+export interface RestoreUndoRow {
+  table: DataTable
+  id: string
+  row: unknown
+}
+
 export type FriendTrackerDB = Dexie & {
   friends: EntityTable<Friend, 'id'>
   groups: EntityTable<Group, 'id'>
@@ -16,6 +26,7 @@ export type FriendTrackerDB = Dexie & {
   meetups: EntityTable<Meetup, 'id'>
   meetupPhotos: EntityTable<MeetupPhoto, 'id'>
   settings: EntityTable<SettingRow, 'key'>
+  restoreUndo: Table<RestoreUndoRow, [DataTable, string]>
 }
 
 export const db = new Dexie('friend-tracker') as FriendTrackerDB
@@ -59,6 +70,20 @@ db.version(3).stores({
   meetups: 'id, date, typeId, *friendIds',
   settings: 'key',
   meetupPhotos: 'id, meetupId, [meetupId+order]',
+})
+
+// Version 4 adds restoreUndo: what the app held just before a backup was restored, kept 7 days so the restore can
+// be undone (src/backup/storage.ts). Rows are { table, id, row }, keyed by [table+id]. Never read by backups or lists.
+// No other store changes, so there is no upgrade step. Older code that is still running (the service worker until it
+// updates, a second tab) opens this version too: Dexie 4 opens a database newer than it declares (tested).
+db.version(4).stores({
+  friends: 'id, groupId',
+  groups: 'id',
+  meetupTypes: 'id, order',
+  meetups: 'id, date, typeId, *friendIds',
+  settings: 'key',
+  meetupPhotos: 'id, meetupId, [meetupId+order]',
+  restoreUndo: '[table+id]',
 })
 
 // The version 2 upgrade runs once, but older code that is still running (a second tab, or a
