@@ -22,6 +22,18 @@
   --space-8: 2rem;
   --space-10: 2.5rem;
 
+  /*
+   * The side margin (the page's and a sheet's, a row's padding, a group title's inset) and the gap between a row's
+   * parts (its badge, text, trailing value and chevron). Through every standard text size they're the rem steps,
+   * growing with the text; at the accessibility sizes they hold at 20px and 12px, as iOS keeps its margins there, so
+   * a row's words keep the width. `--ax-switch` is the switch: far wider than any margin up to 25px text (the largest
+   * standard size is 23px) and below zero above it (the first accessibility size is 28px), so each `max()` gives the
+   * fixed size only at the accessibility sizes.
+   */
+  --ax-switch: calc((25px - 1rem) * 1000);
+  --side-margin: min(var(--space-4), max(20px, var(--ax-switch)));
+  --row-spacing: min(var(--space-3), max(12px, var(--ax-switch)));
+
   --radius-field: 12px;
   --radius-group: 14px;
   --radius-sheet: 22px;

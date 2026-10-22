@@ -137,7 +137,7 @@ export function meetupSubtitle(meetup: Meetup, typeName: string | null, today: I
 ### The photo moves under the text at accessibility sizes
 
 - Each inset group's body is an inline-size container (`container: inset-group / inline-size`). Its width never depends on its rows, so this changes nothing else.
-- **When the group is narrower than 14.5em** (its own text size; 358px wide, that's above about 24.7px text, so every accessibility size and none of the standard ones, on every iPhone from the SE to the Pro Max), a meetup row with a photo becomes a two-row grid:
+- **When the group is narrower than 14.5em** (its own text size; the group is the screen less the page's two 1rem margins, so on a 390pt iPhone that's above about 23.6px text, and on a 375pt SE or mini already at the largest standard size, 23px; every accessibility size on every iPhone from the SE to the Pro Max), a meetup row with a photo becomes a two-row grid:
 
 ```
  (🍽)  Mariya, Jessie and           ›
@@ -222,20 +222,20 @@ The hero (unchanged), the notes, **Birthday**, **Likes**, **Dislikes**, then **H
 - **Now:** two tokens, `--toast-bg` and `--toast-ink`:
   - **Light** (unchanged look): `--toast-bg` is Warm Ink `oklch(25% 0.014 50)`, `--toast-ink` Warm Paper `oklch(96.4% 0.009 60)`. 14.4:1.
   - **Dark:** `--toast-bg` is a raised warm surface, `oklch(35% 0.012 55)` (a step above Linen Pressed), and `--toast-ink` is Warm Ink `oklch(95% 0.008 70)`. 9.8:1.
-- The Undo pill is `--toast-ink` at 18% over the toast in both themes (6.2:1 in dark). The Float shadow and the Peach check are unchanged.
+- The Undo pill is `--toast-ink` at 18% over the toast in both themes (5.9:1 in dark, still AA). The Float shadow and the Peach check are unchanged.
 
 ### "Not seen in <year>" leaves out friends added later
 
 See section 7.
 
-### The Log pill steps aside while you type on a page (`src/components/LogButton.tsx`)
+### The Log pill steps aside while you type on a page (`src/components/LogButton.css`)
 
 - **Seen:** "Add a like" opens its field under the floating Log pill (`b-53-add-like-field.png`).
 - **Now:** while a text field on the page has focus, the pill fades out (160ms) and can't be tapped or reached by VoiceOver (`visibility: hidden`). It comes back when the field loses focus.
   - **A text field:** a `textarea`, or an `input` that takes text (text, search, email, url, tel, number, password).
   - **On the page:** not inside a sheet or an action sheet (a `dialog` or `alertdialog`), which covers the pill anyway; so focus going back to the pill when a sheet closes is never blocked.
   - That's the Likes and Dislikes fields, the Friends search and the Meetups search.
-- `LogButton` listens to `focusin` and `focusout` on the document; on `focusout` it reads where focus went (`relatedTarget`).
+- A CSS rule in `LogButton.css` does it, with no script: `body:has(.page :is(textarea, input…):focus) > .log-button` fades the pill out and hides it, so it follows focus exactly. Sheets render outside `.page`, so their fields never hide it (see Decisions made while building).
 
 ### No group name while filtering by it (`src/screens/FriendsScreen.tsx`)
 
@@ -265,7 +265,7 @@ See section 7.
 - **Targets:** the "Show all" row is a 52px row. Nothing else new is tappable.
 - **Dynamic Type:** the stat note, the lead lines and the row titles wrap between words. At accessibility sizes a meetup row's photo sits under its text, the back label shows "Friends" whole while the large title shows, and Who tiles widen to fit a first name.
 - **Reduce Motion:** the pill's fade stays (fades are allowed); nothing new moves.
-- **Color:** the dark toast is 9.8:1 (text) and 6.2:1 (Undo); everything else uses existing pairs.
+- **Color:** the dark toast is 9.8:1 (text) and 5.9:1 (Undo); everything else uses existing pairs.
 
 ## DESIGN.md
 
@@ -391,3 +391,13 @@ Review them by eye on the phone too: Playwright has no status bar, no safe areas
 - **The dark toast** is checked in `e2e/friends.spec.ts` ("in dark mode") by drawing each computed color on a canvas (so any CSS color, `oklch()` included, comes back as pixels) and reading its luminance: background under 0.15 and AA contrast.
 - **Screenshots:** `31-friend-no-meetups` (Lena Fischer, added to the seed, never seen), and in the accessibility size test `ax-03-log-sheet`, `ax-19-meetups`, `ax-04-friend` and `ax-05-long-name`, with Brandon Cao, a long name and a photo on the Meal.
 - **The long screenshot captures get 180 seconds.** With Lena Fischer in the seed and the new captures, "large text" ran past its 120-second limit at its last step when the merged branch was checked; "all screens", "large text" and the accessibility size test now have 180.
+
+## Changes after review
+
+Both reviewers found the branch ready to merge; these minor findings were fixed after.
+
+- **A pause in a meetup row's name.** The link's name ran the title into the subtitle ("…and Brandon Meal"). A visually hidden ", " now follows the title (`Row`'s new `pauseAfterTitle`, between the title and the subtitle, so neither's text changes) and comes before the "Upcoming" badge, so VoiceOver reads "Mariya, Jessie and Brandon, Meal · Sat, Oct 3" and "Kim, Upcoming, Party · Thu, Oct 8". Tests now need the comma: `/^Alex and Sam ?, Meal · Sat, Oct 3 · Tacos$/` (Playwright's name puts a space before it, since the hidden span is absolutely positioned).
+- **"Logged with" names friends among all friends.** The toast and the day page's Logged note use `shortNameById` over every friend, as the meetup rows do, instead of `shortNames` among the meetup's friends: with Sam Chen and Sam Lee in the app, logging with Sam Lee says "Logged with Sam Lee", as the Recent meetups row does, and "Friend 12" among twelve "Friend"s is named in full. `shortNames` had no other use and was removed. The Paid chips still name friends among the meetup's.
+- **"Not seen in <year>" counts meetups too.** A friend is known by a year when their `createdAt` year is in or before it, or when a meetup with them is dated in or before it (`friendsNotSeenInYear` finds each friend's earliest meetup year). A friend added in 2026 with a 2024 meetup and none in 2025 is in "Not seen in 2025".
+- **Margins hold at the accessibility sizes.** Page margins, row padding and a row's gap grew with rem, so at 40px text a meetup row's text column was about 112px and "Mariya," and "Brandon" split. Two tokens, `--side-margin` and `--row-spacing`, are `1rem` and `0.75rem` through every standard size and hold at 20px and 12px above 25px text (the largest standard size is 23px, the first accessibility size 28px), as iOS keeps its margins. `--ax-switch`, `(25px - 1rem) * 1000`, is the switch: far above any margin up to 25px and below zero beyond, so `min(1rem, max(20px, var(--ax-switch)))` gives the fixed size only at the accessibility sizes, with no container query (the page body has no container to query). They're used for the page body, the large title, sheet and day page bodies, rows and their hairlines, group titles, headers and footers, the stat bars, the day view and How it felt boxes, and the chip rows and strips that bleed to the edges (so a bleed always matches its parent's margin). Every standard size is unchanged: the light, dark and large text captures are pixel for pixel the same as before, apart from the generated photos and a tab icon caught mid-fade, which differ from run to run. On a 390pt iPhone a meetup row's text column (with its photo under it) grows from about 150px to about 228px at 33px, and from about 112px to the same 228px at 40px. New test (`e2e/largeText.spec.ts`): at 40px, "Mariya," and the rest of the title don't break at all, the page margin is 20px and the row's text starts 76px in, and the group chips and the Log sheet's What chips still reach the edges with nothing scrolling sideways.
+- **Doc fixes.** The dark toast's Undo is 5.9:1, not 6.2:1 (still AA). The Log pill's rule is described as the CSS that shipped. The photo moves under the text above about 23.6px on a 390pt iPhone and already at 23px on a 375pt SE or mini, not above 24.7px; with the margins held above 25px, every accessibility size on every iPhone still moves it.

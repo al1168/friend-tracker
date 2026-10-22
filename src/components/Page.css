@@ -59,7 +59,7 @@
 /* Same left edge as the search field and inset groups below it. */
 .page__title {
   margin: 0;
-  padding: 0 var(--space-4) var(--space-4);
+  padding: 0 var(--side-margin) var(--space-4);
   font-family: var(--font-rounded);
   font-size: var(--text-large-title);
   font-weight: 700;
@@ -73,7 +73,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  padding: 0 var(--space-4);
+  padding: 0 var(--side-margin);
 }
 
 .page--pushed {

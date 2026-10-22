@@ -15,9 +15,10 @@
   object-fit: cover;
 }
 
-/* At accessibility sizes (an inset group under 14.5em wide, in its own text size: above about 24.7px text on a 390pt
-   iPhone, and on every iPhone at the accessibility sizes), a row with a photo puts the photo under its text, so the
-   words keep about 52px more of the line. The badge and the chevron span both rows. */
+/* At accessibility sizes (an inset group under 14.5em wide, in its own text size: on every iPhone at the
+   accessibility sizes, above about 23.6px text on a 390pt one, and already at the largest standard size, 23px, on a
+   375pt SE or mini), a row with a photo puts the photo under its text, so the words keep about 52px more of the line.
+   The badge and the chevron span both rows. */
 @container inset-group (width < 14.5em) {
   .row:has(> .row__trailing > .meetup-thumb) {
     display: grid;

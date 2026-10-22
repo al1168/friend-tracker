@@ -1,6 +1,6 @@
 .hbars {
   margin: 0;
-  padding: var(--space-1) var(--space-4);
+  padding: var(--space-1) var(--side-margin);
   border-radius: var(--radius-group);
   background: var(--surface);
   list-style: none;
