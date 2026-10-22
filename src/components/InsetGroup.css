@@ -7,6 +7,41 @@
 .group-title:focus {
   outline: none;
 }
+/* A title with one text link at the end of its line. The line is as tall as any title's, and the link wraps under
+   the title at large text sizes. */
+.group-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  column-gap: var(--space-4);
+  margin: 0 var(--space-4) var(--space-2);
+}
+.group-header .group-title {
+  margin: 0;
+}
+/* Footnote 600 Terracotta Ink, 16px in from the group's right edge. Its hit area is 44px tall and at least 44px wide:
+   it ends where the group's first row starts, never over it, and reaches up into the space above the group. */
+.group-action {
+  position: relative;
+  color: var(--accent-ink);
+  font-size: var(--text-footnote);
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity var(--dur-fast);
+}
+.group-action::before {
+  content: '';
+  position: absolute;
+  bottom: calc(-1 * var(--space-2));
+  left: 50%;
+  width: max(100% + var(--space-4), var(--tap));
+  height: max(var(--tap), 100% + var(--space-2));
+  transform: translateX(-50%);
+}
+.group-action:active {
+  opacity: 0.5;
+}
 
 .inset-group__body {
   overflow: hidden;

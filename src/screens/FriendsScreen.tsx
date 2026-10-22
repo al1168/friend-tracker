@@ -1,4 +1,5 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import { useActionSheet } from '../components/ActionSheet'
 import { Avatar } from '../components/Avatar'
 import { Chip } from '../components/Chip'
@@ -12,23 +13,22 @@ import { Page, type NavState } from '../components/Page'
 import { useFriends, useGroups, useMeetupIdsWithPhotosAmong, useMeetups, useMeetupTypes, useSetting } from '../data/hooks'
 import { setSetting } from '../db/settings'
 import { useToday } from '../hooks/useToday'
-import { describeNextBirthday, upcomingBirthdays } from '../lib/birthdays'
-import { daysBetween, yearOf } from '../lib/dates'
+import { describeBirthdayCountdown, describeNextBirthday, upcomingBirthdays, type UpcomingBirthday } from '../lib/birthdays'
+import { daysBetween, yearOf, type ISODate } from '../lib/dates'
 import { matchFriend, matchSubtitle } from '../lib/friendSearch'
 import { isPlainEnter } from '../lib/keys'
 import { isStandalone } from '../lib/platform'
-import { formatSince } from '../lib/text'
+import { formatSince, shortName } from '../lib/text'
 import { useSheets } from '../sheets/sheetsContext'
 import { countsByFriendForYear } from '../stats/counts'
 import { lastSeenByFriend } from '../stats/lastSeen'
-import { meetupNames, RECENT_MEETUPS, RECENT_MEETUPS_WITH_BIRTHDAYS, recentMeetups } from '../stats/meetupHistory'
+import { meetupNames, recentMeetups } from '../stats/meetupHistory'
 import { FRIEND_SORT_LABELS, sortFriends, type FriendSort } from '../stats/sortFriends'
+import type { Friend } from '../types'
 import './FriendsScreen.css'
 
 const SORT_KEY = 'friend-tracker:sort'
 const SORTS = Object.keys(FRIEND_SORT_LABELS) as FriendSort[]
-/** The most rows Birthdays soon shows. Its footer counts the rest. */
-const MAX_BIRTHDAYS_SOON = 3
 /** A meetup opened from Recent meetups says "Friends" on its back button. */
 const FROM_FRIENDS: NavState = { backLabel: 'Friends' }
 
@@ -57,19 +57,16 @@ export function FriendsScreen() {
   const types = useMeetupTypes()
   const hintDismissed = useSetting('installHintDismissed')
   const today = useToday()
-  // The 3 latest past meetups, whatever shows, so searching or Birthdays soon hiding never changes what's read.
-  const latest = useMemo(() => (meetups ? recentMeetups(meetups, today, RECENT_MEETUPS) : undefined), [meetups, today])
-  // Which of them have photos: a few key-only reads at once, so the screen the app opens on never waits for the
-  // app-wide walk of every meetup with photos (MeetupIdsWithPhotosProvider), which grows with the history.
+  // The latest past meetup: Recent meetups' one row, on every day.
+  const latest = useMemo(() => (meetups ? recentMeetups(meetups, today) : undefined), [meetups, today])
+  // Whether it has photos: one key-only read, so the screen the app opens on never waits for the app-wide walk of
+  // every meetup with photos (MeetupIdsWithPhotosProvider), which grows with the history.
   const latestWithPhotos = useMeetupIdsWithPhotosAmong(latest?.map((meetup) => meetup.id))
   const { openFriendSheet } = useSheets()
   const showActionSheet = useActionSheet()
   const [query, setQuery] = useState('')
   const [groupFilter, setGroupFilter] = useState<string | null>(null)
   const [sort, setSort] = useState<FriendSort>(readStoredSort)
-  const filtersRef = useRef<HTMLDivElement>(null)
-  // Where the search field was before a search or a chip hid or showed the groups above it.
-  const filtersTopBefore = useRef<number | null>(null)
 
   const activeGroup = groups?.find((group) => group.id === groupFilter) ?? null
   // Searching or filtering hides Birthdays soon and Recent meetups, so the list below stays a plain filtered list.
@@ -91,31 +88,8 @@ export function FriendsScreen() {
 
   const birthdaysSoon = useMemo(() => upcomingBirthdays(friends ?? [], today), [friends, today])
   const showBirthdaysSoon = birthdaysSoon.length > 0 && unfiltered
-  // Recent meetups gives up a row while Birthdays soon shows above it, so the search field stays nearer the top.
-  const recent = useMemo(
-    () => (latest ?? []).slice(0, showBirthdaysSoon ? RECENT_MEETUPS_WITH_BIRTHDAYS : RECENT_MEETUPS),
-    [latest, showBirthdaysSoon],
-  )
   const nameById = useMemo(() => new Map((friends ?? []).map((friend) => [friend.id, friend.name] as const)), [friends])
   const typeById = useMemo(() => new Map((types ?? []).map((type) => [type.id, type] as const)), [types])
-
-  // Safari has no scroll anchoring, so when the groups above the search field hide or come back, the page
-  // scrolls by what went away or came back, before paint: the field stays where your eyes are. The browser clamps
-  // the scroll at the top and bottom of the page, so there the field can come to rest a little off, never off screen.
-  useLayoutEffect(() => {
-    const before = filtersTopBefore.current
-    filtersTopBefore.current = null
-    const filters = filtersRef.current
-    if (before === null || !filters) return
-    window.scrollBy(0, filters.getBoundingClientRect().top - before)
-  }, [unfiltered])
-
-  /** Before a search or chip change: notes where the field is when the change will hide or show the groups. */
-  function keepFiltersStill(nextUnfiltered: boolean) {
-    if (nextUnfiltered !== unfiltered && filtersRef.current) {
-      filtersTopBefore.current = filtersRef.current.getBoundingClientRect().top
-    }
-  }
 
   async function chooseSort() {
     const choice = await showActionSheet<FriendSort>({
@@ -128,9 +102,9 @@ export function FriendsScreen() {
     }
   }
 
-  if (!friends || !groups || !meetups || !types || !latestWithPhotos || hintDismissed === undefined) return null
-
-  const moreBirthdays = birthdaysSoon.length - MAX_BIRTHDAYS_SOON
+  if (!friends || !groups || !meetups || !types || !latest || !latestWithPhotos || hintDismissed === undefined) {
+    return null
+  }
 
   return (
     <Page
@@ -167,26 +141,50 @@ export function FriendsScreen() {
         />
       ) : (
         <>
-          {showBirthdaysSoon && (
-            <InsetGroup
-              title="Birthdays soon"
-              footer={moreBirthdays > 0 ? `And ${moreBirthdays} more in the next two weeks.` : undefined}
-            >
-              {birthdaysSoon.slice(0, MAX_BIRTHDAYS_SOON).map(({ friend, birthday }) => (
-                <Row
-                  key={friend.id}
-                  to={`/friends/${friend.id}`}
-                  leading={<Avatar name={friend.name} photo={friend.photo} seed={friend.id} />}
-                  title={friend.name}
-                  subtitle={describeNextBirthday(birthday, today)}
-                />
-              ))}
-            </InsetGroup>
-          )}
+          {/* Search and the chips come first, under the title, as in Contacts. Nothing above them ever hides, so
+              typing or tapping a chip never moves them. */}
+          <div className="friends-filters">
+            <label className="search">
+              <IconSearch size={18} />
+              <input
+                type="search"
+                className="search__input"
+                placeholder="Search"
+                aria-label="Search friends"
+                enterKeyHint="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (isPlainEnter(event)) event.currentTarget.blur()
+                }}
+              />
+            </label>
+            {groups.length > 0 && (
+              <div className="chip-row" role="group" aria-label="Filter by group">
+                <Chip selected={activeGroup === null} onClick={() => setGroupFilter(null)}>
+                  All
+                </Chip>
+                {groups.map((group) => (
+                  <Chip key={group.id} selected={activeGroup?.id === group.id} onClick={() => setGroupFilter(group.id)}>
+                    {group.name}
+                  </Chip>
+                ))}
+              </div>
+            )}
+          </div>
 
-          {unfiltered && recent.length > 0 && (
-            <InsetGroup title="Recent meetups">
-              {recent.map((meetup) => (
+          {showBirthdaysSoon && <BirthdaysSoon birthdays={birthdaysSoon} friends={friends} today={today} />}
+
+          {unfiltered && latest.length > 0 && (
+            <InsetGroup
+              title="Recent meetups"
+              action={
+                <Link to="/meetups" className="group-action" aria-label="See all meetups">
+                  See all
+                </Link>
+              }
+            >
+              {latest.map((meetup) => (
                 <MeetupRow
                   key={meetup.id}
                   meetup={meetup}
@@ -198,56 +196,8 @@ export function FriendsScreen() {
                   subtitleLines={2}
                 />
               ))}
-              <Row to="/meetups" title="See all meetups" accent chevron />
             </InsetGroup>
           )}
-
-          <div className="friends-filters" ref={filtersRef}>
-            <label className="search">
-              <IconSearch size={18} />
-              <input
-                type="search"
-                className="search__input"
-                placeholder="Search"
-                aria-label="Search friends"
-                enterKeyHint="search"
-                value={query}
-                onChange={(event) => {
-                  const value = event.target.value
-                  keepFiltersStill(value.trim() === '' && activeGroup === null)
-                  setQuery(value)
-                }}
-                onKeyDown={(event) => {
-                  if (isPlainEnter(event)) event.currentTarget.blur()
-                }}
-              />
-            </label>
-            {groups.length > 0 && (
-              <div className="chip-row" role="group" aria-label="Filter by group">
-                <Chip
-                  selected={activeGroup === null}
-                  onClick={() => {
-                    keepFiltersStill(query.trim() === '')
-                    setGroupFilter(null)
-                  }}
-                >
-                  All
-                </Chip>
-                {groups.map((group) => (
-                  <Chip
-                    key={group.id}
-                    selected={activeGroup?.id === group.id}
-                    onClick={() => {
-                      keepFiltersStill(false)
-                      setGroupFilter(group.id)
-                    }}
-                  >
-                    {group.name}
-                  </Chip>
-                ))}
-              </div>
-            )}
-          </div>
 
           {rows.length > 0 ? (
             <InsetGroup>
@@ -284,5 +234,47 @@ export function FriendsScreen() {
       )}
       {friends.length > 0 && <LogButton />}
     </Page>
+  )
+}
+
+interface BirthdaysSoonProps {
+  /** Every birthday today or in the next 14 days, soonest first, then by name. */
+  birthdays: UpcomingBirthday[]
+  /** Every friend, so a tile can tell whether its first name is shared. */
+  friends: Friend[]
+  today: ISODate
+}
+
+/**
+ * Birthdays soon: one row of tiles that scrolls sideways, each a link to the friend's page with the face, the short
+ * name and the countdown. A tile is named in full for VoiceOver, starting with the word it shows ("Brandon Cao, In 2
+ * days · turns 27"), so Voice Control's "Tap Brandon" works.
+ */
+function BirthdaysSoon({ birthdays, friends, today }: BirthdaysSoonProps) {
+  const titleId = useId()
+  return (
+    <section className="birthdays-soon" aria-labelledby={titleId}>
+      <h2 id={titleId} className="group-title">
+        Birthdays soon
+      </h2>
+      {/* role="list": Safari drops a list from VoiceOver once its bullets are styled away. */}
+      <ul className="birthday-strip snap-strip" role="list">
+        {birthdays.map(({ friend, birthday, daysUntil }) => (
+          <li key={friend.id}>
+            <Link
+              to={`/friends/${friend.id}`}
+              className="birthday-tile"
+              aria-label={`${friend.name}, ${describeNextBirthday(birthday, today)}`}
+            >
+              <Avatar name={friend.name} photo={friend.photo} seed={friend.id} />
+              <span className="birthday-tile__text">
+                <span className="birthday-tile__name">{shortName(friend, friends)}</span>
+                <span className="birthday-tile__when">{describeBirthdayCountdown(daysUntil)}</span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }

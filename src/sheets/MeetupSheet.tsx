@@ -303,7 +303,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
         </h3>
         {toPick.length > 0 && (
           <div
-            className="friend-strip"
+            className={toPick.length > STILL_GRID_MAX ? 'friend-strip snap-strip' : 'friend-strip'}
             data-swipes={toPick.length > STILL_GRID_MAX}
             role="group"
             aria-label="Friends"

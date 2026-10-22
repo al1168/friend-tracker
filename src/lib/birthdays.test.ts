@@ -6,6 +6,7 @@ import {
   birthdayFromFields,
   birthdayProblem,
   daysUntilBirthday,
+  describeBirthdayCountdown,
   describeNextBirthday,
   EMPTY_BIRTHDAY_FIELDS,
   formatBirthday,
@@ -173,6 +174,14 @@ describe('formatBirthday', () => {
     expect(formatBirthday(bday(3, 14, 1996))).toBe('March 14, 1996')
     expect(formatBirthday(bday(3, 14))).toBe('March 14')
     expect(formatBirthday(bday(2, 29))).toBe('February 29')
+  })
+})
+
+describe('describeBirthdayCountdown', () => {
+  it('says how far off a birthday is', () => {
+    expect(describeBirthdayCountdown(0)).toBe('Today')
+    expect(describeBirthdayCountdown(1)).toBe('Tomorrow')
+    expect(describeBirthdayCountdown(5)).toBe('In 5 days')
   })
 })
 

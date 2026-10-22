@@ -1,9 +1,62 @@
-import { expect, test } from '@playwright/test'
-import { addFriend, ONE_PIXEL_PNG, sheetSave } from './helpers.ts'
+import { expect, test, type Locator } from '@playwright/test'
+import { addFriend, friendRow, meetupRow, ONE_PIXEL_PNG, seedMeetups, sheetSave } from './helpers.ts'
+
+/** The top and bottom of an element on screen, in CSS pixels. */
+async function spanOf(locator: Locator): Promise<{ top: number; bottom: number }> {
+  const box = await locator.boundingBox()
+  if (!box) throw new Error('Not on screen')
+  return { top: box.y, bottom: box.y + box.height }
+}
 
 test('shows a welcome state with no friends', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByText('Add the people you want to keep up with.')).toBeVisible()
+})
+
+test('friends come first: search, the chips, Birthdays soon and the latest meetup, then the list', async ({ page }) => {
+  // Wed, Oct 21, 2026, noon: three birthdays in the next two weeks.
+  await page.clock.setFixedTime(new Date(2026, 9, 21, 12))
+  await page.goto('/')
+  const groups = ['Climbing', 'College', 'Family', 'Work'].map((name) => ({ id: name.toLowerCase(), name }))
+  const friends = [
+    friendRow('alex', 'Alex Rivera', { groupId: 'college' }),
+    friendRow('aisha', 'Aisha Rahman', { groupId: 'work' }),
+    friendRow('maxi', 'Maximiliana Alexandra', { groupId: 'family' }),
+    friendRow('jordan', 'Jordan Lee', { groupId: 'climbing' }),
+    friendRow('kim', 'Kim Park', { groupId: 'work' }),
+    friendRow('brandon', 'Brandon Cao', { birthday: { month: 10, day: 23, year: 1999 } }),
+    friendRow('sam', 'Sam Chen', { groupId: 'college', birthday: { month: 10, day: 30, year: null } }),
+    friendRow('len', 'Len Foster', { birthday: { month: 11, day: 3, year: null } }),
+  ]
+  // A latest meetup whose subtitle runs to two lines.
+  const latest = meetupRow('karaoke', '2026-10-19', ['alex', 'aisha', 'maxi', 'jordan'], {
+    activities: ['Karaoke', 'Board games'],
+  })
+  await seedMeetups(page, { friends, groups, meetups: [latest, meetupRow('older', '2026-10-01', ['kim'])] })
+  await page.getByRole('complementary', { name: 'Install the app' }).getByRole('button', { name: 'Dismiss' }).click()
+
+  const search = await spanOf(page.locator('.friends-filters .search'))
+  expect(search.top, 'Search sits just under the large title').toBeLessThanOrEqual(110)
+  const birthdays = page.getByRole('region', { name: 'Birthdays soon' })
+  await expect(birthdays.getByRole('link')).toHaveCount(3)
+  const recent = page.getByRole('region', { name: 'Recent meetups' })
+  await expect(recent.locator('.row__title')).toHaveText(['Coffee'])
+  const list = page.locator('.inset-group').last().getByRole('link')
+  await expect(list).toHaveCount(8)
+
+  // Top to bottom: the search field, the chips, Birthdays soon, Recent meetups, then the friends.
+  const tops = [
+    search.top,
+    (await spanOf(page.getByRole('group', { name: 'Filter by group' }))).top,
+    (await spanOf(birthdays)).top,
+    (await spanOf(recent)).top,
+    (await spanOf(list.first())).top,
+  ]
+  expect([...tops].sort((a, b) => a - b), 'In that order').toEqual(tops)
+  expect(tops[4], 'The first friend row is on the first screen').toBeLessThanOrEqual(480)
+  // 645px is where the Home Screen app's Log pill starts, in these coordinates (713px less 16 and 52).
+  const third = await spanOf(list.nth(2).locator('.row__title'))
+  expect(third.bottom, 'The third friend’s name shows clear of the Log pill').toBeLessThanOrEqual(645)
 })
 
 test('adds friends and lists them', async ({ page }) => {

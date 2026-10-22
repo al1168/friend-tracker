@@ -175,12 +175,14 @@ test('lists the birthdays in the next two weeks on the Friends tab', async ({ pa
   await addFriend(page, 'Sam', 'Work')
 
   const soon = page.getByRole('region', { name: 'Birthdays soon' })
-  const rows = soon.getByRole('link')
-  await expect(rows).toHaveCount(2)
-  await expect(rows.nth(0)).toContainText('Lee')
-  await expect(rows.nth(0)).toContainText('Today')
-  await expect(rows.nth(1)).toContainText('Alex')
-  await expect(rows.nth(1)).toContainText('In 5 days · turns 40')
+  const tiles = soon.getByRole('link')
+  await expect(tiles).toHaveCount(2)
+  // Each tile shows the first name and the countdown, and is named in full with the age.
+  await expect(tiles.locator('.birthday-tile__name')).toHaveText(['Lee', 'Alex'])
+  await expect(tiles.locator('.birthday-tile__when')).toHaveText(['Today', 'In 5 days'])
+  await expect(tiles.nth(0)).toHaveAccessibleName('Lee, Today')
+  await expect(tiles.nth(1)).toHaveAccessibleName('Alex, In 5 days · turns 40')
+  await expect(soon.getByRole('list')).toBeVisible()
 
   const search = page.getByLabel('Search friends')
   await search.fill('a')
@@ -194,23 +196,48 @@ test('lists the birthdays in the next two weeks on the Friends tab', async ({ pa
   await filters.getByRole('button', { name: 'All' }).click()
   await expect(soon).toBeVisible()
 
-  await rows.nth(1).click()
+  await tiles.nth(1).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Alex' })).toBeVisible()
   await page.getByRole('button', { name: 'Friends', exact: true }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
 })
 
-test('shows at most three birthdays soon, then how many more', async ({ page }) => {
+test('shows every birthday soon in one strip that scrolls sideways', async ({ page }) => {
   await page.goto('/')
-  for (const [days, name] of ['Ana', 'Ben', 'Cal', 'Dee', 'Eve', 'Fay'].entries()) {
+  const names = ['Ana', 'Ben', 'Cal', 'Dee', 'Eve', 'Fay']
+  for (const [days, name] of names.entries()) {
     const { month, day } = dayFromToday(days)
     await addFriend(page, name, undefined, { month, day })
   }
 
   const soon = page.getByRole('region', { name: 'Birthdays soon' })
-  await expect(soon.getByRole('link')).toHaveCount(3)
-  await expect(soon.getByRole('link').last()).toContainText('Cal')
-  await expect(soon).toContainText('And 3 more in the next two weeks.')
+  const tiles = soon.getByRole('link')
+  await expect(tiles.locator('.birthday-tile__name')).toHaveText(names)
+  await expect(soon).not.toContainText('more in the next two weeks')
+  // One row: every tile at the same height.
+  const tops = await tiles.evaluateAll((links) => links.map((link) => Math.round(link.getBoundingClientRect().top)))
+  expect(new Set(tops).size, 'One row').toBe(1)
+
+  // Playwright's mobile WebKit has no touch scrolling, so the swipe is played by scrolling the strip.
+  const sixth = tiles.nth(5)
+  await expect(sixth).not.toBeInViewport({ ratio: 1 })
+  await soon.getByRole('list').evaluate((strip) => {
+    strip.scrollLeft = strip.scrollWidth
+  })
+  await expect(sixth).toBeInViewport({ ratio: 1 })
+  await sixth.click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Fay' })).toBeVisible()
+})
+
+test('two friends with the same first name show their full names on their tiles', async ({ page }) => {
+  await page.goto('/')
+  for (const [days, name] of ['Sam Lee', 'Sam Park', 'Kim Ito'].entries()) {
+    const { month, day } = dayFromToday(days + 1)
+    await addFriend(page, name, undefined, { month, day })
+  }
+  const tiles = page.getByRole('region', { name: 'Birthdays soon' }).getByRole('link')
+  await expect(tiles.locator('.birthday-tile__name')).toHaveText(['Sam Lee', 'Sam Park', 'Kim'])
+  await expect(tiles.nth(0)).toHaveAccessibleName('Sam Lee, Tomorrow')
 })
 
 test('keeps birthdays through a backup', async ({ page }) => {

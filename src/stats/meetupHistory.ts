@@ -7,10 +7,8 @@ import { groupByMonth, newestFirst } from './history'
 
 // Pure: no window, document or Intl of its own, so it's tested in Node with fixed dates.
 
-/** How many meetups Recent meetups shows on the Friends tab. */
-export const RECENT_MEETUPS = 3
-/** How many it shows while Birthdays soon is showing above it. */
-export const RECENT_MEETUPS_WITH_BIRTHDAYS = 2
+/** How many meetups Recent meetups shows on the Friends tab: the latest, on every day, so the friends show on open. */
+export const RECENT_MEETUPS = 1
 /** Rows the Meetups page shows at first, and how many each "Show older meetups" adds. */
 export const MEETUPS_PAGE_SIZE = 60
 

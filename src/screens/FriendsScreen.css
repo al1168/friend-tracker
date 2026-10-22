@@ -5,6 +5,54 @@
   margin-bottom: calc(-1 * var(--space-2));
 }
 
+/* Birthdays soon: one row of tiles that scrolls sideways (.snap-strip in base.css), each tile snapping to the margin. */
+.birthday-strip {
+  display: flex;
+  gap: var(--space-2);
+  margin-block: 0;
+  list-style: none;
+  scroll-snap-type: x proximity;
+}
+.birthday-strip > li {
+  flex: none;
+  scroll-snap-align: start;
+}
+/* Paper White with 14px corners: the 44px face, then the short name over the countdown. 60px tall at the default
+   size (the face and 8px above and below), taller as the text grows. */
+.birthday-tile {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.875rem 0.5rem 0.5rem;
+  border-radius: var(--radius-group);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color var(--dur-fast);
+}
+.birthday-tile:active {
+  background: var(--surface-pressed);
+}
+.birthday-tile__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* One line: a first name longer than 10rem ends in an ellipsis. */
+.birthday-tile__name {
+  max-width: 10rem;
+  overflow: hidden;
+  font-size: var(--text-subhead);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.birthday-tile__when {
+  color: var(--ink-2);
+  font-size: var(--text-footnote);
+  white-space: nowrap;
+}
+
 .friend-count {
   display: flex;
   flex-direction: column;

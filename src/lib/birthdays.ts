@@ -106,10 +106,14 @@ export function formatBirthday(birthday: Birthday): string {
   return birthday.year === null ? date : `${date}, ${birthday.year}`
 }
 
+/** How far off a birthday `days` from today is: "Today", "Tomorrow" or "In 12 days". */
+export function describeBirthdayCountdown(days: number): string {
+  return days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days} days`
+}
+
 /** "Today", "Tomorrow" or "In 12 days", plus the age when the year is known: "In 12 days · turns 31". */
 export function describeNextBirthday(birthday: Birthday, today: ISODate): string {
-  const days = daysUntilBirthday(birthday, today)
-  const when = days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days} days`
+  const when = describeBirthdayCountdown(daysUntilBirthday(birthday, today))
   const age = ageOnNextBirthday(birthday, today)
   return age === null ? when : `${when} · turns ${age}`
 }

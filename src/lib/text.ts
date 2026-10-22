@@ -45,6 +45,23 @@ export function sameName(a: string, b: string): boolean {
   return a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase()
 }
 
+type Named = { name: string }
+
+/** The first word of a friend's name. */
+export function firstName(friend: Named): string {
+  return friend.name.trim().split(/\s+/)[0]
+}
+
+/**
+ * A friend's name kept short: their first name, or their full name when another friend in `among` has the same first
+ * name (ignoring case). "Who paid?" passes the friends on the meetup; Birthdays soon passes every friend.
+ */
+export function shortName(friend: Named, among: readonly Named[]): string {
+  const first = firstName(friend).toLowerCase()
+  const shared = among.some((other) => other !== friend && firstName(other).toLowerCase() === first)
+  return shared ? friend.name.trim() : firstName(friend)
+}
+
 // Intl.Segmenter arrived in iOS Safari 16.4; fall back to code points before that.
 const segmenter =
   typeof Intl.Segmenter === 'function' ? new Intl.Segmenter('en', { granularity: 'grapheme' }) : null

@@ -10,6 +10,7 @@ import {
   initials,
   plural,
   sameName,
+  shortName,
 } from './text'
 
 describe('formatSince', () => {
@@ -94,6 +95,29 @@ describe('describeBackup', () => {
     expect(describeBackup(today, '2026-10-02', 0)).toBe('Last backup: today')
     expect(describeBackup(today, '2026-10-02', 12)).toBe('Last backup: today. Includes 12 photos.')
     expect(describeBackup(null, '2026-10-02', 1)).toBe('Never backed up. Includes 1 photo.')
+  })
+})
+
+describe('shortName', () => {
+  const brandonCao = { name: 'Brandon Cao' }
+  const brandonLee = { name: 'brandon lee' }
+  const mariya = { name: 'Mariya' }
+
+  it('is the first name when no other friend shares it', () => {
+    expect(shortName(brandonCao, [brandonCao])).toBe('Brandon')
+    expect(shortName(brandonCao, [brandonCao, mariya])).toBe('Brandon')
+    expect(shortName(mariya, [brandonCao, brandonLee, mariya])).toBe('Mariya')
+  })
+
+  it('is the full name when another friend has the same first name, ignoring case', () => {
+    expect(shortName(brandonCao, [brandonCao, brandonLee, mariya])).toBe('Brandon Cao')
+    expect(shortName(brandonLee, [brandonCao, brandonLee])).toBe('brandon lee')
+  })
+
+  it('ignores extra spaces', () => {
+    const spaced = { name: '  Brandon   Cao ' }
+    expect(shortName(spaced, [spaced])).toBe('Brandon')
+    expect(shortName(spaced, [spaced, brandonLee])).toBe('Brandon   Cao')
   })
 })
 

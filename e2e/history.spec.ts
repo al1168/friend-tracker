@@ -109,27 +109,44 @@ function visit(page: Page, n: number): Locator {
   return page.getByRole('link', { name: new RegExp(`Visit ${n}$`) })
 }
 
-test('Recent meetups shows the three latest that happened, naming everyone', async ({ page }) => {
-  await openWith(page, { friends: [ALEX, SAM, KIM], meetups: [...PAST, PARTY] })
+test('Recent meetups shows the latest that happened, naming everyone, with "See all" in its header', async ({
+  page,
+}) => {
+  await openWith(page, { friends: [ALEX, SAM, KIM], meetups: [MEAL, COFFEE, CALL, PARTY] })
   const recent = recentGroup(page)
-  await expect(recent.locator('.row__title')).toHaveText(['Drinks', 'Meal', 'Coffee', 'See all meetups'])
-  await expect(recent.getByRole('link', { name: /^Meal/ })).toHaveAccessibleName(
-    /^Meal\s*Sat, Oct 3 · with Alex and Sam · Tacos$/,
-  )
+  await expect(recent.locator('.row__title')).toHaveText(['Meal'])
+  // "See all" comes first: it's at the end of the title's line, above the row.
+  const links = recent.getByRole('link')
+  await expect(links).toHaveCount(2)
+  await expect(links.nth(0)).toHaveAccessibleName('See all meetups')
+  await expect(links.nth(0)).toHaveText('See all')
+  await expect(links.nth(1)).toHaveAccessibleName(/^Meal\s*Sat, Oct 3 · with Alex and Sam · Tacos$/)
   await expect(recent).not.toContainText('Party')
-  await expect(recent).not.toContainText('Call')
+  await expect(recent).not.toContainText('Coffee')
+
+  // A 44px hit area at least, ending where the row starts.
+  const area = await links.nth(0).evaluate((link) => {
+    const before = getComputedStyle(link, '::before')
+    return { width: parseFloat(before.width), height: parseFloat(before.height) }
+  })
+  expect(area.width).toBeGreaterThanOrEqual(44)
+  expect(area.height).toBeGreaterThanOrEqual(44)
+  const seeAll = await links.nth(0).boundingBox()
+  const row = await links.nth(1).boundingBox()
+  if (!seeAll || !row) throw new Error('Not on screen')
+  expect(seeAll.y + seeAll.height, 'Above the row, with the gap the title keeps').toBeLessThanOrEqual(row.y - 8 + 1)
 })
 
-test('Recent meetups shows two while Birthdays soon shows', async ({ page }) => {
+test('Recent meetups shows one row with or without Birthdays soon', async ({ page }) => {
   const lee = friendRow('lee', 'Lee', { birthday: { month: 10, day: 8, year: null } })
   await openWith(page, { friends: [ALEX, SAM, KIM, lee], meetups: PAST })
   await expect(page.getByRole('region', { name: 'Birthdays soon' })).toContainText('Lee')
-  await expect(recentGroup(page).locator('.row__title')).toHaveText(['Drinks', 'Meal', 'See all meetups'])
+  await expect(recentGroup(page).locator('.row__title')).toHaveText(['Drinks'])
 
-  // Two weeks on, no birthday is near: the third row comes back.
+  // Two weeks on, no birthday is near: still one row.
   await page.clock.setFixedTime(new Date(2026, 9, 20, 12))
   await page.reload()
-  await expect(recentGroup(page).locator('.row__title')).toHaveText(['Drinks', 'Meal', 'Coffee', 'See all meetups'])
+  await expect(recentGroup(page).locator('.row__title')).toHaveText(['Drinks'])
   await expect(page.getByRole('region', { name: 'Birthdays soon' })).toHaveCount(0)
 })
 
@@ -140,7 +157,7 @@ test('Recent meetups hides while searching or filtering, and until a meetup has 
   await expect(recentGroup(page)).toHaveCount(0)
 
   await logMeetup(page, ['Kim'], { date: '2026-10-01' })
-  await expect(recentGroup(page).locator('.row__title')).toHaveText(['Coffee', 'See all meetups'])
+  await expect(recentGroup(page).locator('.row__title')).toHaveText(['Coffee'])
 
   const search = page.getByLabel('Search friends')
   await search.fill('k')
@@ -190,12 +207,12 @@ test('the search field stays put while the groups above it hide and come back', 
   await search.fill('a')
   await expect(recentGroup(page)).toHaveCount(0)
   expect(Math.abs((await topOf(field)) - start), 'The field stays put when the groups hide').toBeLessThanOrEqual(4)
-  await expect(page.locator('.friends-filters + .inset-group').getByRole('link').first()).toBeInViewport()
+  await expect(page.locator('.inset-group').last().getByRole('link').first()).toBeInViewport()
 
   await search.fill('')
   await expect(recentGroup(page)).toBeVisible()
   expect(Math.abs((await topOf(field)) - start), 'The field stays put when they come back').toBeLessThanOrEqual(4)
-  await expect(page.locator('.friends-filters + .inset-group').getByRole('link').first()).toBeInViewport()
+  await expect(page.locator('.inset-group').last().getByRole('link').first()).toBeInViewport()
   // While Recent meetups comes back and its thumbnail arrives.
   for (const top of await topsOverFrames(page, '.friends-filters .search')) {
     expect(Math.abs(top - start), 'The field stays put as the thumbnail arrives').toBeLessThanOrEqual(4)
@@ -214,8 +231,8 @@ test('the search field stays put while the groups above it hide and come back', 
 
 test('a recent meetup opens its page with "Friends" on the back button', async ({ page }) => {
   await openWith(page, { friends: [ALEX, SAM, KIM], meetups: PAST })
-  await recentGroup(page).getByRole('link', { name: /^Meal/ }).click()
-  await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
+  await recentGroup(page).getByRole('link', { name: /^Drinks/ }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Drinks' })).toBeVisible()
   const back = page.locator('header.navbar .navbar__back')
   await expect(back).toHaveText('Friends')
   await back.click()
@@ -224,7 +241,7 @@ test('a recent meetup opens its page with "Friends" on the back button', async (
 })
 
 test('the friend page still leaves its friend out', async ({ page }) => {
-  await openWith(page, { friends: [ALEX, SAM, KIM], meetups: PAST })
+  await openWith(page, { friends: [ALEX, SAM, KIM], meetups: [MEAL, COFFEE, CALL] })
   const meal = recentGroup(page).getByRole('link', { name: /^Meal/ })
   await expect(meal).toHaveAccessibleName(/· with Alex and Sam · Tacos$/)
   await friendLink(page, 'Alex').click()

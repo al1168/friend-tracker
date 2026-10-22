@@ -11,7 +11,6 @@ import {
   meetupSearchText,
   meetupSubtitle,
   RECENT_MEETUPS,
-  RECENT_MEETUPS_WITH_BIRTHDAYS,
   recentMeetups,
   searchKey,
 } from './meetupHistory'
@@ -27,9 +26,8 @@ function loggedAt(id: string, date: string, time: string, fields: Partial<Meetup
 const ids = (meetups: Meetup[]) => meetups.map((m) => m.id)
 
 describe('limits', () => {
-  it('shows 3 recent meetups, 2 while Birthdays soon shows, and 60 rows a page', () => {
-    expect(RECENT_MEETUPS).toBe(3)
-    expect(RECENT_MEETUPS_WITH_BIRTHDAYS).toBe(2)
+  it('shows the latest meetup on the Friends tab on every day, and 60 rows a page', () => {
+    expect(RECENT_MEETUPS).toBe(1)
     expect(MEETUPS_PAGE_SIZE).toBe(60)
   })
 })
@@ -43,8 +41,8 @@ describe('recentMeetups', () => {
     loggedAt('evening', TODAY, '18:00'),
   ]
 
-  it('gives the latest meetups that happened, newest first, the one logged later first on the same date', () => {
-    expect(ids(recentMeetups(meetups, TODAY))).toEqual(['evening', 'morning', 'oct1'])
+  it('gives the latest meetup that happened, the one logged later first on the same date', () => {
+    expect(ids(recentMeetups(meetups, TODAY))).toEqual(['evening'])
   })
 
   it('never gives a future meetup', () => {
@@ -57,7 +55,7 @@ describe('recentMeetups', () => {
   })
 
   it('takes another limit', () => {
-    expect(ids(recentMeetups(meetups, TODAY, RECENT_MEETUPS_WITH_BIRTHDAYS))).toEqual(['evening', 'morning'])
+    expect(ids(recentMeetups(meetups, TODAY, 3))).toEqual(['evening', 'morning', 'oct1'])
   })
 })
 

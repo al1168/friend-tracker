@@ -1,20 +1,10 @@
 import type { Friend } from '../types'
+import { firstName } from './text'
 
 // Who paid is a plain fact on one place, in your words: never totaled, counted or compared (the No Ledger Rule).
-// These only put names on the "Who paid?" chips and a face beside a paid line.
+// The "Who paid?" chips name a friend by shortName (src/lib/text.ts); this only puts a face beside a paid line.
 
 type Named = Pick<Friend, 'name'>
-
-function firstName(friend: Named): string {
-  return friend.name.trim().split(/\s+/)[0]
-}
-
-/** How the "Who paid?" row names a friend on the meetup: the first name, or the full name when two of them share it. */
-export function payerLabel(friend: Named, people: readonly Named[]): string {
-  const first = firstName(friend).toLowerCase()
-  const sharing = people.filter((other) => firstName(other).toLowerCase() === first).length
-  return sharing > 1 ? friend.name.trim() : firstName(friend)
-}
 
 /**
  * The friend a paid line names, when its words match exactly one friend on the meetup (their first or full name,

@@ -18,8 +18,7 @@ import { formatDate } from '../lib/dates'
 import { changeBetween, insertAtCaret, insertPaidLine, insertPlaceLine, lineCaret, type DayEdit } from '../lib/dayEdit'
 import { BOX_FULL, DAY_MAX_TYPED, FEELINGS_MAX, readDay } from '../lib/dayText'
 import { feelingsApply } from '../lib/moods'
-import { payerLabel } from '../lib/payers'
-import { formatNameList } from '../lib/text'
+import { formatNameList, shortName } from '../lib/text'
 import { cleanWeather, WEATHER } from '../lib/weather'
 import type { Friend, Meetup, Mood, Weather } from '../types'
 import { DayHelperBar, type HelperRow, type Payer } from './DayHelperBar'
@@ -64,7 +63,7 @@ function payersFor(people: Friend[]): Payer[] {
   return [
     { key: 'me', label: 'Me', line: 'I paid' },
     ...people.map((friend) => {
-      const label = payerLabel(friend, people)
+      const label = shortName(friend, people)
       return { key: friend.id, label, line: `${label} paid`, friend }
     }),
     { key: 'split', label: 'Split', line: 'We split it' },

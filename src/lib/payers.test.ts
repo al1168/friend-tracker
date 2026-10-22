@@ -1,21 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import { friend } from '../test/fixtures'
-import { paidBy, payerLabel } from './payers'
+import { paidBy } from './payers'
+import { shortName } from './text'
 
 const mariya = friend('f-mariya', 'Mariya')
 const jessie = friend('f-jessie', 'Jessie Tran')
 const samLee = friend('f-sam-lee', 'Sam Lee')
 const samPark = friend('f-sam-park', 'sam Park')
 
-describe('payerLabel', () => {
+// "Who paid?" names each friend on the meetup by shortName.
+describe('shortName among the friends on a meetup', () => {
   it('uses the first name', () => {
-    expect(payerLabel(jessie, [mariya, jessie])).toBe('Jessie')
-    expect(payerLabel(mariya, [mariya, jessie])).toBe('Mariya')
+    expect(shortName(jessie, [mariya, jessie])).toBe('Jessie')
+    expect(shortName(mariya, [mariya, jessie])).toBe('Mariya')
   })
 
   it('uses the full name when two friends on the meetup share a first name, ignoring case', () => {
-    expect(payerLabel(samLee, [samLee, samPark, mariya])).toBe('Sam Lee')
-    expect(payerLabel(samPark, [samLee, samPark, mariya])).toBe('sam Park')
+    expect(shortName(samLee, [samLee, samPark, mariya])).toBe('Sam Lee')
+    expect(shortName(samPark, [samLee, samPark, mariya])).toBe('sam Park')
   })
 })
 

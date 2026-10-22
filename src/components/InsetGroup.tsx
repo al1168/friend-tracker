@@ -8,6 +8,8 @@ interface InsetGroupProps {
   title?: string
   /** Heading level for the title (3 when nested inside a Section). */
   level?: 2 | 3
+  /** One text link at the end of the title's line ("See all"), with the `group-action` class. */
+  action?: ReactNode
   footer?: ReactNode
   /** An id for the footer, so a row can point at it with `describedBy`. */
   footerId?: string
@@ -16,15 +18,24 @@ interface InsetGroupProps {
   children: ReactNode
 }
 
-export function InsetGroup({ title, level = 2, footer, footerId, titleRef, children }: InsetGroupProps) {
+export function InsetGroup({ title, level = 2, action, footer, footerId, titleRef, children }: InsetGroupProps) {
   const titleId = useId()
   const Heading = level === 3 ? 'h3' : 'h2'
+  const heading = title && (
+    <Heading id={titleId} className="group-title" ref={titleRef} tabIndex={titleRef ? -1 : undefined}>
+      {title}
+    </Heading>
+  )
   return (
     <section className="inset-group" aria-labelledby={title && level !== 3 ? titleId : undefined}>
-      {title && (
-        <Heading id={titleId} className="group-title" ref={titleRef} tabIndex={titleRef ? -1 : undefined}>
-          {title}
-        </Heading>
+      {/* The action comes after the heading and before the rows, in the DOM as on screen. */}
+      {heading && action ? (
+        <div className="group-header">
+          {heading}
+          {action}
+        </div>
+      ) : (
+        heading
       )}
       <div className="inset-group__body">{children}</div>
       {footer && (
