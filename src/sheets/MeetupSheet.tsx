@@ -225,13 +225,16 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
       } else {
         const meetup = await addMeetup(input, photoChanges)
         added = meetup.id
-        toast({
-          message: `Logged with ${formatNameList(selected.map((f) => f.name))}`,
-          actionLabel: 'Undo',
-          onAction: () => {
-            deleteMeetup(meetup.id).catch(() => toast({ message: UNDO_FAILED, tone: 'plain' }))
-          },
-        })
+        // "Save and write about the day" confirms on the day page itself, which never shows a toast.
+        if (!writeDay) {
+          toast({
+            message: `Logged with ${formatNameList(selected.map((f) => f.name))}`,
+            actionLabel: 'Undo',
+            onAction: () => {
+              deleteMeetup(meetup.id).catch(() => toast({ message: UNDO_FAILED, tone: 'plain' }))
+            },
+          })
+        }
       }
       // Photos take real space, so ask Safari to keep the data when the phone runs low (best effort).
       if (photoChanges.add.length > 0) void askToKeepData()
@@ -242,7 +245,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
         const presetFriend = initial?.presetFriendId ? friendById.get(initial.presetFriendId) : undefined
         const fromHere: NavState = { backLabel: presetFriend?.name, tab: (location.state as NavState | null)?.tab }
         navigate(`/meetups/${added}`, { state: fromHere })
-        navigate(`/meetups/${added}/day`)
+        navigate(`/meetups/${added}/day`, { state: { logged: true } satisfies NavState })
       }
     } catch (caught) {
       setError(caught instanceof ValidationError ? caught.message : "Couldn't save. Please try again.")

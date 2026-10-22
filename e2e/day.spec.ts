@@ -102,13 +102,9 @@ test('"Save and write about the day" logs the meetup and opens its day; Back lan
   await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
 
   await expect(sheet).toBeHidden()
-  await expect(page.getByRole('status')).toContainText('Logged with Mariya')
   await expect(page.getByRole('heading', { level: 1, name: 'The day' })).toBeFocused()
-  // The toast sits 8px above the helper bar.
-  const toast = await page.locator('.toast').boundingBox()
-  const bar = await page.locator('.day-page__footer').boundingBox()
-  if (!toast || !bar) throw new Error('The toast or the helper bar is not on screen')
-  expect(Math.abs(toast.y + toast.height - (bar.y - 8)), 'Within a pixel').toBeLessThanOrEqual(1)
+  // The day page shows no toast: nothing covers the box you're about to write in.
+  await expect(page.locator('.toast')).toHaveCount(0)
   await dayBox(page).fill('Tacos')
   await page.getByRole('button', { name: 'Meal' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
@@ -118,20 +114,33 @@ test('"Save and write about the day" logs the meetup and opens its day; Back lan
   await expect(page.getByRole('heading', { level: 1, name: 'Mariya' })).toBeVisible()
 })
 
-test('Undo on the "Logged" toast takes the day with it, back to Friends', async ({ page }) => {
+test('a toast belongs to its page: following a link clears it', async ({ page }) => {
   await page.goto('/')
   await addFriend(page, 'Alex')
-  await page.getByRole('button', { name: 'Log meetup' }).click()
-  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
-  await sheet.getByLabel('Search all friends').fill('Alex')
-  await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name: 'Alex', exact: true }).click()
-  await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
-  await dayBox(page).fill('A line I meant to keep')
+  await logMeetup(page, ['Alex'])
+  await expect(page.getByRole('status')).toContainText('Logged with Alex')
 
-  await page.getByRole('status').getByRole('button', { name: 'Undo' }).click()
+  await page.getByRole('region', { name: 'Recent meetups' }).getByRole('link', { name: /^Coffee/ }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
+  await expect(page.locator('.toast')).toHaveCount(0)
+})
+
+test('going back keeps a toast: "Meetup deleted" shows on the page you land on, and Undo puts the row back', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await logMeetup(page, ['Alex'])
+  const recent = page.getByRole('region', { name: 'Recent meetups' })
+  await recent.getByRole('link', { name: /^Coffee/ }).click()
+  await page.getByRole('button', { name: 'Edit', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Edit meetup' }).getByRole('button', { name: 'Delete meetup' }).click()
 
   await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
-  await expect.poll(async () => (await readMeetups(page)).length).toBe(0)
+  await expect(recent).toHaveCount(0)
+  await expect(page.getByRole('status')).toContainText('Meetup deleted')
+  await page.getByRole('status').getByRole('button', { name: 'Undo' }).click()
+  await expect(recent.getByRole('link', { name: /^Coffee/ })).toBeVisible()
 })
 
 test('opens on its title, with the meetup on Back and who was there', async ({ page }) => {
@@ -659,9 +668,9 @@ test('the owner’s example, written on the walk home, reads back as their day',
   await pickActivity(sheet, 'Movie')
   await pickActivity(sheet, 'Shopping')
 
-  // 2. "Save and write about the day": the toast, and the day page slides in.
+  // 2. "Save and write about the day": the day page slides in, with no toast over it.
   await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
-  await expect(page.getByRole('status')).toContainText('Logged with Mariya, Jessie and Brandon')
+  await expect(page.locator('.toast')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Meal' })).toBeVisible()
   await expect(page.getByText('Sat, Oct 3 · with Mariya, Jessie and Brandon', { exact: true })).toBeVisible()
 

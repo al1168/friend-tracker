@@ -92,7 +92,8 @@ test('the meetup just logged scrolls clear of its toast and opens with one tap',
   await expect(toast).toBeVisible()
   await row.click({ timeout: 2000 })
   await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
-  await expect(toast).toContainText('Logged with Alex')
+  // The toast belongs to the friend page: the meetup opens without it.
+  await expect(page.locator('.toast')).toHaveCount(0)
 })
 
 test('at large text, the meetup just logged scrolls clear of a toast that wraps, and opens with one tap', async ({
@@ -123,7 +124,7 @@ test('at large text, the meetup just logged scrolls clear of a toast that wraps,
   await expect(toast).toBeVisible()
   await row.click({ timeout: 2000 })
   await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
-  await expect(toast).toContainText(`Logged with ${name}`)
+  await expect(page.locator('.toast')).toHaveCount(0)
 })
 
 test('at large text, the room for a toast that wrapped stays after it goes, until the next page', async ({ page }) => {

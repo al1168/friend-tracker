@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router'
+import { isDayPage } from '../lib/routes'
 import type { NavState } from './Page'
 import { IconFriends, IconSettings, IconStats } from './icons'
 import './TabBar.css'
@@ -14,14 +15,12 @@ const TABS = [
   { to: '/settings', label: 'Settings', Icon: IconSettings, matches: (path: string) => path.startsWith('/settings') },
 ]
 
-/** The day page fills the screen, so it has no tab bar. */
-const DAY_PAGE = /^\/meetups\/[^/]+\/day$/
-
 export function TabBar() {
   const location = useLocation()
   const { pathname } = location
   const originTab = (location.state as NavState | null)?.tab
-  if (DAY_PAGE.test(pathname)) return null
+  // The day page fills the screen, so it has no tab bar.
+  if (isDayPage(pathname)) return null
   return (
     <nav className="tabbar" aria-label="Main">
       {TABS.map(({ to, label, Icon, matches }) => {

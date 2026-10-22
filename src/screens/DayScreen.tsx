@@ -96,7 +96,7 @@ export function DayScreen() {
     [location.key, navigate],
   )
 
-  // Deleted (Undo on the "Logged" toast, another tab) or never there: go back, like the Meetup page does.
+  // Deleted (another tab) or never there: go back, like the Meetup page does.
   useEffect(() => {
     if (meetup === null) leave('/')
   }, [meetup, leave])
@@ -125,7 +125,6 @@ function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
   const dayRef = useRef<HTMLTextAreaElement>(null)
   const placeRef = useRef<HTMLInputElement>(null)
   const paidRef = useRef<HTMLButtonElement>(null)
-  const footerRef = useRef<HTMLDivElement>(null)
   const weatherId = useId()
   const dayId = useId()
   const hintId = useId()
@@ -172,21 +171,6 @@ function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
   useEffect(() => {
     if (status.gone) onLeave('/')
   }, [status.gone, onLeave])
-
-  // The toast sits 8px above the helper bar here (Toast.css): mark the page and publish the bar's height.
-  useLayoutEffect(() => {
-    const root = document.documentElement
-    root.classList.add('day-open')
-    const observer = new ResizeObserver(([entry]) => {
-      root.style.setProperty('--day-bar-height', `${Math.ceil(entry.borderBoxSize[0].blockSize)}px`)
-    })
-    if (footerRef.current) observer.observe(footerRef.current)
-    return () => {
-      observer.disconnect()
-      root.classList.remove('day-open')
-      root.style.removeProperty('--day-bar-height')
-    }
-  }, [])
 
   // A newer stored value (another tab, a backup restore) only goes into a field that isn't focused and has
   // nothing waiting to save, so nothing changes under your thumb.
@@ -518,7 +502,7 @@ function DayPage({ meetup, people, typeName, onLeave }: DayPageProps) {
 
       {/* With How it felt focused there's nothing to show until the keyboard is up ("Hide keyboard"), so the bar
           goes away rather than leave an empty band (DayScreen.css). */}
-      <div ref={footerRef} className="day-page__footer" data-bare={focused === 'feelings' && !status.failed}>
+      <div className="day-page__footer" data-bare={focused === 'feelings' && !status.failed}>
         {status.failed && (
           <p className="field-error" role="alert">
             {SAVE_FAILED}

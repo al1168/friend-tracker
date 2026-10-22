@@ -7,6 +7,8 @@ import './Page.css'
 export interface NavState {
   backLabel?: string
   tab?: string
+  /** On the day page: it was opened by "Save and write about the day", just after the meetup was logged. */
+  logged?: boolean
 }
 
 interface PageProps {

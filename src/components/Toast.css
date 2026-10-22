@@ -12,11 +12,6 @@
   pointer-events: none;
 }
 
-/* On the day page the toast sits 8px above the helper bar, which rides on the keyboard (see DayScreen). */
-.day-open .toast-region {
-  bottom: calc(var(--keyboard-inset, 0px) + var(--day-bar-height, 0px) + var(--space-2));
-}
-
 .toast {
   display: flex;
   align-items: center;

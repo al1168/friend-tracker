@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { useLocation } from 'react-router'
+import { useLocation, useNavigationType } from 'react-router'
+import { isDayPage } from '../lib/routes'
 import './Toast.css'
 
 export interface ToastOptions {
@@ -20,9 +21,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [paused, setPaused] = useState(false)
   const nextId = useRef(0)
   const toastRef = useRef<HTMLDivElement>(null)
-  const { key: pageKey } = useLocation()
+  const { key: pageKey, pathname } = useLocation()
+  const navigationType = useNavigationType()
+  const pathRef = useRef(pathname)
 
   const show = useCallback((options: ToastOptions) => {
+    // The day page never shows a toast, so none covers the box being written in: it says what it needs itself.
+    if (isDayPage(pathRef.current)) return
     nextId.current += 1
     setPaused(false)
     setToast({ ...options, id: nextId.current })
@@ -46,11 +51,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     observer.observe(element)
     return () => observer.disconnect()
   }, [toast])
-  // A new page keeps room only for a toast that is showing now.
+  // A toast belongs to the page it was shown on. Opening another page (a push) clears it at once, so an Undo never
+  // shows over a page it isn't about. Going back (a pop) keeps it, so a delete's Undo shows on the page you land on;
+  // so does a replace, which in this app stands in for Back or changes the same page. A new page keeps room only for
+  // a toast that is showing now (on a push the toast is still in the DOM here, so it isn't measured).
   useLayoutEffect(() => {
+    pathRef.current = pathname
+    if (navigationType === 'PUSH') {
+      setToast(null)
+      document.documentElement.style.setProperty('--toast-space', '0px')
+      return
+    }
     const element = toastRef.current
     const space = element ? Math.ceil(element.getBoundingClientRect().height) : 0
     document.documentElement.style.setProperty('--toast-space', `${space}px`)
+    // Only a new page runs this: its path and how it was reached are read with it.
   }, [pageKey])
   useLayoutEffect(
     () => () => {
