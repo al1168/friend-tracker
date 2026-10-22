@@ -10,6 +10,7 @@ import {
   LARGE_TEXT,
   lockHeading,
   logMeetup,
+  putSetting,
   reopenAfterAWhile,
   seedAppLock,
   setBirthday,
@@ -32,6 +33,10 @@ function daysAgo(days: number): string {
 async function seed(page: Page) {
   // The day page's Place and Who paid rows are captured over the fake keyboard.
   await fakeVisualViewport(page)
+  // A backup is exported for the import confirm: the download path, since the share sheet can't be driven in tests.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'canShare', { value: undefined, configurable: true })
+  })
   await page.goto('/')
   await page.getByRole('complementary', { name: 'Install the app' }).getByRole('button', { name: 'Dismiss' }).click()
   // Birthdays soon shows Maya (today), Sam (in 3 days, with an age) and Theo (in 9 days).
@@ -119,7 +124,7 @@ async function writeOwnersDay(page: Page) {
   await page.getByRole('textbox', { name: 'How it felt, in your words' }).fill(OWNER_FEELINGS)
 }
 
-async function captureAll(page: Page, prefix: string) {
+async function captureAll(page: Page, prefix: string, largeText = false) {
   await page.screenshot({ path: `${DIR}/${prefix}-02-friends.png` })
   // Where the search field, the chips and the friend list land below Birthdays soon and Recent meetups.
   await captureFullList(page, `${DIR}/${prefix}-02-friends-full.png`)
@@ -180,6 +185,18 @@ async function captureAll(page: Page, prefix: string) {
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${DIR}/${prefix}-15-day-empty.png` })
 
+  // Just logged, the keyboard up for The day: its top goes under the nav bar, with the Logged note above it.
+  const loggedDay = page.getByRole('textbox', { name: 'The day' })
+  await loggedDay.focus()
+  await openKeyboard(page)
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-25-day-logged.png` })
+  await loggedDay.blur()
+  await closeKeyboard(page)
+  await page.locator('.day-page__body').evaluate((element) => {
+    element.scrollTop = 0
+  })
+
   await writeOwnersDay(page)
   await expect(page.getByRole('status')).toBeEmpty({ timeout: 12_000 })
   await captureFullDay(page, `${DIR}/${prefix}-16-day-written.png`)
@@ -193,6 +210,10 @@ async function captureAll(page: Page, prefix: string) {
   await helpers.getByRole('textbox', { name: 'Place and time' }).fill('Blue willow 3:30')
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${DIR}/${prefix}-17-day-place.png` })
+  // The Place field across the whole bar, with a place and its time showing whole.
+  await helpers.getByRole('textbox', { name: 'Place and time' }).fill('nonstopstyle 10:30')
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: `${DIR}/${prefix}-26-day-place-row.png` })
   await helpers.getByRole('button', { name: 'Close' }).click()
   await helpers.getByRole('button', { name: 'Paid' }).click()
   await page.waitForTimeout(500)
@@ -221,6 +242,17 @@ async function captureAll(page: Page, prefix: string) {
   await page.locator('header.navbar .navbar__back').click()
   await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
 
+  // A meetup with no photos and no day: Photos, just the Add photos tile, comes before "Write about the day".
+  await friendLink(page, 'Kim Park').click()
+  await page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Coffee/ }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-27-meetup-photos.png` })
+  await page.locator('header.navbar .navbar__back').click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Kim Park' })).toBeVisible()
+  await page.locator('header.navbar .navbar__back').click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
+
   await friendLink(page, 'Alex Rivera').click()
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${DIR}/${prefix}-04-friend.png` })
@@ -245,8 +277,39 @@ async function captureAll(page: Page, prefix: string) {
   await goToTab(page, 'Stats')
   await page.screenshot({ path: `${DIR}/${prefix}-06-stats.png`, fullPage: true })
 
+  // A backup is due: the last one 40 days ago, and every meetup logged since. The dot on the Settings tab.
+  await goToTab(page, 'Friends')
+  await putSetting(page, 'lastBackupAt', new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString())
+  await page.reload()
+  if (largeText) await page.addStyleTag({ content: LARGE_TEXT })
+  await expect(page.getByRole('link', { name: 'Settings, backup suggested' })).toBeVisible()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-30-tab-dot.png` })
+
+  // Settings, where the footer says what's new since that backup (opening it sees the dot, which goes).
   await goToTab(page, 'Settings')
+  await expect(page.locator('.tabbar__dot')).toHaveCount(0)
   await page.screenshot({ path: `${DIR}/${prefix}-07-settings.png` })
+
+  // A backup made now, then one more meetup, then that backup imported: the confirm compares the two.
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export backup' }).click()
+  const backupPath = await (await download).path()
+  await goToTab(page, 'Friends')
+  await logMeetup(page, ['Jordan Lee'], { type: 'Coffee' })
+  await goToTab(page, 'Settings')
+  await page.locator('input[type="file"]').setInputFiles(backupPath)
+  const confirm = page.getByRole('alertdialog', { name: 'Replace all data with this backup?' })
+  await expect(confirm).toBeVisible()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-28-import-confirm.png` })
+
+  // Restored: the toast's Undo, and "Undo restore" in the Backup group for 7 days.
+  await confirm.getByRole('button', { name: 'Replace all data' }).click()
+  await expect(page.getByRole('status')).toContainText('Backup restored')
+  await page.getByRole('button', { name: 'Undo restore', exact: true }).scrollIntoViewIfNeeded()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-29-settings-undo-restore.png` })
 }
 
 /** Settings with birthday reminders just turned on, as in the Home Screen app (push is faked). */
@@ -302,7 +365,7 @@ test('large text', async ({ page }) => {
   test.setTimeout(120_000)
   await seed(page)
   await page.addStyleTag({ content: LARGE_TEXT })
-  await captureAll(page, 'large-text')
+  await captureAll(page, 'large-text', true)
 })
 
 test('accessibility text size day page and memory', async ({ page }) => {
