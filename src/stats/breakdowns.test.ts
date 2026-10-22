@@ -116,4 +116,13 @@ describe('friendsNotSeenInYear', () => {
     )
     expect(result.map((f) => f.id)).toEqual(['kim', 'lee', 'sam'])
   })
+
+  it('leaves out friends added after the year, read on the phone’s calendar', () => {
+    const later = { ...friend('new', 'New'), createdAt: '2026-03-01T12:00:00.000Z' }
+    // 9 PM on Dec 31, 2025 in Los Angeles, already Jan 1 in UTC.
+    const lastNight = { ...friend('eve', 'Eve'), createdAt: '2026-01-01T05:00:00.000Z' }
+    const unknown = { ...friend('odd', 'Odd'), createdAt: 'not a date' }
+    const result = friendsNotSeenInYear([], [later, lastNight, unknown], 2025, TODAY)
+    expect(result.map((f) => f.id)).toEqual(['eve', 'odd'])
+  })
 })

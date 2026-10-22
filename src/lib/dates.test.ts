@@ -3,6 +3,7 @@ import {
   addDays,
   daysBetween,
   formatDate,
+  formatMonthDay,
   formatMonthYear,
   isISODate,
   monthIndexOf,
@@ -65,6 +66,14 @@ describe('formatDate', () => {
 
   it('includes the year for other years', () => {
     expect(formatDate('2025-09-12', '2026-10-02')).toBe('Fri, Sep 12, 2025')
+  })
+})
+
+describe('formatMonthDay', () => {
+  it('gives the short month and the day, with no weekday or year', () => {
+    expect(formatMonthDay('2025-10-22')).toBe('Oct 22')
+    expect(formatMonthDay('2027-02-28')).toBe('Feb 28')
+    expect(formatMonthDay('2025-01-01')).toBe('Jan 1')
   })
 })
 

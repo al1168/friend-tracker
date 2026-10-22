@@ -3,6 +3,8 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-4);
+  /* As tall with the year alone as with its arrows, so nothing moves when a second year arrives. */
+  min-height: var(--tap);
   margin-top: calc(-1 * var(--space-4));
 }
 .year-switcher__year {

@@ -63,12 +63,18 @@ const dayFormatWithYear = new Intl.DateTimeFormat('en-US', {
   year: 'numeric',
   timeZone: 'UTC',
 })
+const monthDayFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 const monthYearFormat = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 
 /** "Sat, Sep 12" in the current year, "Fri, Sep 12, 2025" otherwise. */
 export function formatDate(iso: ISODate, today: ISODate): string {
   const date = new Date(toUTCms(iso))
   return yearOf(iso) === yearOf(today) ? dayFormat.format(date) : dayFormatWithYear.format(date)
+}
+
+/** "Oct 22": no weekday and no year, for a date the words around it place ("By Oct 22 last year"). */
+export function formatMonthDay(iso: ISODate): string {
+  return monthDayFormat.format(new Date(toUTCms(iso)))
 }
 
 /** "September 2026" */

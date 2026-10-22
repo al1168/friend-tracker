@@ -102,8 +102,19 @@ export function topFriends(
     .slice(0, limit)
 }
 
-/** Friends with no meetups (up to today) in `year`, by name. */
+/**
+ * Whether a friend was in the app by the end of `year`, on the phone's calendar. A `createdAt` that isn't a date
+ * counts as in.
+ */
+function addedBy(friend: Friend, year: number): boolean {
+  const added = new Date(friend.createdAt)
+  return Number.isNaN(added.getTime()) || added.getFullYear() <= year
+}
+
+/** Friends with no meetups (up to today) in `year`, by name. Friends added after the year aren't listed. */
 export function friendsNotSeenInYear(meetups: Meetup[], friends: Friend[], year: number, today: ISODate): Friend[] {
   const counts = countsByFriendForYear(meetups, year, today)
-  return friends.filter((friend) => !counts.has(friend.id)).sort((a, b) => compareNames(a.name, b.name))
+  return friends
+    .filter((friend) => !counts.has(friend.id) && addedBy(friend, year))
+    .sort((a, b) => compareNames(a.name, b.name))
 }
