@@ -27,9 +27,9 @@ function topAligned(field: Element): HTMLElement | null {
  * Only the body scrolls, and only when it shrinks, focus moves, or the caret's line is hidden: never the
  * locked page or the visual viewport, and never while someone is just scrolling.
  *
- * A field inside an element marked `data-reveal="top"` (the meetup sheet's friend search) goes to the top of the
- * view instead, that element's top its scroll margin below the header, so what comes up under it (the search's
- * results) gets all the room down to the keyboard. It goes there when it takes focus and whenever its text
+ * A field inside an element marked `data-reveal="top"` (the meetup sheet's picked friends and friend search) goes to
+ * the top of the view instead, that element's top its scroll margin below the header, so what comes up under it (the
+ * search's results) gets all the room down to the keyboard. It goes there when it takes focus and whenever its text
  * changes, keyboard or not, and when the body shrinks; moving its caret moves nothing.
  */
 export function useRevealFocusedField(active: boolean, bodyRef: RefObject<HTMLElement | null>) {

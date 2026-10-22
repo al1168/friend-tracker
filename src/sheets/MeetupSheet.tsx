@@ -81,6 +81,8 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
   const [activityDraft, setActivityDraft] = useState<string | null>(null)
   const [note, setNote] = useState(start.note)
   const [query, setQuery] = useState('')
+  // What the search last said aloud ("Added Kim"); `n` makes the same words a new announcement.
+  const [said, setSaid] = useState({ text: '', n: 0 })
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
@@ -167,9 +169,18 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
     setError(null)
   }
 
-  function addFriendId(id: string) {
-    setFriendIds((ids) => (ids.includes(id) ? ids : [...ids, id]))
+  /**
+   * A friend picked from the search results is added (never removed) and the field is emptied for the next name.
+   * Its chip shows just above the field; it's also said aloud, as focus stays in the field.
+   */
+  function pickFromSearch(friend: Friend) {
+    if (!friendIds.includes(friend.id)) {
+      setFriendIds((ids) => (ids.includes(friend.id) ? ids : [...ids, friend.id]))
+      setSaid((last) => ({ text: `Added ${friend.name}`, n: last.n + 1 }))
+    }
     setError(null)
+    setQuery('')
+    searchRef.current?.focus()
   }
 
   async function requestClose() {
@@ -279,22 +290,6 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
         <h3 id={whoId} className="form-section__label">
           Who
         </h3>
-        {selected.length > 0 && (
-          <div className="chip-wrap" role="group" aria-label="Selected friends">
-            {selected.map((friend) => (
-              <Chip
-                key={friend.id}
-                active
-                onClick={() => toggleFriend(friend.id)}
-                ariaLabel={`Remove ${friend.name}`}
-              >
-                <Avatar name={friend.name} photo={friend.photo} seed={friend.id} size={24} />
-                {friend.name}
-                <IconClose size={14} strokeWidth={2.6} />
-              </Chip>
-            ))}
-          </div>
-        )}
         {toPick.length > 0 && (
           <div
             className="friend-strip"
@@ -326,22 +321,42 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
             })}
           </div>
         )}
-        {/* Goes to the top of the sheet when it takes focus or its text changes, so the results get the room
-            (useRevealFocusedField). */}
-        <label className="search" data-reveal="top">
-          <IconSearch size={18} />
-          <input
-            ref={searchRef}
-            type="search"
-            className="search__input"
-            placeholder="Search all friends"
-            aria-label="Search all friends"
-            enterKeyHint="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={blurOnEnter}
-          />
-        </label>
+        {/* The friends picked, then the search. Together they go to the top of the sheet when the search takes
+            focus or its text changes, so the results get the room and a friend picked from them shows as a chip
+            just above the field (useRevealFocusedField). */}
+        <div className="friend-search" data-reveal="top">
+          {selected.length > 0 && (
+            <div className="chip-wrap" role="group" aria-label="Selected friends">
+              {selected.map((friend) => (
+                <Chip
+                  key={friend.id}
+                  active
+                  onClick={() => toggleFriend(friend.id)}
+                  ariaLabel={`Remove ${friend.name}`}
+                >
+                  <Avatar name={friend.name} photo={friend.photo} seed={friend.id} size={24} />
+                  {friend.name}
+                  <IconClose size={14} strokeWidth={2.6} />
+                </Chip>
+              ))}
+            </div>
+          )}
+          <label className="search">
+            <IconSearch size={18} />
+            <input
+              ref={searchRef}
+              type="search"
+              className="search__input"
+              placeholder="Search all friends"
+              aria-label="Search all friends"
+              enterKeyHint="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={blurOnEnter}
+              onBlur={() => setSaid((last) => (last.text ? { text: '', n: last.n } : last))}
+            />
+          </label>
+        </div>
         {query.trim() !== '' &&
           (results.length > 0 ? (
             <div role="group" aria-label="Search results">
@@ -349,11 +364,7 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
                 {results.map((friend) => (
                   <Row
                     key={friend.id}
-                    onClick={() => {
-                      addFriendId(friend.id)
-                      setQuery('')
-                      searchRef.current?.focus()
-                    }}
+                    onClick={() => pickFromSearch(friend)}
                     leading={<Avatar name={friend.name} photo={friend.photo} seed={friend.id} />}
                     title={friend.name}
                     trailing={friendIds.includes(friend.id) ? <IconCheck size={20} /> : undefined}
@@ -364,6 +375,9 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
           ) : (
             <p className="list-message">No friends match “{query.trim()}”.</p>
           ))}
+        <p className="visually-hidden" aria-live="polite">
+          <span key={said.n}>{said.text}</span>
+        </p>
       </section>
 
       <section className="form-section" aria-labelledby={whatId}>

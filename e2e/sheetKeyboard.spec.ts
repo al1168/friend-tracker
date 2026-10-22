@@ -266,6 +266,37 @@ test('the friend search goes to the top of the sheet as you type, so its results
   await expect(rows).toHaveCount(SEARCHABLE.filter((name) => name.toLowerCase().includes('ar')).length)
 })
 
+test('a friend picked from the search shows as a chip just above the field, and is said aloud', async ({ page }) => {
+  const { sheet, input, field } = await searchWithKeyboardUp(page)
+  const selected = sheet.getByRole('group', { name: 'Selected friends' })
+  const said = sheet.locator('[aria-live="polite"]').filter({ hasText: /^Added / })
+
+  for (const [letters, name] of [['ra', 'Zara'], ['lan', 'Lana']] as const) {
+    await input.fill(letters)
+    await nextFrames(page)
+    await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name, exact: true }).click()
+    await nextFrames(page)
+    await expect(input).toBeFocused()
+    await expect(input).toHaveValue('')
+    const chip = selected.getByRole('button', { name: `Remove ${name}` })
+    await expect(chip).toBeVisible()
+    const chipAt = await placement(chip)
+    const fieldAt = await placement(field)
+    expect(chipAt.top, `${name}'s chip shows in the sheet`).toBeGreaterThanOrEqual(chipAt.visibleTop)
+    expect(chipAt.bottom, `${name}'s chip is above the field`).toBeLessThanOrEqual(fieldAt.top)
+    expect(fieldAt.top - chipAt.bottom, `${name}'s chip is just above it`).toBeLessThanOrEqual(MARGIN)
+    expect(fieldAt.bottom, 'The field stays above the keyboard').toBeLessThanOrEqual(fieldAt.visibleBottom)
+    // Said once, politely, for VoiceOver.
+    await expect(said).toHaveText(`Added ${name}`)
+    await expect(sheet.getByRole('status')).toHaveCount(0)
+  }
+  await expect(selected.getByRole('button')).toHaveCount(2)
+
+  // Done searching: nothing is left to say.
+  await input.blur()
+  await expect(said).toHaveCount(0)
+})
+
 test.describe('as the Home Screen app', () => {
   // The iPhone 13's whole 844px screen, with its 47px status bar and 34px home indicator.
   test.use({ viewport: { width: 390, height: 844 } })
