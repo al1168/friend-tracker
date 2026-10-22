@@ -98,7 +98,7 @@ Recent meetups                          See all
   - Layout: `display: flex; gap: var(--space-2); overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scroll-padding-inline: var(--space-4); scrollbar-width: none`. Each tile is `flex: none; scroll-snap-align: start`.
   - Edges: it bleeds to the screen edges (`margin: 0 calc(-1 * var(--space-4)); padding: var(--space-1) var(--space-4)`) like `.chip-row`, so the first tile sits on the 16px margin.
   - Shared rules: the scroller rules are shared with the sheet-details batch's Who strip, as one `.snap-strip` class.
-- **What shows:** with 3 birthdays, two tiles show whole and most of the third peeks in (avatar and the start of the name), which says there's more. With 1 or 2 birthdays, they all show and nothing scrolls.
+- **What shows:** with 3 birthdays, two tiles show whole and the third peeks in (avatar and the start of the name), which says there's more. A tile is at least 2.4 to the strip's width, so that holds even with short names (changed after review). With 1 or 2 birthdays, they all show and nothing scrolls.
 - **Accessible name of a tile:** the full name, then the existing row wording: "Brandon Cao, In 2 days · turns 27", or "Lee, Today". It starts with the word the tile shows, so Voice Control's "Tap Brandon" works.
 - **Data:** none new. `describeNextBirthday` is split so the countdown has its own function, `describeBirthdayCountdown(days)` ("Today", "Tomorrow", "In 9 days"), in `src/lib/birthdays.ts`. `describeNextBirthday` keeps its output and uses it.
 - **Short names:** `payers.ts`'s private `firstName` and the rule in `payerLabel` move into `src/lib/text.ts` as `shortName(friend, among)`. `payerLabel(friend, people)` becomes `shortName(friend, people)`, with the same results. Birthdays soon passes all friends as `among`.
@@ -183,6 +183,7 @@ Title, search field, chips, Birthdays soon (heading, then each tile), Recent mee
   - the toast's 24px Peach check circle, drawing its check in over 420ms (`aria-hidden`; with Reduce Motion it's simply drawn);
   - "Logged with Mariya and Jessie" in Subhead 600 Warm Ink, built as the toast was: "Logged with " and `formatNameList` of the friends on the meetup, in the meetup's order;
   - an "Undo" text button at the end (Terracotta Ink 600, 44px).
+- **Undo is offered only for a meetup logged empty** (no words for the day, no photos, no activities; changed after review). Logged with any of those, the note shows without it, its room kept, as after a change.
 - **Undo lasts until you first change something on the page:** typing in either box, a weather chip, a mood, or any helper.
   - After that, the button is gone but its space stays (the box keeps its 44px height), so nothing below moves.
   - The note stays for the visit.
@@ -197,7 +198,7 @@ Title, search field, chips, Birthdays soon (heading, then each tile), Recent mee
 
 - **Today:** tapping The day box raises the keyboard, and `useRevealFocusedField` only makes sure the caret's line shows. On a short day the box stays where it was, under the context line, Weather, the label and the two-line hint, so about 4 lines show on the phone (2 with the toast).
 - **New, `data-reveal="start"` on The day box:**
-  - When the body shrinks because the keyboard came up while this box has focus, the reveal scrolls the body so the box's top sits 12px (its `scroll-margin`) under the nav bar.
+  - When the body shrinks because the keyboard came up while this box has focus, the reveal scrolls the body so the box's top sits 8px (its `scroll-margin-top`; 12px before review) under the nav bar.
   - It does this only when the caret's line still shows after the scroll. Otherwise (a long day tapped near its end), it shows the caret's line as today.
   - Typing and caret moves then follow the caret as today.
   - It happens once per keyboard opening. A helper handing focus back (Add, Close, a payer chip, Now) happens with the keyboard already up, so the body doesn't shrink and the box doesn't jump.
@@ -332,7 +333,7 @@ export function showBackupDot(due: boolean, seenAt: string | null, now: Date): b
   - It never refuses a file. Older and edited files still import.
 - **The confirm:**
   - The title "Replace all data with this backup?" and the destructive button "Replace all data" are unchanged.
-  - The message becomes up to four lines (the action sheet's message gains `white-space: pre-line`; no existing message has a line break):
+  - The message becomes up to four lines (the action sheet's message puts each line in its own block, 0.3em apart, changed after review; no existing message has a line break):
 
 ```
 Backup from Wed, Sep 2: 15 friends, 30 meetups, 6 photos.
@@ -380,7 +381,8 @@ Everything in the app now will be replaced. You can undo this in Settings for 7 
 
     ```
     Before Wed, Oct 21: 15 friends, 39 meetups, 9 photos.
-    In the app now: 15 friends, 30 meetups, 6 photos.
+    In the app now: 15 friends, 42 meetups, 6 photos.
+    3 meetups in the app now aren't in what's put back.
     Everything in the app now will be replaced.
     ```
 
@@ -460,7 +462,7 @@ Add or change:
   - Add "A batch of photos added on the Meetup page ends with "Added 3 photos" and Undo."
 - **The day page:**
   - Add "Opened by "Save and write about the day", the body starts with the Logged note: a Paper White box with the toast's check, "Logged with Mariya and Jessie" and an Undo that lasts until the first change on the page."
-  - Add "When the keyboard comes up for The day, the box's top goes 12px under the nav bar, unless that would hide the caret's line."
+  - Add "When the keyboard comes up for The day, the box's top goes 8px under the nav bar, unless that would hide the caret's line."
 - **Helper bar:** ""@ Place" swaps the row for the Place field across the whole bar (autocorrect off), with Now, Add, Close and Hide keyboard on a line under it."
 - **Meetup page:**
   - The order becomes "Activities, Photos, The day, How it felt, then the day row".
@@ -537,7 +539,7 @@ Add or change:
     - delete a meetup from its Edit sheet: after the page goes back, "Meetup deleted" still shows, and Undo puts the row back.
   - Line 665 checks the note instead of the toast.
 - **`e2e/dayKeyboard.spec.ts`** (the fake keyboard):
-  - With a short day, focusing The day puts its top 12px under the nav bar (within 2px).
+  - With a short day, focusing The day puts its top 8px under the nav bar (within 2px).
   - With a 60-line day and the caret at the end, the caret's line shows.
   - Adding a place from the Place row hands focus back without moving the box's top (within 1px).
   - The Place field is as wide as the bar less 32px (within 2px), and "Now", "Add", "Close" and "Hide keyboard" sit on the line below it.
@@ -635,3 +637,27 @@ The sheet-details batch merged into `main` before this one was built, so this ba
 - **"Undo restore" reads its subtitle as its description** through a new `Row` prop, `subtitleDescribes` (`aria-labelledby` the title, `aria-describedby` the subtitle).
 - **Dexie version 4 and the service worker.** Dexie 4.4 opens a database newer than it declares: a version 3 reader on a version 4 database reads its friends, and a birthday push read that way names the friend (`db.test.ts`, `push.test.ts`). There's no upgrade step, so nothing new runs in the worker.
 - **Screenshots** take the next free numbers: `25-day-logged`, `26-day-place-row`, `27-meetup-photos`, `28-import-confirm`, `29-settings-undo-restore` and `30-tab-dot`, in light, dark and large text. `07-settings` now shows the footer's "8 meetups since then". Still 15 screenshot tests.
+
+## Changes after review
+
+Two reviews (data safety, and spec, UX and visual) found these. Each fix but the shared dot query comes with a unit or e2e test that failed before it.
+
+### Data safety
+
+- **The Logged note's Undo only for a meetup logged empty.** It deletes the meetup, so it could take a day written in the sheet, or its photos, with it. "Save and write about the day" now pushes `{ logged: true, undoable }`, where `undoable` is `loggedEmpty(...)` (`src/lib/loggedUndo.ts`): the day text trimmed is empty, no photos were added and no activities were picked. The day page offers Undo only when `logged && undoable` and it isn't spent; otherwise the note shows with Undo's room kept, as after a change. A state without `undoable` (an older history entry) counts as not undoable.
+- **"Undo the restore?" says what it takes away.** Before confirming, Settings reads the snapshot's friend and meetup ids, keys only (`restoreUndoIds()`, the `[table+id]` primary keys, never a row or a photo), and the message gains a line before the last one when the app holds some that the snapshot doesn't: "3 meetups in the app now aren't in what's put back.", "1 meetup in the app now isn't in what's put back.", "1 friend and 2 meetups in the app now aren't in what's put back.". No line when there are none. If that read fails, the confirm doesn't open and the toast says "Couldn't undo. Please try again.".
+- **A second restore says it ends the first one's undo.** While a restore can still be undone (not past its 7 days), the import confirm ends with "The restore of Wed, Oct 21 can't be undone after this." (`formatDate` of the day it was taken), even into an app emptied since. `describeImport` takes the kept restore as a fifth argument.
+- **Room on the phone.**
+  - `undoRestore` deletes each part of the snapshot from `restoreUndo` right after putting it back, in the same transaction (groups, types, friends, meetups, then photos 20 at a time), so it never needs room for the data twice over.
+  - A restore that fails for lack of room (`isQuotaExceeded` in `src/db/errors.ts`: a `QuotaExceededError` or Firefox's `NS_ERROR_DOM_QUOTA_REACHED`, found through Dexie's `inner`, a `cause`, or a `BulkError`'s `failures`) changed nothing, and Settings asks "Restore without undo?" with "There isn't room on this iPhone to keep a copy for undo. Nothing was changed." and "Everything in the app now will be replaced, and it can't be undone.", then "Restore without undo" and Cancel. It runs `restoreBackup(data, now, { keepUndo: false })`: the restore with no snapshot, which also drops any older one (the confirm before it already said so), and shows "Backup restored" with no Undo.
+- **One backup dot query.** `BackupDotProvider` (in `App`, around the routes and the tab bar) runs `useBackupDotQuery` once and shares it through a context, so the tab bar and Settings don't scan twice. On the day page it reads nothing, as the tab bar's query never ran there.
+- **No toast after leaving Settings.** A restore or its undo that ends after Settings unmounted shows no "Backup restored" (with or without Undo) or "Restore undone" on the page you went to, and doesn't open "Restore without undo?" there either (it says "Couldn't restore the backup. Nothing was changed." instead). A failure still says so wherever you are.
+
+### Spec, UX and visual
+
+- **The Logged note never shrinks.** It was a flex item with `min-height: 44px` in the day page's column, so the column squeezed it to 44px and its wrapped words spilled out at large text sizes. It's `flex: none` now.
+- **The day box aligns 8px under the nav bar** (`scroll-margin-top: var(--space-2)` on that textarea), so no sliver of the hint shows above it; its focus ring still fits. With the hint out of view, WebKit's scroll anchoring picked a line of GrowField's hidden highlight copy as its anchor, so adding a place (a new line) scrolled the page by a line. The copy is `overflow-anchor: none` now.
+- **Birthdays soon spacing.** The strip takes back its 4px above and below (`margin-block: calc(-1 * var(--space-1))`, as the Who strip does), so the title sits 8px above the tiles and the next group 24px below them. The filters' `margin-bottom: -8px` now applies only when the untitled friend list (or its "No friends match" message) follows them directly; a titled group sits 24px under the chips, so "See all"'s hit area can't reach into the chip row.
+- **Birthday tiles are at least 2.4 to the strip's width** (`min-width: calc((100% - var(--space-2)) / 2.4)`), so two show whole and the third plainly peeks in, even with short names. A very long first name still makes its tile wider.
+- **"Add photos" wraps only between words** (`overflow-wrap: normal` on `.photo-add`, no hyphens, which would still split the word), so at accessibility sizes it reads "Add / photos", never "phot / os". The word fits inside the tile.
+- **The confirm's facts are blocks.** The action sheet's message puts each line in its own `span` block, 0.3em below the one before, instead of `white-space: pre-line`, so a fact that wraps at large text sizes doesn't run into the next. A space between them keeps VoiceOver's description one message, read in order.
