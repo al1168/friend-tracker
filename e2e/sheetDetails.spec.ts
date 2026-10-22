@@ -293,6 +293,30 @@ test.describe('swiping through friends', () => {
     await expect(page.getByRole('status')).toContainText('Logged with Friend 12')
   })
 
+  test('the swiping strip has room for a focused tile’s ring, and its tiles stay where they were', async ({ page }) => {
+    await page.goto('/')
+    await seedMeetups(page, { friends: NAMES.map((name, i) => friendRow(`f${i + 1}`, name)) })
+    const sheet = await openLogMeetup(page)
+    const strip = sheet.getByRole('group', { name: 'Friends', exact: true })
+    const room = await strip.evaluate((element) => {
+      // The strip scrolls, so it clips at its padding box.
+      const top = element.getBoundingClientRect().top + element.clientTop
+      const bottom = top + element.clientHeight
+      const tiles = [...element.querySelectorAll('.friend-tile')].map((tile) => tile.getBoundingClientRect())
+      const label = element.closest('section')?.querySelector('.form-section__label')?.getBoundingClientRect()
+      if (!label) throw new Error('No Who label')
+      return {
+        above: Math.min(...tiles.map((tile) => tile.top - top)),
+        below: Math.min(...tiles.map((tile) => bottom - tile.bottom)),
+        underLabel: tiles[0].top - label.bottom,
+      }
+    })
+    // The ring is 2px wide, 2px out from the tile.
+    expect(room.above, 'Room for the ring above the top row').toBeGreaterThanOrEqual(4)
+    expect(room.below, 'and below the bottom row').toBeGreaterThanOrEqual(4)
+    expect(room.underLabel, 'The tiles start the section’s 8px gap under Who, as before').toBeCloseTo(8, 0)
+  })
+
   test('a tile that takes keyboard focus scrolls into view', async ({ page }) => {
     await page.goto('/')
     await seedMeetups(page, { friends: NAMES.map((name, i) => friendRow(`f${i + 1}`, name)) })

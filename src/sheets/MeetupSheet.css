@@ -1,19 +1,23 @@
-/* Who: every friend as a tile, most recently seen first. Up to 8 fill a still grid four across. More make a strip
-   two rows high, filled a column at a time, that swipes sideways: it runs to the sheet's edges with its first column
-   on the 16px margin (like the meetup type chips), and its columns are a little narrower than a quarter of the
-   width, so the fifth peeks in to show there's more. Each column snaps to the margin. */
+/* Who: every friend as a tile, the friends you met most in the last 90 days first, then the rest by their most recent
+   meetup, then those never seen by name (from a friend's page, the friends usually with them come first). Up to 8 fill
+   a still grid four across. More make a strip two rows high, filled a column at a time, that swipes sideways: it runs
+   to the sheet's edges with its first column on the 16px margin (like the meetup type chips), and its columns are a
+   little narrower than a quarter of the width, so the fifth peeks in to show there's more. Each column snaps to the
+   margin. */
 .friend-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-3) var(--space-2);
 }
+/* A strip that scrolls clips what spills out of it, so 4px above and below (cancelled by the margin, so nothing
+   moves) hold a focused tile's ring: 2px wide, 2px out. */
 .friend-strip[data-swipes='true'] {
   grid-template-columns: none;
   grid-template-rows: repeat(2, auto);
   grid-auto-flow: column;
   grid-auto-columns: calc((100% - 3 * var(--space-2)) / 4.4);
-  margin: 0 calc(-1 * var(--space-4));
-  padding: 0 var(--space-4);
+  margin: -4px calc(-1 * var(--space-4));
+  padding: 4px var(--space-4);
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scroll-snap-type: x mandatory;

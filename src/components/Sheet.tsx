@@ -125,7 +125,7 @@ export function Sheet({ open, title, onRequestClose, action, footer, children }:
               wide as the wider one: the title stays centered and can wrap at large text sizes. */}
           <div className="sheet__bar">
             <span className="sheet__side">
-              <button type="button" className="text-button sheet__cancel" onClick={() => void onRequestClose()}>
+              <button type="button" className="text-button" onClick={() => void onRequestClose()}>
                 Cancel
               </button>
               {action && (
