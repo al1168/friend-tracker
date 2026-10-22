@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { OWNER_DAY_TYPED, OWNER_FEELINGS } from '../src/test/dayFixtures.ts'
 import {
   addFriend,
+  addPhotos,
   addToList,
   dayFromToday,
   drawnPhoto,
@@ -52,6 +53,8 @@ async function seed(page: Page) {
   await addFriend(page, 'Theo Brooks', 'Family', { month: inNine.month, day: inNine.day })
   // The owner's example day is written with these three.
   for (const name of ['Mariya', 'Jessie', 'Brandon']) await addFriend(page, name)
+  // Never seen: her page has the one calm line instead of numbers.
+  await addFriend(page, 'Lena Fischer', 'Family')
   // The meetup page, the viewer and the sheet show this one: two activities and three photos.
   const photos = [
     await drawnPhoto(page, 'ramen.png', 1200, 900, 25),
@@ -253,6 +256,15 @@ async function captureAll(page: Page, prefix: string, largeText = false) {
   await page.locator('header.navbar .navbar__back').click()
   await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
 
+  // A friend never seen: History says so in one line, with no numbers under it.
+  await friendLink(page, 'Lena Fischer').click()
+  await expect(page.getByText('No meetups yet. Log one when you see them.')).toBeVisible()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-31-friend-no-meetups.png` })
+  await page.locator('header.navbar .navbar__back').click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
+
+  // History comes before the numbers.
   await friendLink(page, 'Alex Rivera').click()
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${DIR}/${prefix}-04-friend.png` })
@@ -371,14 +383,21 @@ test('large text', async ({ page }) => {
 test('accessibility text size day page and memory', async ({ page }) => {
   test.setTimeout(120_000)
   await page.goto('/')
-  for (const name of ['Mariya', 'Jessie', 'Brandon']) await addFriend(page, name)
+  await page.getByRole('complementary', { name: 'Install the app' }).getByRole('button', { name: 'Dismiss' }).click()
+  const longName = 'Maximiliana Alexandra Featherstonehaugh-Worthington'
+  for (const name of ['Mariya', 'Jessie', 'Brandon Cao', longName]) await addFriend(page, name)
+  const photo = await drawnPhoto(page, 'ramen.png', 1200, 900, 25)
   await page.addStyleTag({ content: 'html { font: 33px/1.35 -apple-system, system-ui, sans-serif !important; }' })
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
-  for (const name of ['Mariya', 'Jessie', 'Brandon']) {
+  for (const name of ['Mariya', 'Jessie', 'Brandon Cao']) {
     await sheet.getByRole('group', { name: 'Friends', exact: true }).getByRole('button', { name }).click()
   }
+  // Who at this size: two tiles across, each first name whole.
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/ax-03-log-sheet.png` })
   await sheet.getByRole('button', { name: 'Meal', exact: true }).click()
+  await addPhotos(sheet, [photo])
   await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
   await writeOwnersDay(page)
   await expect(page.getByRole('status')).toBeEmpty({ timeout: 12_000 })
@@ -389,6 +408,26 @@ test('accessibility text size day page and memory', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${DIR}/ax-12-meetup.png`, fullPage: true })
+  await page.locator('header.navbar .navbar__back').click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
+
+  // The Meetups page: the row's photo under its words, every word whole.
+  await page.getByRole('link', { name: 'See all meetups' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Meetups' })).toBeVisible()
+  await page.waitForTimeout(500)
+  await captureFullList(page, `${DIR}/ax-19-meetups.png`)
+  await page.locator('header.navbar .navbar__back').click()
+
+  // Mariya's page: History before the numbers. Then a long name, with "Friends" whole on the back button.
+  await friendLink(page, 'Mariya').click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Mariya' })).toBeVisible()
+  await page.waitForTimeout(500)
+  await captureFullList(page, `${DIR}/ax-04-friend.png`)
+  await page.locator('header.navbar .navbar__back').click()
+  await friendLink(page, longName).click()
+  await expect(page.getByRole('heading', { level: 1, name: longName })).toBeVisible()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/ax-05-long-name.png` })
 })
 
 test('large text reminders on', async ({ page }) => {
