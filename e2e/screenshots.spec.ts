@@ -124,23 +124,35 @@ async function captureAll(page: Page, prefix: string) {
   // Where the search field, the chips and the friend list land below Birthdays soon and Recent meetups.
   await captureFullList(page, `${DIR}/${prefix}-02-friends-full.png`)
 
+  // The New friend sheet, with Save at the top right.
+  await page.getByRole('button', { name: 'Add friend' }).first().click()
+  const friendSheet = page.getByRole('dialog', { name: 'New friend' })
+  await expect(friendSheet).toBeVisible()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-23-friend-sheet.png` })
+  await friendSheet.getByRole('button', { name: 'Cancel' }).click()
+  await expect(friendSheet).toBeHidden()
+
   // The Log sheet: the friend search over the keyboard, then Save at the top right over every friend's tile, then The
-  // day with a place line tinted, then the day page written through it.
+  // day with a place line tinted, then the end of the sheet, then the day page written through it.
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
   const body = sheet.locator('.sheet__body')
   const search = sheet.getByLabel('Search all friends')
+  const pickFromSearch = async (name: string) => {
+    await search.fill(name)
+    await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name, exact: true }).click()
+  }
   await search.focus()
   await openKeyboard(page)
+  // Mariya picked from the search: her chip sits just above the field, over the results for the next name.
+  await pickFromSearch('Mariya')
   await search.fill('a')
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${DIR}/${prefix}-22-log-search.png` })
   await search.fill('')
   await closeKeyboard(page)
-  for (const name of ['Mariya', 'Jessie', 'Brandon']) {
-    await search.fill(name)
-    await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name, exact: true }).click()
-  }
+  for (const name of ['Jessie', 'Brandon']) await pickFromSearch(name)
   await sheet.getByRole('button', { name: 'Meal', exact: true }).click()
   await search.blur()
   await body.evaluate((element) => {
@@ -156,6 +168,13 @@ async function captureAll(page: Page, prefix: string) {
   await page.screenshot({ path: `${DIR}/${prefix}-21-log-day.png` })
   // The day page opens empty for the captures that follow.
   await sheetDay.fill('')
+  await sheetDay.blur()
+  // The end of the sheet: Activities, Photos and "Save and write about the day".
+  await body.evaluate((element) => {
+    element.scrollTop = element.scrollHeight
+  })
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${DIR}/${prefix}-24-log-end.png` })
   await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'The day' })).toBeVisible()
   await page.waitForTimeout(500)
