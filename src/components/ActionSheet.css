@@ -53,12 +53,18 @@
   font-weight: 600;
   color: var(--ink-2);
 }
-/* A message may run to several short lines, one fact each (the import confirm). */
+/* A message may run to several short lines, one fact each (the import confirm): each its own block, 0.3em below the
+   one before, so a fact that wraps at large text sizes still reads as one. */
 .action-sheet__message {
   margin: var(--space-1) 0 0;
   font-size: var(--text-footnote);
   color: var(--ink-2);
-  white-space: pre-line;
+}
+.action-sheet__line {
+  display: block;
+}
+.action-sheet__line + .action-sheet__line {
+  margin-top: 0.3em;
 }
 .action-sheet__button {
   display: flex;

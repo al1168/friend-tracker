@@ -304,3 +304,37 @@ test('the photo viewer changes photos with a swipe, and only fades with Reduce M
   await page.mouse.up()
   await expect(page.getByRole('dialog', { name: 'Photo 1 of 2' })).toBeVisible()
 })
+
+test('at an accessibility text size "Add photos" wraps between its words, never inside one, and stays in its tile', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  await logMeetup(page, ['Alex'])
+  await page.addStyleTag({ content: 'html { font: 33px/1.35 -apple-system, system-ui, sans-serif !important; }' })
+  await openFriendPage(page, 'Alex')
+  await page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Coffee/ }).click()
+  const tile = page.getByRole('region', { name: 'Photos' }).getByRole('button', { name: 'Add photos' })
+  await expect(tile).toBeVisible()
+
+  const words = await tile.evaluate((button) => {
+    const box = button.getBoundingClientRect()
+    const label = button.querySelector('span')?.firstChild
+    if (!label?.textContent) throw new Error('No label')
+    return [...label.textContent.matchAll(/\S+/g)].map((match) => {
+      const range = document.createRange()
+      range.setStart(label, match.index)
+      range.setEnd(label, match.index + match[0].length)
+      const rects = [...range.getClientRects()]
+      return {
+        word: match[0],
+        lines: new Set(rects.map((rect) => Math.round(rect.top))).size,
+        inside: rects.every((rect) => rect.left >= box.left && rect.right <= box.right),
+      }
+    })
+  })
+  expect(words).toEqual([
+    { word: 'Add', lines: 1, inside: true },
+    { word: 'photos', lines: 1, inside: true },
+  ])
+})

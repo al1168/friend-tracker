@@ -379,7 +379,8 @@ textarea.field {
   font-weight: 600;
   line-height: 1.25;
   text-align: center;
-  overflow-wrap: anywhere;
+  /* Wraps between words only: at accessibility sizes "Add photos" takes two lines, never "phot / os". */
+  overflow-wrap: normal;
   transition: background-color var(--dur-fast);
 }
 .photo-add:active {

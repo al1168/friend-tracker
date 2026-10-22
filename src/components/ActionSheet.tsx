@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { createContext, Fragment, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useScrollLock } from '../hooks/useScrollLock'
 import { IconCheck } from './icons'
@@ -99,7 +99,18 @@ export function ActionSheetProvider({ children }: { children: ReactNode }) {
                 {(options.title || options.message) && (
                   <div className="action-sheet__header">
                     {options.title && <p className="action-sheet__title">{options.title}</p>}
-                    {options.message && <p id={messageId} className="action-sheet__message">{options.message}</p>}
+                    {options.message && (
+                      <p id={messageId} className="action-sheet__message">
+                        {/* One block a line (the import confirm's facts), so wrapped lines don't run together. The
+                            space between them is only for VoiceOver, which reads the message as one. */}
+                        {options.message.split('\n').map((line, i) => (
+                          <Fragment key={i}>
+                            {i > 0 && ' '}
+                            <span className="action-sheet__line">{line}</span>
+                          </Fragment>
+                        ))}
+                      </p>
+                    )}
                   </div>
                 )}
                 {options.actions.map((action) => (

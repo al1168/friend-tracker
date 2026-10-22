@@ -2,19 +2,29 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+/* The friend list (untitled), or the message standing in for it, right under the filters sits closer, 16px: the
+   search goes with the list. A titled group keeps the 24px between groups, so "See all"'s hit area, which reaches up
+   into that space, stays clear of the chips. */
+.friends-filters:has(+ .inset-group > .inset-group__body:first-child, + .list-message) {
   margin-bottom: calc(-1 * var(--space-2));
 }
 
-/* Birthdays soon: one row of tiles that scrolls sideways (.snap-strip in base.css), each tile snapping to the margin. */
+/* Birthdays soon: one row of tiles that scrolls sideways (.snap-strip in base.css), each tile snapping to the margin.
+   The negative margin takes back the strip's 4px above and below (room for a focus ring), as the Who strip does, so
+   the title sits 8px above the tiles and the next group 24px below them. */
 .birthday-strip {
   display: flex;
   gap: var(--space-2);
-  margin-block: 0;
+  margin-block: calc(-1 * var(--space-1));
   list-style: none;
   scroll-snap-type: x proximity;
 }
+/* At least 2.4 tiles to the strip's width: two show whole and a good part of the third peeks in, even when the names
+   are short, so there's always a sign of more. */
 .birthday-strip > li {
   flex: none;
+  min-width: calc((100% - var(--space-2)) / 2.4);
   scroll-snap-align: start;
 }
 /* Paper White with 14px corners: the 44px face, then the short name over the countdown. 60px tall at the default

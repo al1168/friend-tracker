@@ -18,9 +18,11 @@ async function exportFile(page: Page): Promise<string> {
   return path
 }
 
-/** A confirm's message, one fact a line. */
+/** A confirm's message, one fact a line: each line is its own block. */
 async function messageLines(confirm: Locator): Promise<string[]> {
-  return (await confirm.locator('.action-sheet__message').evaluate((element) => element.textContent ?? '')).split('\n')
+  const lines = confirm.locator('.action-sheet__message .action-sheet__line')
+  await expect(lines.first()).toBeVisible()
+  return lines.allTextContents()
 }
 
 /** The Settings tab in the tab bar, by its exact name. */
@@ -401,8 +403,19 @@ test('the import confirm compares the backup with the app', async ({ page }) => 
     "1 friend and 2 meetups in the app now aren't in this backup.",
     'Everything in the app now will be replaced. You can undo this in Settings for 7 days.',
   ])
-  // One line each.
-  await expect(confirm.locator('.action-sheet__message')).toHaveCSS('white-space', 'pre-line')
+  // Each fact is its own block, about 0.3em below the one before, so they don't run together when they wrap.
+  const gaps = await confirm.locator('.action-sheet__line').evaluateAll((lines) =>
+    lines.slice(1).map((line, i) => {
+      const em = parseFloat(getComputedStyle(line).fontSize)
+      return (line.getBoundingClientRect().top - lines[i].getBoundingClientRect().bottom) / em
+    }),
+  )
+  expect(gaps).toHaveLength(3)
+  for (const gap of gaps) expect(gap).toBeCloseTo(0.3, 1)
+  // VoiceOver reads them as one message, in order, with a space between facts.
+  await expect(confirm).toHaveAccessibleDescription(
+    "Backup from Wed, Sep 2: 1 friend, 1 meetup. In the app now: 2 friends, 3 meetups. 1 friend and 2 meetups in the app now aren't in this backup. Everything in the app now will be replaced. You can undo this in Settings for 7 days.",
+  )
   await confirm.getByRole('button', { name: 'Cancel' }).click()
   await expect(confirm).toHaveCount(0)
 })

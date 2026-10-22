@@ -59,6 +59,68 @@ test('friends come first: search, the chips, Birthdays soon and the latest meetu
   expect(third.bottom, 'The third friend’s name shows clear of the Log pill').toBeLessThanOrEqual(645)
 })
 
+test('under the chips the groups sit 24px apart, Birthdays soon 8px under its title with two whole tiles and a peek', async ({
+  page,
+}) => {
+  // Wed, Oct 21, 2026, noon: four birthdays soon, with names short enough that three tiles would just fit.
+  await page.clock.setFixedTime(new Date(2026, 9, 21, 12))
+  await page.goto('/')
+  const friends = [
+    friendRow('al', 'Al', { groupId: 'work', birthday: { month: 10, day: 21, year: null } }),
+    friendRow('bo', 'Bo', { birthday: { month: 10, day: 22, year: null } }),
+    friendRow('cy', 'Cy', { birthday: { month: 10, day: 24, year: null } }),
+    friendRow('di', 'Di', { birthday: { month: 10, day: 25, year: null } }),
+  ]
+  await seedMeetups(page, {
+    friends,
+    groups: [{ id: 'work', name: 'Work' }],
+    meetups: [meetupRow('coffee', '2026-10-19', ['bo'])],
+  })
+  await page.getByRole('complementary', { name: 'Install the app' }).getByRole('button', { name: 'Dismiss' }).click()
+  const chips = page.getByRole('group', { name: 'Filter by group' })
+  const birthdays = page.getByRole('region', { name: 'Birthdays soon' })
+  const recent = page.getByRole('region', { name: 'Recent meetups' })
+  await expect(birthdays.getByRole('link')).toHaveCount(4)
+  const near = (value: number, expected: number) => Math.abs(value - expected) <= 1
+
+  const title = await spanOf(birthdays.getByRole('heading'))
+  const tile = await spanOf(birthdays.getByRole('link').first())
+  expect(near(title.top - (await spanOf(chips)).bottom, 24), 'Birthdays soon 24px under the chips').toBe(true)
+  expect(near(tile.top - title.bottom, 8), 'Its title 8px above the tiles').toBe(true)
+  expect(near((await spanOf(recent)).top - tile.bottom, 24), 'Recent meetups 24px under the tiles').toBe(true)
+
+  // Two whole tiles, then a peek of the third, plainly cut off: there's more to swipe to.
+  const width = page.viewportSize()?.width ?? 0
+  const edges = await birthdays.getByRole('link').evaluateAll((links) =>
+    links.map((link) => {
+      const box = link.getBoundingClientRect()
+      return { left: box.left, right: box.right }
+    }),
+  )
+  expect(edges[1].right, 'The second tile shows whole').toBeLessThanOrEqual(width)
+  const peek = width - edges[2].left
+  expect(peek, 'The third tile peeks in').toBeGreaterThanOrEqual(40)
+  expect(peek / (edges[2].right - edges[2].left), 'Less than two thirds of it shows').toBeLessThan(2 / 3)
+
+  // With no birthday soon, Recent meetups sits 24px under the chips, and See all's hit area stays clear of them.
+  await page.clock.setFixedTime(new Date(2026, 11, 1, 12))
+  await page.reload()
+  await expect(birthdays).toHaveCount(0)
+  const chipsBottom = (await spanOf(chips)).bottom
+  expect(near((await spanOf(recent)).top - chipsBottom, 24), 'Recent meetups 24px under the chips').toBe(true)
+  const hitTop = await recent.getByRole('link', { name: 'See all meetups' }).evaluate((link) => {
+    const area = getComputedStyle(link, '::before')
+    return link.getBoundingClientRect().bottom - parseFloat(area.bottom) - parseFloat(area.height)
+  })
+  expect(hitTop, 'See all reaches up no further than the chips').toBeGreaterThanOrEqual(chipsBottom)
+
+  // The friend list alone, right under the chips, sits closer: 16px.
+  await chips.getByRole('button', { name: 'Work' }).click()
+  await expect(recent).toHaveCount(0)
+  const list = page.locator('.inset-group').last()
+  expect(near((await spanOf(list)).top - (await spanOf(chips)).bottom, 16), 'The list 16px under the chips').toBe(true)
+})
+
 test('adds friends and lists them', async ({ page }) => {
   await page.goto('/')
   await addFriend(page, 'Alex Smith')
