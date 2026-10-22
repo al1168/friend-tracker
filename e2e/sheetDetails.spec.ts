@@ -12,6 +12,13 @@ import {
   sheetSave,
 } from './helpers.ts'
 
+declare global {
+  interface Window {
+    /** Set by the test of the suggestion while the sheet opens: what the What row showed, in order. */
+    whatRowSeen?: string[]
+  }
+}
+
 // Most tests add a friend and log a meetup first, so they get more time than most.
 test.describe.configure({ timeout: 60_000 })
 
@@ -327,6 +334,54 @@ test.describe('the suggested meetup type', () => {
     await sheetSave(sheet).click()
     await expect(sheet).toBeHidden()
     expect((await readMeetups(page)).at(-1)).toMatchObject({ typeId: 'type-meal', friendIds: ['jamie'] })
+  })
+
+  test('tapping the type already suggested is no change, and tapping another one is', async ({ page }) => {
+    await page.goto('/')
+    await seedMeetups(page, { friends, meetups })
+    await openFriendPage(page, 'Jamie')
+    let sheet = await openLogMeetup(page)
+    const what = () => sheet.getByRole('group', { name: 'What' })
+    await expect(pickedType(sheet)).toHaveText(/Meal/)
+    await what().getByRole('button', { name: 'Meal', exact: true }).click()
+    await sheet.getByRole('button', { name: 'Cancel' }).click()
+    await expect(sheet).toBeHidden()
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
+
+    sheet = await openLogMeetup(page)
+    await what().getByRole('button', { name: 'Coffee', exact: true }).click()
+    await sheet.getByRole('button', { name: 'Cancel' }).click()
+    await expect(page.getByRole('alertdialog')).toContainText('Discard changes?')
+  })
+
+  test('while the sheet opens, the What row shows only the real suggestion, never the first type before it', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await seedMeetups(page, { friends, meetups })
+    await openFriendPage(page, 'Lee')
+    // Every type the What row shows picked, and whether it's scrolled, in order, from before the sheet opens.
+    await page.evaluate(() => {
+      const seen: string[] = []
+      window.whatRowSeen = seen
+      const note = () => {
+        const row = document.querySelector('[role="dialog"] .chip-row')
+        if (!row) return
+        const picked = row.querySelector('[aria-pressed="true"]')?.textContent ?? 'none'
+        const entry = `${picked} at ${row.scrollLeft > 0 ? 'scrolled' : 'start'}`
+        if (seen.at(-1) !== entry) seen.push(entry)
+      }
+      new MutationObserver(note).observe(document.body, { subtree: true, childList: true, attributes: true })
+      document.addEventListener('scroll', note, true)
+    })
+    const sheet = await openLogMeetup(page)
+    const trip = sheet.getByRole('group', { name: 'What' }).getByRole('button', { name: 'Trip', exact: true })
+    await expect(trip).toHaveAttribute('aria-pressed', 'true')
+    await expect.poll(() => shownInStrip(trip)).toBe(true)
+    const seen = (await page.evaluate(() => window.whatRowSeen)) ?? []
+    // Nothing picked and the row at its start, until Trip.
+    const beforeTrip = seen.slice(0, seen.findIndex((entry) => entry.includes('Trip')))
+    expect(beforeTrip.every((entry) => entry === 'none at start'), seen.join(', ')).toBe(true)
   })
 
   test('the suggestion follows the friends picked until a type is tapped, which then sticks', async ({ page }) => {

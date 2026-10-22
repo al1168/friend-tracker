@@ -114,9 +114,11 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
   }, [error])
 
   // A new meetup starts on a suggested type, worked out again as friends are picked, until a type is tapped; from
-  // then on the tapped one sticks. An edit keeps its own type, which typeId starts as.
+  // then on the tapped one sticks. An edit keeps its own type, which typeId starts as. There's no suggestion until
+  // both the types and the meetups have loaded: on the types alone it would be the first type, flipping (and moving
+  // the What row) as the meetups arrive. Until then no type is picked, so Save is dimmed.
   const suggestedTypeId = useMemo(
-    () => (types ? suggestMeetupType(meetups ?? [], friendIds, types, today) : null),
+    () => (types && meetups ? suggestMeetupType(meetups, friendIds, types, today) : null),
     [meetups, friendIds, types, today],
   )
   const effectiveTypeId = typeId ?? suggestedTypeId
@@ -154,10 +156,12 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
   }, [friends, query])
 
   const sameFriends = [...friendIds].sort().join() === [...start.friendIds].sort().join()
-  // Only a tapped type counts as a change: a suggestion alone never asks "Discard changes?".
+  // Only a tapped type counts as a change, and only one other than the type the sheet would show anyway: the
+  // meetup's own (Edit) or the suggestion (Log). A suggestion, or tapping it, never asks "Discard changes?".
+  const typeChanged = editing ? typeId !== start.typeId : typeId !== null && typeId !== suggestedTypeId
   const dirty =
     !sameFriends ||
-    typeId !== start.typeId ||
+    typeChanged ||
     date !== start.date ||
     activities.join('\n') !== start.activities.join('\n') ||
     !!activityDraft?.trim() ||
