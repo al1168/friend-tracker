@@ -31,6 +31,7 @@ test('friends come first: search, the chips, Birthdays soon and the latest meetu
   // A latest meetup whose subtitle runs to two lines.
   const latest = meetupRow('karaoke', '2026-10-19', ['alex', 'aisha', 'maxi', 'jordan'], {
     activities: ['Karaoke', 'Board games'],
+    note: 'Sang until the place closed, then walked the long way home along the river',
   })
   await seedMeetups(page, { friends, groups, meetups: [latest, meetupRow('older', '2026-10-01', ['kim'])] })
   await page.getByRole('complementary', { name: 'Install the app' }).getByRole('button', { name: 'Dismiss' }).click()
@@ -40,7 +41,7 @@ test('friends come first: search, the chips, Birthdays soon and the latest meetu
   const birthdays = page.getByRole('region', { name: 'Birthdays soon' })
   await expect(birthdays.getByRole('link')).toHaveCount(3)
   const recent = page.getByRole('region', { name: 'Recent meetups' })
-  await expect(recent.locator('.row__title')).toHaveText(['Coffee'])
+  await expect(recent.locator('.row__title')).toHaveText(['Alex, Aisha and 2 others'])
   const list = page.locator('.inset-group').last().getByRole('link')
   await expect(list).toHaveCount(8)
 

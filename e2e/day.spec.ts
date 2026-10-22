@@ -245,7 +245,7 @@ test('a toast belongs to its page: following a link clears it', async ({ page })
   await logMeetup(page, ['Alex'])
   await expect(page.getByRole('status')).toContainText('Logged with Alex')
 
-  await page.getByRole('region', { name: 'Recent meetups' }).getByRole('link', { name: /^Coffee/ }).click()
+  await page.getByRole('region', { name: 'Recent meetups' }).getByRole('link', { name: /Coffee/ }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
   await expect(page.locator('.toast')).toHaveCount(0)
 })
@@ -257,7 +257,7 @@ test('going back keeps a toast: "Meetup deleted" shows on the page you land on, 
   await addFriend(page, 'Alex')
   await logMeetup(page, ['Alex'])
   const recent = page.getByRole('region', { name: 'Recent meetups' })
-  await recent.getByRole('link', { name: /^Coffee/ }).click()
+  await recent.getByRole('link', { name: /Coffee/ }).click()
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
   await page.getByRole('dialog', { name: 'Edit meetup' }).getByRole('button', { name: 'Delete meetup' }).click()
 
@@ -265,7 +265,7 @@ test('going back keeps a toast: "Meetup deleted" shows on the page you land on, 
   await expect(recent).toHaveCount(0)
   await expect(page.getByRole('status')).toContainText('Meetup deleted')
   await page.getByRole('status').getByRole('button', { name: 'Undo' }).click()
-  await expect(recent.getByRole('link', { name: /^Coffee/ })).toBeVisible()
+  await expect(recent.getByRole('link', { name: /Coffee/ })).toBeVisible()
 })
 
 test('opens on its title, with the meetup on Back and who was there', async ({ page }) => {
@@ -914,12 +914,14 @@ test('the owner’s example, written on the walk home, reads back as their day',
   await expect(felt).toContainText(OWNER_FEELINGS)
   await expect(page.getByRole('link', { name: 'Edit the day' })).toBeVisible()
 
-  // In Mariya's history: the date, the others, the activities and the first places. No mood, no weather.
+  // In Mariya's history: the others, then the type, the date, the activities and the first places. No mood, no
+  // weather.
   await page.getByRole('button', { name: 'Back' }).click()
   await openFriendPage(page, 'Mariya')
   const row = page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Meal/ })
+  await expect(row.locator('.row__title')).toHaveText('Jessie and Brandon')
   await expect(row.locator('.row__subtitle')).toHaveText(
-    'Sat, Oct 3 · with Jessie and Brandon · Movie, Shopping · nonstopstyle, strand bookstore, Sammy L coffee and 5 more',
+    'Meal · Sat, Oct 3 · Movie, Shopping · nonstopstyle, strand bookstore, Sammy L coffee and 5 more',
   )
   await expect(row).not.toContainText('Okay')
   await expect(row).not.toContainText('Rainy')

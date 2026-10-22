@@ -1,7 +1,7 @@
 import { memo, type Ref } from 'react'
 import { useFirstPhotoThumb } from '../data/hooks'
 import type { ISODate } from '../lib/dates'
-import { meetupSubtitle } from '../stats/meetupHistory'
+import { meetupSubtitle, meetupTitle } from '../stats/meetupHistory'
 import type { Meetup, MeetupType } from '../types'
 import { Row } from './InsetGroup'
 import type { NavState } from './Page'
@@ -11,7 +11,10 @@ interface MeetupRowProps {
   meetup: Meetup
   /** Undefined when the meetup's type was deleted: the row then reads "Meetup" with ✨. */
   type: MeetupType | undefined
-  /** The names after "with", in the meetup's order (see meetupNames). */
+  /**
+   * Who was there, by short name (shortNameById), in the meetup's order; on a friend's page, the others (see
+   * meetupNames). They make the title. Empty: the title is the type.
+   */
   names: string[]
   today: ISODate
   /** Router state for the Meetup page: its back label, and the tab it keeps. */
@@ -44,7 +47,8 @@ export function MeetupThumb({ meetupId }: { meetupId: string }) {
 
 /**
  * One row for a meetup, the same everywhere (a friend's History, Recent meetups, the Meetups page): the type's
- * badge and name, the subtitle, the first photo and a chevron. Tapping it opens the Meetup page.
+ * badge, who was there as the title, the type and date in the subtitle, the first photo and a chevron. Tapping it
+ * opens the Meetup page.
  */
 export const MeetupRow = memo(function MeetupRow({
   meetup,
@@ -58,7 +62,9 @@ export const MeetupRow = memo(function MeetupRow({
   ref,
 }: MeetupRowProps) {
   const upcoming = showUpcoming && meetup.date > today
-  const subtitle = meetupSubtitle(meetup, names, today)
+  const typeName = type?.name ?? 'Meetup'
+  // The badge shows the type, so the title names people; the subtitle then starts with the type.
+  const subtitle = meetupSubtitle(meetup, names.length > 0 ? typeName : null, today)
   return (
     <Row
       ref={ref}
@@ -71,7 +77,7 @@ export const MeetupRow = memo(function MeetupRow({
       }
       title={
         <>
-          {type?.name ?? 'Meetup'}
+          {meetupTitle(names, typeName)}
           {upcoming && ' '}
           {upcoming && <span className="upcoming-badge">Upcoming</span>}
         </>

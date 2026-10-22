@@ -11,6 +11,7 @@ import { useFriends, useMeetupIdsWithPhotos, useMeetups, useMeetupTypes } from '
 import { useToday } from '../hooks/useToday'
 import type { ISODate } from '../lib/dates'
 import { isPlainEnter } from '../lib/keys'
+import { shortNameById } from '../lib/text'
 import {
   firstRows,
   historySections,
@@ -41,6 +42,7 @@ interface MeetupListProps {
   /** How many rows show, counted across the groups. */
   count: number
   typeById: ReadonlyMap<string, MeetupType>
+  /** Each meetup's row names, by short name. */
   namesById: ReadonlyMap<string, string[]>
   withPhotos: ReadonlySet<string>
   today: ISODate
@@ -127,10 +129,16 @@ export function MeetupsScreen() {
   const searched = useDeferredValue(query.trim())
 
   const nameById = useMemo(() => new Map((friends ?? []).map((friend) => [friend.id, friend.name] as const)), [friends])
+  const shortById = useMemo(() => shortNameById(friends ?? []), [friends])
   const typeById = useMemo(() => new Map((types ?? []).map((type) => [type.id, type] as const)), [types])
+  // Full names for the search, short names for the rows' titles.
   const namesById = useMemo(
     () => new Map((meetups ?? []).map((meetup) => [meetup.id, meetupNames(meetup, nameById)] as const)),
     [meetups, nameById],
+  )
+  const rowNamesById = useMemo(
+    () => new Map((meetups ?? []).map((meetup) => [meetup.id, meetupNames(meetup, shortById)] as const)),
+    [meetups, shortById],
   )
   // Folding every day is the slow part, so it happens only while there's a search, once per data change.
   const searching = searched !== ''
@@ -224,7 +232,7 @@ export function MeetupsScreen() {
             query={searched}
             count={count}
             typeById={typeById}
-            namesById={namesById}
+            namesById={rowNamesById}
             withPhotos={withPhotos}
             today={today}
             focusIndex={focusIndex}

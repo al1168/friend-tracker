@@ -150,7 +150,7 @@ async function openCoffee(page: Page) {
   await page.goto('/')
   await addFriend(page, 'Alex')
   await logMeetup(page, ['Alex'])
-  await page.getByRole('region', { name: 'Recent meetups' }).getByRole('link', { name: /^Coffee/ }).click()
+  await page.getByRole('region', { name: 'Recent meetups' }).getByRole('link', { name: /Coffee/ }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
 }
 

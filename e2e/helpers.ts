@@ -502,11 +502,14 @@ function escapeRegExp(text: string): string {
 }
 
 /**
- * A friend's row on the Friends tab (or Birthdays soon) by the friend's name. A friend row's name starts with the
- * friend's name (the avatar is hidden); a meetup row's starts with its type, so "with Alex" never matches.
+ * A friend's row on the Friends tab (or Birthdays soon) by the friend's name: a link to the friend's page whose name
+ * starts with the friend's name (the avatar is hidden). A meetup row's name can start with a friend's name too, but
+ * it links to the meetup.
  */
 export function friendLink(page: Page, name: string): Locator {
-  return page.getByRole('link', { name: new RegExp(`^${escapeRegExp(name)}`) })
+  return page
+    .getByRole('link', { name: new RegExp(`^${escapeRegExp(name)}`) })
+    .and(page.locator('a[href^="#/friends/"]'))
 }
 
 /** A friend as IndexedDB stores it, for seedMeetups. */

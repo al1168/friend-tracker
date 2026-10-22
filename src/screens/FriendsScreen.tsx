@@ -18,7 +18,7 @@ import { daysBetween, yearOf, type ISODate } from '../lib/dates'
 import { matchFriend, matchSubtitle } from '../lib/friendSearch'
 import { isPlainEnter } from '../lib/keys'
 import { isStandalone } from '../lib/platform'
-import { formatSince, shortName } from '../lib/text'
+import { formatSince, shortName, shortNameById } from '../lib/text'
 import { useSheets } from '../sheets/sheetsContext'
 import { countsByFriendForYear } from '../stats/counts'
 import { lastSeenByFriend } from '../stats/lastSeen'
@@ -88,7 +88,8 @@ export function FriendsScreen() {
 
   const birthdaysSoon = useMemo(() => upcomingBirthdays(friends ?? [], today), [friends, today])
   const showBirthdaysSoon = birthdaysSoon.length > 0 && unfiltered
-  const nameById = useMemo(() => new Map((friends ?? []).map((friend) => [friend.id, friend.name] as const)), [friends])
+  // Meetup rows name people by short name.
+  const nameById = useMemo(() => shortNameById(friends ?? []), [friends])
   const typeById = useMemo(() => new Map((types ?? []).map((type) => [type.id, type] as const)), [types])
 
   async function chooseSort() {

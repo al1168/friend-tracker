@@ -62,6 +62,29 @@ export function shortName(friend: Named, among: readonly Named[]): string {
   return shared ? friend.name.trim() : firstName(friend)
 }
 
+/** Each friend's short name among these friends, in order: "Logged with Mariya, Jessie and Brandon". */
+export function shortNames(friends: readonly Named[]): string[] {
+  return friends.map((friend) => shortName(friend, friends))
+}
+
+/**
+ * Every friend's short name among them all, by id: what `shortName(friend, friends)` gives, in one pass. Meetup rows
+ * name people this way, so a list of many rows reads each name once.
+ */
+export function shortNameById(friends: readonly (Named & { id: string })[]): Map<string, string> {
+  const counts = new Map<string, number>()
+  for (const friend of friends) {
+    const first = firstName(friend).toLowerCase()
+    counts.set(first, (counts.get(first) ?? 0) + 1)
+  }
+  return new Map(
+    friends.map((friend) => {
+      const first = firstName(friend)
+      return [friend.id, (counts.get(first.toLowerCase()) ?? 0) > 1 ? friend.name.trim() : first] as const
+    }),
+  )
+}
+
 // Intl.Segmenter arrived in iOS Safari 16.4; fall back to code points before that.
 const segmenter =
   typeof Intl.Segmenter === 'function' ? new Intl.Segmenter('en', { granularity: 'grapheme' }) : null

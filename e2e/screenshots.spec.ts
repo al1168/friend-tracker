@@ -236,7 +236,7 @@ async function captureAll(page: Page, prefix: string, largeText = false) {
   await page.waitForTimeout(500)
   await captureFullList(page, `${DIR}/${prefix}-19-meetups.png`)
   await page.getByRole('searchbox', { name: 'Search meetups' }).fill('ramen')
-  await expect(page.locator('.inset-group .row__title')).toHaveText(['Meal'])
+  await expect(page.locator('.inset-group .row__title')).toHaveText(['Alex and Sam'])
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${DIR}/${prefix}-20-meetups-search.png` })
   await page.locator('header.navbar .navbar__back').click()

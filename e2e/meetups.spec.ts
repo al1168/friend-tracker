@@ -83,8 +83,8 @@ test('sorts friends by most seen this year', async ({ page }) => {
   await addFriend(page, 'Amy')
   await addFriend(page, 'Zoe')
   await logMeetup(page, ['Zoe'])
-  // The friend rows only: Recent meetups above them now holds the Coffee and "See all meetups".
-  const names = page.getByRole('link', { name: /^(Amy|Zoe)/ }).locator('.row__title')
+  // The friend rows only: Recent meetups above them now holds the Coffee with Zoe and "See all meetups".
+  const names = page.locator('a.row[href^="#/friends/"] .row__title')
   await expect(names).toHaveText(['Amy', 'Zoe'])
   await page.getByRole('button', { name: /^Sort/ }).click()
   await page.getByRole('dialog', { name: 'Sort friends by' }).getByRole('button', { name: 'Most seen this year' }).click()

@@ -10,6 +10,7 @@ import {
   meetupNames,
   meetupSearchText,
   meetupSubtitle,
+  meetupTitle,
   RECENT_MEETUPS,
   recentMeetups,
   searchKey,
@@ -75,32 +76,42 @@ describe('meetupNames', () => {
   })
 })
 
+describe('meetupTitle', () => {
+  it('names who was there', () => {
+    expect(meetupTitle(['Mariya'], 'Meal')).toBe('Mariya')
+    expect(meetupTitle(['Mariya', 'Jessie'], 'Meal')).toBe('Mariya and Jessie')
+    expect(meetupTitle(['Mariya', 'Jessie', 'Brandon'], 'Meal')).toBe('Mariya, Jessie and Brandon')
+  })
+
+  it('shortens four names or more', () => {
+    expect(meetupTitle(['Alex', 'Sam', 'Kim', 'Lee'], 'Coffee')).toBe('Alex, Sam and 2 others')
+  })
+
+  it('is the type when no one else was there', () => {
+    expect(meetupTitle([], 'Coffee')).toBe('Coffee')
+  })
+})
+
 describe('meetupSubtitle', () => {
-  it('reads the date, who, the activities and the day’s first places', () => {
+  it('reads the type, the date, the activities and the day’s first places', () => {
     const owners = {
       ...meetup('m', '2026-10-03', ['m', 'j', 'b']),
       activities: ['Movie', 'Shopping'],
       note: OWNER_DAY_TYPED,
     }
-    expect(meetupSubtitle(owners, ['Mariya', 'Jessie', 'Brandon'], TODAY)).toBe(
-      'Sat, Oct 3 · with Mariya, Jessie and Brandon · Movie, Shopping · ' +
-        'nonstopstyle, strand bookstore, Sammy L coffee and 5 more',
+    expect(meetupSubtitle(owners, 'Meal', TODAY)).toBe(
+      'Meal · Sat, Oct 3 · Movie, Shopping · nonstopstyle, strand bookstore, Sammy L coffee and 5 more',
     )
   })
 
-  it('leaves out the parts that are empty', () => {
+  it('starts with the date when the title is the type, and leaves out the parts that are empty', () => {
     const tacos = { ...meetup('m', '2026-10-03', ['alex']), note: 'Tacos' }
-    expect(meetupSubtitle(tacos, [], TODAY)).toBe('Sat, Oct 3 · Tacos')
+    expect(meetupSubtitle(tacos, null, TODAY)).toBe('Sat, Oct 3 · Tacos')
+    expect(meetupSubtitle(meetup('m', '2026-10-03', ['alex']), null, TODAY)).toBe('Sat, Oct 3')
   })
 
   it('gives the year of a date in another year', () => {
-    expect(meetupSubtitle(meetup('m', '2025-09-12', ['sam']), ['Sam'], TODAY)).toBe('Fri, Sep 12, 2025 · with Sam')
-  })
-
-  it('shortens four names or more', () => {
-    expect(meetupSubtitle(meetup('m', '2026-10-03', ['a']), ['Alex', 'Sam', 'Kim', 'Lee'], TODAY)).toBe(
-      'Sat, Oct 3 · with Alex, Sam and 2 others',
-    )
+    expect(meetupSubtitle(meetup('m', '2025-09-12', ['sam']), 'Coffee', TODAY)).toBe('Coffee · Fri, Sep 12, 2025')
   })
 })
 
@@ -178,8 +189,23 @@ describe('matchesSearch', () => {
     expect(finds('sam tacos', { ...meetup('m', '2026-10-03', ['sam']), note: 'Tacos' }, 'Meal')).toBe(true)
   })
 
-  it('never searches the weather, the mood or the date', () => {
-    expect(finds('rainy', { ...meal, weather: ['rainy'] }, 'Meal')).toBe(false)
+  it('finds the weather’s words, on a meetup that has happened or is upcoming', () => {
+    const rainy = { ...meal, weather: ['rainy' as const, 'cold' as const] }
+    expect(finds('rainy', rainy, 'Meal')).toBe(true)
+    expect(finds('COLD', rainy, 'Meal')).toBe(true)
+    expect(finds('rainy jessie', rainy, 'Meal')).toBe(true)
+    expect(finds('rainy alex', rainy, 'Meal')).toBe(false)
+    expect(finds('sunny', rainy, 'Meal')).toBe(false)
+    expect(finds('rainy', { ...rainy, date: '2026-10-09' }, 'Meal')).toBe(true)
+  })
+
+  it('skips a weather it doesn’t know', () => {
+    const odd = { ...meal, weather: ['foggy'] } as unknown as Meetup
+    expect(finds('foggy', odd, 'Meal')).toBe(false)
+    expect(finds('meal', odd, 'Meal')).toBe(true)
+  })
+
+  it('never searches the mood or the date', () => {
     expect(finds('okay', { ...meal, mood: 'okay' }, 'Meal')).toBe(false)
     expect(finds('oct', meal, 'Meal')).toBe(false)
   })

@@ -13,7 +13,7 @@ import { useFriend, useFriends, useGroups, useMeetupIdsWithPhotos, useMeetups, u
 import { useToday } from '../hooks/useToday'
 import { describeNextBirthday, formatBirthday } from '../lib/birthdays'
 import { daysBetween, formatDate, formatMonthYear, yearOf } from '../lib/dates'
-import { formatSince } from '../lib/text'
+import { formatSince, shortNameById } from '../lib/text'
 import { useSheets } from '../sheets/sheetsContext'
 import { allTimeCountsByFriend, countsByFriendForYear, monthlyCounts } from '../stats/counts'
 import { groupByMonth } from '../stats/history'
@@ -55,7 +55,8 @@ export function FriendDetailScreen() {
 
   const groupName = groups.find((group) => group.id === friend.groupId)?.name
   const typeById = new Map(types.map((type) => [type.id, type] as const))
-  const nameById = new Map(friends.map((f) => [f.id, f.name] as const))
+  // Rows name the others by short name.
+  const nameById = shortNameById(friends)
   // A meetup opened from here says the friend's name on its back button, and keeps the tab this page came from.
   const fromFriend: NavState = { backLabel: friend.name, tab: (location.state as NavState | null)?.tab }
 
@@ -135,7 +136,7 @@ export function FriendDetailScreen() {
           data.history.map(({ month, meetups: monthMeetups }) => (
             <InsetGroup key={month} title={formatMonthYear(`${month}-01`)} level={3}>
               {monthMeetups.map((meetup) => (
-                // "with" leaves out the friend this page is about.
+                // The title names the others: this page is about the friend.
                 <MeetupRow
                   key={meetup.id}
                   meetup={meetup}

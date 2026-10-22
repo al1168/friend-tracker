@@ -2,6 +2,7 @@ import { formatDate, formatMonthYear, type ISODate } from '../lib/dates'
 import { daySnippet } from '../lib/dayText'
 import { feelingsApply } from '../lib/moods'
 import { formatNameList } from '../lib/text'
+import { WEATHER } from '../lib/weather'
 import type { Meetup } from '../types'
 import { groupByMonth, newestFirst } from './history'
 
@@ -21,8 +22,8 @@ export function recentMeetups(meetups: Meetup[], today: ISODate, limit = RECENT_
 }
 
 /**
- * The names a row says after "with", in the meetup's order. Ids with no friend are skipped. `leaveOut` is the
- * friend whose page the row is on.
+ * The names of who was there, in the meetup's order, from `nameById` (short names for a row's title, full names for
+ * the search). Ids with no friend are skipped. `leaveOut` is the friend whose page the row is on.
  */
 export function meetupNames(meetup: Meetup, nameById: ReadonlyMap<string, string>, leaveOut?: string): string[] {
   return meetup.friendIds
@@ -32,13 +33,21 @@ export function meetupNames(meetup: Meetup, nameById: ReadonlyMap<string, string
 }
 
 /**
- * A meetup row's subtitle: the date, "with …" (when there are names), the activities and the day's snippet, joined
- * by " · ".
+ * A meetup row's title: who was there ("Mariya, Jessie and Brandon", "Alex, Sam and 2 others"), or the type's name
+ * when no one else was (on a friend's page, a meetup with just them).
  */
-export function meetupSubtitle(meetup: Meetup, names: string[], today: ISODate): string {
+export function meetupTitle(names: string[], typeName: string): string {
+  return names.length > 0 ? formatNameList(names) : typeName
+}
+
+/**
+ * A meetup row's subtitle: the type (when the title names people; null when the title is the type), the date, the
+ * activities and the day's snippet, joined by " · ".
+ */
+export function meetupSubtitle(meetup: Meetup, typeName: string | null, today: ISODate): string {
   return [
+    typeName,
     formatDate(meetup.date, today),
-    names.length > 0 ? `with ${formatNameList(names)}` : null,
     meetup.activities.length > 0 ? meetup.activities.join(', ') : null,
     daySnippet(meetup.note),
   ]
@@ -59,12 +68,13 @@ export function searchKey(text: string): string {
 }
 
 /**
- * Everything the Meetups search looks in, folded: the names, the type's name, activities, the day, and How it
- * felt's words when the meetup has happened (feelingsApply). The parts are joined by line breaks, which no query
- * word holds, so a word never matches across two parts.
+ * Everything the Meetups search looks in, folded: the names, the type's name, activities, the weather's words
+ * ("Rainy"), the day, and How it felt's words when the meetup has happened (feelingsApply). Never the mood or the
+ * date. The parts are joined by line breaks, which no query word holds, so a word never matches across two parts.
  */
 export function meetupSearchText(meetup: Meetup, names: string[], typeName: string, today: ISODate): string {
-  const parts = [...names, typeName, ...meetup.activities, meetup.note]
+  const weather = WEATHER.filter(({ key }) => meetup.weather.includes(key)).map(({ label }) => label)
+  const parts = [...names, typeName, ...meetup.activities, ...weather, meetup.note]
   if (feelingsApply(meetup, today)) parts.push(meetup.feelings)
   return parts
     .map(searchKey)

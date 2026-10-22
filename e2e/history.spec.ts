@@ -114,13 +114,13 @@ test('Recent meetups shows the latest that happened, naming everyone, with "See 
 }) => {
   await openWith(page, { friends: [ALEX, SAM, KIM], meetups: [MEAL, COFFEE, CALL, PARTY] })
   const recent = recentGroup(page)
-  await expect(recent.locator('.row__title')).toHaveText(['Meal'])
+  await expect(recent.locator('.row__title')).toHaveText(['Alex and Sam'])
   // "See all" comes first: it's at the end of the title's line, above the row.
   const links = recent.getByRole('link')
   await expect(links).toHaveCount(2)
   await expect(links.nth(0)).toHaveAccessibleName('See all meetups')
   await expect(links.nth(0)).toHaveText('See all')
-  await expect(links.nth(1)).toHaveAccessibleName(/^Meal\s*Sat, Oct 3 · with Alex and Sam · Tacos$/)
+  await expect(links.nth(1)).toHaveAccessibleName(/^Alex and Sam\s*Meal · Sat, Oct 3 · Tacos$/)
   await expect(recent).not.toContainText('Party')
   await expect(recent).not.toContainText('Coffee')
 
@@ -141,12 +141,12 @@ test('Recent meetups shows one row with or without Birthdays soon', async ({ pag
   const lee = friendRow('lee', 'Lee', { birthday: { month: 10, day: 8, year: null } })
   await openWith(page, { friends: [ALEX, SAM, KIM, lee], meetups: PAST })
   await expect(page.getByRole('region', { name: 'Birthdays soon' })).toContainText('Lee')
-  await expect(recentGroup(page).locator('.row__title')).toHaveText(['Drinks'])
+  await expect(recentGroup(page).locator('.row__title')).toHaveText(['Kim'])
 
   // Two weeks on, no birthday is near: still one row.
   await page.clock.setFixedTime(new Date(2026, 9, 20, 12))
   await page.reload()
-  await expect(recentGroup(page).locator('.row__title')).toHaveText(['Drinks'])
+  await expect(recentGroup(page).locator('.row__title')).toHaveText(['Kim'])
   await expect(page.getByRole('region', { name: 'Birthdays soon' })).toHaveCount(0)
 })
 
@@ -157,7 +157,8 @@ test('Recent meetups hides while searching or filtering, and until a meetup has 
   await expect(recentGroup(page)).toHaveCount(0)
 
   await logMeetup(page, ['Kim'], { date: '2026-10-01' })
-  await expect(recentGroup(page).locator('.row__title')).toHaveText(['Coffee'])
+  await expect(recentGroup(page).locator('.row__title')).toHaveText(['Kim'])
+  await expect(recentGroup(page).locator('.row__subtitle')).toHaveText('Coffee · Thu, Oct 1')
 
   const search = page.getByLabel('Search friends')
   await search.fill('k')
@@ -231,7 +232,7 @@ test('the search field stays put while the groups above it hide and come back', 
 
 test('a recent meetup opens its page with "Friends" on the back button', async ({ page }) => {
   await openWith(page, { friends: [ALEX, SAM, KIM], meetups: PAST })
-  await recentGroup(page).getByRole('link', { name: /^Drinks/ }).click()
+  await recentGroup(page).getByRole('link', { name: /Drinks/ }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Drinks' })).toBeVisible()
   const back = page.locator('header.navbar .navbar__back')
   await expect(back).toHaveText('Friends')
@@ -240,14 +241,30 @@ test('a recent meetup opens its page with "Friends" on the back button', async (
   await expect(recentGroup(page)).toBeVisible()
 })
 
-test('the friend page still leaves its friend out', async ({ page }) => {
+test('a row is titled by who was there; on a friend’s page, by the others, or the type when it was just them', async ({
+  page,
+}) => {
   await openWith(page, { friends: [ALEX, SAM, KIM], meetups: [MEAL, COFFEE, CALL] })
-  const meal = recentGroup(page).getByRole('link', { name: /^Meal/ })
-  await expect(meal).toHaveAccessibleName(/· with Alex and Sam · Tacos$/)
+  const meal = recentGroup(page).getByRole('link', { name: /Meal/ })
+  await expect(meal).toHaveAccessibleName(/^Alex and Sam\s*Meal · Sat, Oct 3 · Tacos$/)
   await friendLink(page, 'Alex').click()
   await expect(page.getByRole('heading', { level: 1, name: 'Alex' })).toBeVisible()
   const history = page.getByRole('region', { name: 'History' })
-  await expect(history.getByRole('link', { name: /^Meal/ })).toHaveAccessibleName(/· with Sam · Tacos$/)
+  await expect(history.getByRole('link', { name: /Meal/ })).toHaveAccessibleName(/^Sam\s*Meal · Sat, Oct 3 · Tacos$/)
+  // A Coffee with Alex alone: the title is the type, and the subtitle starts with the date.
+  await expect(history.getByRole('link', { name: /Coffee/ })).toHaveAccessibleName(/^Coffee\s*Fri, Sep 25$/)
+})
+
+test('rows name friends by first name, or the full name when two friends share it', async ({ page }) => {
+  const friends = [
+    friendRow('brandon', 'Brandon Cao'),
+    friendRow('sam-chen', 'Sam Chen'),
+    friendRow('sam-lee', 'sam lee'),
+    friendRow('mariya', 'Mariya'),
+  ]
+  const meetup = meetupRow('dinner', '2026-10-03', ['mariya', 'brandon', 'sam-chen'], { typeId: 'type-meal' })
+  await openWith(page, { friends, meetups: [meetup] })
+  await expect(recentGroup(page).locator('.row__title')).toHaveText(['Mariya, Brandon and Sam Chen'])
 })
 
 test('Recent meetups stops a subtitle at two lines; the Meetups page shows it all', async ({ page }) => {
@@ -258,7 +275,7 @@ test('Recent meetups stops a subtitle at two lines; the Meetups page shows it al
     note: OWNER_DAY_TYPED,
   })
   await openWith(page, { friends, meetups: [owners] })
-  const row = recentGroup(page).getByRole('link', { name: /^Meal/ })
+  const row = recentGroup(page).getByRole('link', { name: /Meal/ })
   const clamp = row.locator('.meetup-row__clamp')
   const lines = (element: Element) => ({
     height: element.getBoundingClientRect().height,
@@ -268,13 +285,13 @@ test('Recent meetups stops a subtitle at two lines; the Meetups page shows it al
   expect(clamped.height, 'Two lines at most').toBeLessThanOrEqual(2 * clamped.line + 1)
   // VoiceOver still reads the whole subtitle.
   await expect(row).toHaveAccessibleName(
-    /· with Mariya, Jessie and Brandon · Movie, Shopping · nonstopstyle, strand bookstore, Sammy L coffee and 5 more/,
+    /^Mariya, Jessie and Brandon\s*Meal · Sat, Oct 3 · Movie, Shopping · nonstopstyle, strand bookstore, Sammy L coffee and 5 more$/,
   )
 
   await openMeetups(page)
   const full = await page
     .getByRole('region', { name: 'October 2026' })
-    .getByRole('link', { name: /^Meal/ })
+    .getByRole('link', { name: /Meal/ })
     .locator('.row__subtitle')
     .evaluate(lines)
   expect(full.height, 'More than two lines').toBeGreaterThan(2 * full.line + 1)
@@ -298,17 +315,20 @@ test('See all opens the Meetups page: Upcoming, then each month', async ({ page 
     'December 2025',
   ])
   const titlesIn = (name: string) => page.getByRole('region', { name }).locator('.row__title')
-  await expect(titlesIn('Upcoming')).toHaveText(['Party', 'Activity'])
-  await expect(titlesIn('October 2026')).toHaveText(['Drinks', 'Meal'])
-  await expect(titlesIn('September 2026')).toHaveText(['Coffee', 'Call'])
-  await expect(titlesIn('December 2025')).toHaveText(['Trip'])
+  await expect(titlesIn('Upcoming')).toHaveText(['Kim', 'Alex'])
+  await expect(titlesIn('October 2026')).toHaveText(['Kim', 'Alex and Sam'])
+  await expect(titlesIn('September 2026')).toHaveText(['Alex', 'Sam'])
+  await expect(titlesIn('December 2025')).toHaveText(['Sam'])
+  const subtitlesIn = (name: string) => page.getByRole('region', { name }).locator('.row__subtitle')
+  await expect(subtitlesIn('October 2026')).toHaveText(['Drinks · Sun, Oct 4', 'Meal · Sat, Oct 3 · Tacos'])
+  await expect(subtitlesIn('December 2025')).toHaveText(['Trip · Wed, Dec 24, 2025'])
 
   // The group's title says it, so its rows don't; Kim's History still does.
-  const party = page.getByRole('region', { name: 'Upcoming' }).getByRole('link', { name: /^Party/ })
-  await expect(party).toHaveAccessibleName(/^Party\s*Thu, Oct 8 · with Kim$/)
+  const party = page.getByRole('region', { name: 'Upcoming' }).getByRole('link', { name: /Party/ })
+  await expect(party).toHaveAccessibleName(/^Kim\s*Party · Thu, Oct 8$/)
   await page.locator('header.navbar .navbar__back').click()
   await friendLink(page, 'Kim').click()
-  const kimsParty = page.getByRole('region', { name: 'History' }).getByRole('link', { name: /^Party/ })
+  const kimsParty = page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Party/ })
   await expect(kimsParty).toHaveAccessibleName(/^Party\s*Upcoming/)
 })
 
@@ -329,14 +349,17 @@ test('the Meetups search finds memories by their words', async ({ page }) => {
   const titles = rowTitles(page)
 
   const expected: [string, string[]][] = [
-    ['alex', ['Meal', 'Coffee']],
-    ['MEAL', ['Meal', 'Meal']],
-    ['karaoke', ['Activity']],
-    ['blue willow', ['Meal']],
-    ['soup', ['Meal']],
-    ['outsidery', ['Coffee']],
-    ["didn't", ['Meal']],
-    ['sam tacos', ['Meal']],
+    ['alex', ['Alex and Sam', 'Alex']],
+    ['MEAL', ['Alex and Sam', 'Sam']],
+    ['karaoke', ['Kim']],
+    ['blue willow', ['Sam']],
+    ['soup', ['Sam']],
+    ['outsidery', ['Kim']],
+    ["didn't", ['Sam']],
+    ['sam tacos', ['Alex and Sam']],
+    // The weather's words, though the row never shows the weather.
+    ['rainy', ['Kim']],
+    ['rainy kim', ['Kim']],
   ]
   for (const [query, rows] of expected) {
     await search.fill(query)
@@ -349,9 +372,9 @@ test('the Meetups search finds memories by their words', async ({ page }) => {
   // Read out once typing pauses.
   await expect(page.locator('.meetups-announcer')).toHaveText('No meetups match “zebra”.')
 
-  // Weather is never searched.
-  await search.fill('rainy')
-  await expect(page.locator('.list-message')).toHaveText('No meetups match “rainy”.')
+  await search.fill('rainy alex')
+  await expect(page.locator('.list-message')).toHaveText('No meetups match “rainy alex”.')
+  await expect(page.getByRole('main')).not.toContainText('Rainy')
 
   await search.fill('')
   await expect(page.locator('.inset-group .group-title')).toHaveText(['Upcoming', 'October 2026', 'September 2026'])
@@ -364,10 +387,10 @@ test('a meetup opened from Meetups goes back to the same search', async ({ page 
   await openMeetups(page)
   const search = page.getByRole('searchbox', { name: 'Search meetups' })
   await search.fill('tacos')
-  await expect(rowTitles(page)).toHaveText(['Meal'])
+  await expect(rowTitles(page)).toHaveText(['Alex and Sam'])
   await expect(page.locator('.meetups-announcer')).toHaveText('1 meetup matches.')
 
-  await page.getByRole('link', { name: /^Meal/ }).click()
+  await page.getByRole('link', { name: /Meal/ }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Meal' })).toBeVisible()
   await expect(page.locator('header.navbar .navbar__back')).toHaveText('Meetups')
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
@@ -380,7 +403,7 @@ test('a meetup opened from Meetups goes back to the same search', async ({ page 
   await page.locator('header.navbar .navbar__back').click()
   await expect(page.getByRole('heading', { level: 1, name: 'Meetups' })).toBeVisible()
   await expect(search).toHaveValue('tacos')
-  await expect(rowTitles(page)).toHaveText(['Drinks'])
+  await expect(page.locator('.inset-group .row__subtitle')).toHaveText([/^Drinks · /])
   // A restored search isn't read out again.
   await page.waitForTimeout(1000)
   await expect(page.locator('.meetups-announcer')).toHaveText('')
@@ -390,13 +413,13 @@ test('deleting a meetup from Meetups goes back to the list, and Undo puts it bac
   await openWith(page, { friends: [ALEX, SAM, KIM], meetups: PAST })
   await openMeetups(page)
   const september = page.getByRole('region', { name: 'September 2026' })
-  await september.getByRole('link', { name: /^Coffee/ }).click()
+  await september.getByRole('link', { name: /Coffee/ }).click()
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
   await page.getByRole('dialog', { name: 'Edit meetup' }).getByRole('button', { name: 'Delete meetup' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Meetups' })).toBeVisible()
-  await expect(september.locator('.row__title')).toHaveText(['Call'])
+  await expect(september.locator('.row__title')).toHaveText(['Sam'])
   await page.getByRole('status').getByRole('button', { name: 'Undo' }).click()
-  await expect(september.locator('.row__title')).toHaveText(['Coffee', 'Call'])
+  await expect(september.locator('.row__title')).toHaveText(['Alex', 'Sam'])
 })
 
 test('a long history shows 60 rows at a time and keeps its place', async ({ page }) => {
@@ -516,5 +539,5 @@ test('Meetups with no meetups yet', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Log meetup' })).toBeVisible()
 
   await logMeetup(page, ['Alex'])
-  await expect(page.getByRole('region', { name: 'October 2026' }).locator('.row__title')).toHaveText(['Coffee'])
+  await expect(page.getByRole('region', { name: 'October 2026' }).locator('.row__title')).toHaveText(['Alex'])
 })
