@@ -11,7 +11,7 @@
 .stat-row__item {
   flex: 1 1 calc((12rem - 100%) * 999);
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column;
   align-items: center;
   gap: 2px;
 }
@@ -19,9 +19,18 @@
   font-size: var(--text-footnote);
   color: var(--ink-2);
 }
+/* First on screen, though second in the DOM (after its label). */
 .stat-row__value {
+  order: -1;
   margin: 0;
   font-size: 1.6rem;
   font-weight: 600;
   line-height: 1.1;
+}
+/* "3 by Oct 22": the same quiet footnote as the label, wrapping at large text. */
+.stat-row__note {
+  margin: 0;
+  font-size: var(--text-footnote);
+  color: var(--ink-2);
+  text-align: center;
 }

@@ -3,6 +3,7 @@ import { OWNER_DAY_TYPED } from '../test/dayFixtures'
 import { meetup } from '../test/fixtures'
 import type { Meetup } from '../types'
 import {
+  FRIEND_HISTORY_ROWS,
   firstRows,
   historySections,
   matchesSearch,
@@ -11,6 +12,7 @@ import {
   meetupSearchText,
   meetupSubtitle,
   meetupTitle,
+  monthSections,
   RECENT_MEETUPS,
   recentMeetups,
   searchKey,
@@ -30,6 +32,10 @@ describe('limits', () => {
   it('shows the latest meetup on the Friends tab on every day, and 60 rows a page', () => {
     expect(RECENT_MEETUPS).toBe(1)
     expect(MEETUPS_PAGE_SIZE).toBe(60)
+  })
+
+  it('shows a friend’s latest five meetups before "Show all"', () => {
+    expect(FRIEND_HISTORY_ROWS).toBe(5)
   })
 })
 
@@ -240,6 +246,35 @@ describe('historySections', () => {
   it('shows no empty groups', () => {
     expect(historySections([], TODAY)).toEqual([])
     expect(historySections([loggedAt('oct9', '2026-10-09', '12:00')], TODAY).map((s) => s.title)).toEqual(['Upcoming'])
+  })
+})
+
+describe('monthSections', () => {
+  it('groups by month, newest first, an upcoming month first, each titled', () => {
+    const sections = monthSections([
+      loggedAt('sep30', '2026-09-30', '12:00'),
+      loggedAt('oct9', '2026-10-09', '12:00'),
+      loggedAt('oct1', '2026-10-01', '12:00'),
+      loggedAt('dec24', '2025-12-24', '12:00'),
+    ])
+    expect(sections.map(({ key, title, meetups }) => [key, title, ids(meetups)])).toEqual([
+      ['2026-10', 'October 2026', ['oct9', 'oct1']],
+      ['2026-09', 'September 2026', ['sep30']],
+      ['2025-12', 'December 2025', ['dec24']],
+    ])
+    expect(monthSections([])).toEqual([])
+  })
+
+  it('gives a friend’s latest five across months, and how many more', () => {
+    // m1 to m3 in October, m4 to m8 in September, newest first.
+    const date = (i: number) => `2026-${i < 3 ? '10' : '09'}-0${9 - i}`
+    const meetups = Array.from({ length: 8 }, (_, i) => loggedAt(`m${i + 1}`, date(i), '12:00'))
+    const shown = firstRows(monthSections(meetups), FRIEND_HISTORY_ROWS)
+    expect(shown.sections.map((section) => ids(section.meetups))).toEqual([
+      ['m1', 'm2', 'm3'],
+      ['m4', 'm5'],
+    ])
+    expect(shown.more).toBe(3)
   })
 })
 

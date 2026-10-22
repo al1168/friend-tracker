@@ -12,6 +12,8 @@ import { groupByMonth, newestFirst } from './history'
 export const RECENT_MEETUPS = 1
 /** Rows the Meetups page shows at first, and how many each "Show older meetups" adds. */
 export const MEETUPS_PAGE_SIZE = 60
+/** Rows a friend's History shows before "Show all 12 meetups": the latest five, memories before numbers. */
+export const FRIEND_HISTORY_ROWS = 5
 
 /** The latest meetups dated today or earlier: newest date first, then the one logged later. */
 export function recentMeetups(meetups: Meetup[], today: ISODate, limit = RECENT_MEETUPS): Meetup[] {
@@ -98,16 +100,24 @@ export interface HistorySection {
   meetups: Meetup[]
 }
 
+/**
+ * One group per month ("October 2026"), newest first, so a month with upcoming meetups comes first: a friend's
+ * History, and the Meetups page's months.
+ */
+export function monthSections(meetups: Meetup[]): HistorySection[] {
+  return groupByMonth(meetups).map(({ month, meetups: inMonth }) => ({
+    key: month,
+    title: formatMonthYear(`${month}-01`),
+    meetups: inMonth,
+  }))
+}
+
 /** The Meetups page's groups: Upcoming (soonest first), then each month, newest first. No empty groups. */
 export function historySections(meetups: Meetup[], today: ISODate): HistorySection[] {
   const upcoming = meetups
     .filter((meetup) => meetup.date > today)
     .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt))
-  const months = groupByMonth(meetups.filter((meetup) => meetup.date <= today)).map(({ month, meetups: inMonth }) => ({
-    key: month,
-    title: formatMonthYear(`${month}-01`),
-    meetups: inMonth,
-  }))
+  const months = monthSections(meetups.filter((meetup) => meetup.date <= today))
   return upcoming.length > 0 ? [{ key: 'upcoming', title: 'Upcoming', meetups: upcoming }, ...months] : months
 }
 

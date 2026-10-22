@@ -3,6 +3,7 @@ import { createContext, useContext, useRef, type ReactNode } from 'react'
 /** Where you were on a list: its search and how many rows it showed. */
 export interface Place {
   query: string
+  /** Rows shown; Infinity for all of them (a friend's History after "Show all"). */
   count: number
 }
 

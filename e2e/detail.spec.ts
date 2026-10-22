@@ -1,5 +1,122 @@
-import { expect, test } from '@playwright/test'
-import { addFriend, friendLink, LARGE_TEXT, logMeetup, sheetSave, tinyPhoto } from './helpers.ts'
+import { expect, test, type Locator, type Page } from '@playwright/test'
+import {
+  addFriend,
+  friendLink,
+  friendRow,
+  LARGE_TEXT,
+  logMeetup,
+  meetupRow,
+  seedMeetups,
+  sheetSave,
+  tinyPhoto,
+} from './helpers.ts'
+
+/** Thu, Oct 22, 2026, 12:00 PM on the phone's clock. */
+const OCT_22_NOON = new Date(2026, 9, 22, 12)
+
+/** The top of an element on screen, in CSS pixels. */
+async function topOf(locator: Locator): Promise<number> {
+  const box = await locator.boundingBox()
+  if (!box) throw new Error('Not on screen')
+  return box.y
+}
+
+/** On Oct 22, 2026: seeds Alex (and Sam) with these meetups and opens Alex's page. */
+async function openAlexWith(page: Page, meetups: Parameters<typeof seedMeetups>[1]['meetups']) {
+  await page.clock.setFixedTime(OCT_22_NOON)
+  await page.goto('/')
+  await seedMeetups(page, { friends: [friendRow('alex', 'Alex'), friendRow('sam', 'Sam')], meetups })
+  await friendLink(page, 'Alex').click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Alex' })).toBeVisible()
+}
+
+/** Eight meetups with Alex, one a week back from Oct 21, newest first as Visit 1 to Visit 8. */
+function eightVisits() {
+  return Array.from({ length: 8 }, (_, i) => {
+    const date = new Date(Date.UTC(2026, 9, 21 - 7 * i)).toISOString().slice(0, 10)
+    return meetupRow(`v${i + 1}`, date, ['alex'], { note: `Visit ${i + 1}` })
+  })
+}
+
+test('memories before numbers: Birthday, Likes, Dislikes, then History, then the stat row and the chart', async ({
+  page,
+}) => {
+  await openAlexWith(page, [meetupRow('coffee', '2026-10-01', ['alex'])])
+  const tops = [
+    await topOf(page.getByRole('region', { name: 'Birthday', exact: true })),
+    await topOf(page.getByRole('region', { name: 'Likes', exact: true })),
+    await topOf(page.getByRole('region', { name: 'Dislikes', exact: true })),
+    await topOf(page.getByRole('region', { name: 'History' })),
+    await topOf(page.locator('.stat-row')),
+    await topOf(page.getByRole('region', { name: 'Month by month' })),
+  ]
+  expect([...tops].sort((a, b) => a - b), 'In that order').toEqual(tops)
+})
+
+test('History shows the latest five, then "Show all", which shows the rest and focuses the first it added', async ({
+  page,
+}) => {
+  await openAlexWith(page, eightVisits())
+  const history = page.getByRole('region', { name: 'History' })
+  const rows = history.locator('a.row')
+  await expect(rows).toHaveCount(5)
+  await expect(rows.last()).toHaveAccessibleName(/Visit 5$/)
+  const showAll = history.getByRole('button', { name: 'Show all 8 meetups' })
+  await expect(showAll).toBeVisible()
+
+  await showAll.click()
+  await expect(rows).toHaveCount(8)
+  await expect(showAll).toHaveCount(0)
+  await expect(rows.nth(5)).toBeFocused()
+  await expect(rows.nth(5)).toHaveAccessibleName(/Visit 6$/)
+
+  // Open the oldest and come back: History is still open.
+  await rows.nth(7).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Coffee' })).toBeVisible()
+  await page.locator('header.navbar .navbar__back').click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Alex' })).toBeVisible()
+  await expect(rows).toHaveCount(8)
+  await expect(history.getByRole('button', { name: /^Show all/ })).toHaveCount(0)
+})
+
+test('five meetups or fewer show with no "Show all"', async ({ page }) => {
+  await openAlexWith(page, eightVisits().slice(0, 5))
+  const history = page.getByRole('region', { name: 'History' })
+  await expect(history.locator('a.row')).toHaveCount(5)
+  await expect(history.getByRole('button')).toHaveCount(0)
+})
+
+test('a friend with no meetups gets one calm line, and no numbers', async ({ page }) => {
+  await openAlexWith(page, [meetupRow('sams', '2026-10-01', ['sam'])])
+  const history = page.getByRole('region', { name: 'History' })
+  await expect(history.locator('.list-message')).toHaveText('No meetups yet. Log one when you see them.')
+  await expect(history.locator('a.row')).toHaveCount(0)
+  await expect(page.getByText('Your first meetup will show up here.')).toHaveCount(0)
+  await expect(page.locator('.stat-row')).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Month by month' })).toHaveCount(0)
+})
+
+test('"Last year" says how many were by today’s date a year ago', async ({ page }) => {
+  await openAlexWith(page, [
+    meetupRow('mar', '2025-03-03', ['alex']),
+    meetupRow('nov', '2025-11-05', ['alex']),
+    meetupRow('now', '2026-10-01', ['alex']),
+  ])
+  await expect(page.locator('.stat-row__label')).toHaveText(['This year', 'Last year', 'All time'])
+  await expect(page.locator('.stat-row__value')).toHaveText(['1', '2', '3'])
+  await expect(page.locator('.stat-row__note')).toHaveText(['1 by Oct 22'])
+  await expect(page.locator('.month-bars__key')).toHaveText(['2025', '2026'])
+})
+
+test('with no meetup before this year, there is no "Last year" and the chart is this year alone', async ({ page }) => {
+  await openAlexWith(page, [meetupRow('now', '2026-10-01', ['alex']), meetupRow('june', '2026-06-01', ['sam'])])
+  await expect(page.locator('.stat-row__label')).toHaveText(['This year', 'All time'])
+  await expect(page.locator('.stat-row__note')).toHaveCount(0)
+  await expect(page.locator('.month-bars__key')).toHaveText(['2026'])
+  await expect(page.locator('.month-bars__bar--previous')).toHaveCount(0)
+  const chart = page.locator('.month-bars__chart')
+  await expect(chart).toHaveAttribute('aria-label', /^Meetups per month\. January: 0 in 2026\./)
+})
 
 test('shows a friend’s stats and history', async ({ page }) => {
   await page.goto('/')
@@ -181,7 +298,7 @@ test('edits a meetup from its page, then deletes it with undo', async ({ page })
   await page.getByRole('dialog', { name: 'Edit meetup' }).getByRole('button', { name: 'Delete meetup' }).click()
   // The meetup is gone, so its page goes back to the friend.
   await expect(page.getByRole('heading', { level: 1, name: 'Alex' })).toBeVisible()
-  await expect(page.getByText('Your first meetup will show up here.')).toBeVisible()
+  await expect(page.getByText('No meetups yet. Log one when you see them.')).toBeVisible()
   await page.getByRole('status').getByRole('button', { name: 'Undo' }).click()
   await expect(history.getByRole('link', { name: /Drinks/ })).toBeVisible()
 })
@@ -211,8 +328,10 @@ test('shows a future meetup as upcoming without counting it', async ({ page }) =
   await friendLink(page, 'Alex').click()
 
   await expect(page.getByText('Not seen yet')).toBeVisible()
-  await expect(page.locator('.stat-row__item').first()).toHaveText(/This year\s*0$/)
   await expect(page.getByRole('region', { name: 'History' })).toContainText('Upcoming')
+  // Nothing has happened yet, so no numbers: they'd all be zero.
+  await expect(page.locator('.stat-row')).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Month by month' })).toHaveCount(0)
 })
 
 test('redirects to Friends for an unknown friend', async ({ page }) => {
