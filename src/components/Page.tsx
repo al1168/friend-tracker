@@ -9,6 +9,11 @@ export interface NavState {
   tab?: string
   /** On the day page: it was opened by "Save and write about the day", just after the meetup was logged. */
   logged?: boolean
+  /**
+   * With `logged`: the meetup was logged empty (no words for the day, no photos, no activities), so the Logged note
+   * offers Undo. Without it the note shows with no Undo, so one tap can't delete what was written or added.
+   */
+  undoable?: boolean
 }
 
 interface PageProps {

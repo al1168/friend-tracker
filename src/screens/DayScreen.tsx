@@ -107,9 +107,18 @@ export function DayScreen() {
   const typeName = types.find((type) => type.id === meetup.typeId)?.name ?? 'Meetup'
   const friendById = new Map(friends.map((friend) => [friend.id, friend] as const))
   const people = meetup.friendIds.map((friendId) => friendById.get(friendId)).filter((f): f is Friend => !!f)
-  const logged = (location.state as NavState | null)?.logged === true
+  const state = location.state as NavState | null
+  const logged = state?.logged === true
   return (
-    <DayPage key={meetup.id} meetup={meetup} people={people} typeName={typeName} logged={logged} onLeave={leave} />
+    <DayPage
+      key={meetup.id}
+      meetup={meetup}
+      people={people}
+      typeName={typeName}
+      logged={logged}
+      undoable={logged && state?.undoable === true}
+      onLeave={leave}
+    />
   )
 }
 
@@ -119,11 +128,13 @@ interface DayPageProps {
   typeName: string
   /** Opened by "Save and write about the day", just after the meetup was logged: the body starts with the Logged note. */
   logged: boolean
+  /** With `logged`: the meetup was logged empty (no words, photos or activities), so the note offers Undo. */
+  undoable: boolean
   /** Goes back (once, however often it's called), or to `fallback` when the page was opened directly. */
   onLeave: (fallback: string) => void
 }
 
-function DayPage({ meetup, people, typeName, logged, onLeave }: DayPageProps) {
+function DayPage({ meetup, people, typeName, logged, undoable, onLeave }: DayPageProps) {
   const today = useToday()
   const minutesNow = useMinutesNow()
   const confirmDiscard = useConfirmDiscard()
@@ -155,9 +166,10 @@ function DayPage({ meetup, people, typeName, logged, onLeave }: DayPageProps) {
   const [feelingsRefused, setFeelingsRefused] = useState(false)
   // Back was tapped and is on its way out (saving first): another tap does nothing.
   const leavingRef = useRef(false)
-  // The Logged note's Undo: offered until the first change on the page (markChanged), even one made before the app
-  // lock brought the page back.
-  const [undoOffered, setUndoOffered] = useState(() => logged && !loggedUndoSpent(meetup.id))
+  // The Logged note's Undo: offered only for a meetup logged empty, and then until the first change on the page
+  // (markChanged), even one made before the app lock brought the page back. Logged with words, photos or activities,
+  // the note shows without it, its room kept as after a change: Undo deletes the meetup, and all that with it.
+  const [undoOffered, setUndoOffered] = useState(() => undoable && !loggedUndoSpent(meetup.id))
   const [undoFailed, setUndoFailed] = useState(false)
   const loggedWith = people.length > 0 ? `Logged with ${formatNameList(people.map((friend) => friend.name))}` : 'Logged'
 
@@ -225,7 +237,7 @@ function DayPage({ meetup, people, typeName, logged, onLeave }: DayPageProps) {
     setUndoFailed(false)
   }
 
-  /** Undo in the Logged note: nothing was written yet, so the meetup goes, and the page goes back with it. */
+  /** Undo in the Logged note: the meetup was logged empty and nothing changed since, so it goes, and the page with it. */
   async function undoLogged() {
     setUndoFailed(false)
     try {

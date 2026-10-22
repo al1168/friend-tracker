@@ -3,9 +3,11 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
 import { OWNER_DAY_TYPED, OWNER_FEELINGS, OWNER_MESSAGE } from '../src/test/dayFixtures.ts'
 import {
   addFriend,
+  addPhotos,
   editMeetup,
   enterPin,
   goToTab,
+  LARGE_TEXT,
   lockHeading,
   logMeetup,
   openDay,
@@ -123,11 +125,20 @@ test('"Save and write about the day" logs the meetup and opens its day; Back lan
 /** Adds Alex and logs a Coffee with "Save and write about the day", which opens its day page. */
 async function logAndWrite(page: Page) {
   await addFriend(page, 'Alex')
+  await writeAfterLogging(page)
+}
+
+/**
+ * Logs a Coffee with Alex (already added) with "Save and write about the day", after `fill` adds anything else in the
+ * sheet, and waits for the day page.
+ */
+async function writeAfterLogging(page: Page, fill?: (sheet: Locator) => Promise<void>) {
   await page.getByRole('button', { name: 'Log meetup' }).click()
   const sheet = page.getByRole('dialog', { name: 'Log meetup' })
   await sheet.getByLabel('Search all friends').fill('Alex')
   await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name: 'Alex', exact: true }).click()
   await sheet.getByRole('button', { name: 'Coffee', exact: true }).click()
+  await fill?.(sheet)
   await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'The day' })).toBeVisible()
   // Once the sheet has slid away, its own The day box with it.
@@ -152,6 +163,48 @@ test('Undo in the Logged note takes the meetup away before anything is written, 
   await expect(page.getByRole('heading', { level: 1, name: 'Friends' })).toBeVisible()
   await expect.poll(async () => (await readMeetups(page)).length).toBe(0)
   await expect(page.getByRole('region', { name: 'Recent meetups' })).toHaveCount(0)
+})
+
+test('at a large text size the Logged note grows to hold its words, never squeezed by the page', async ({ page }) => {
+  await page.goto('/')
+  for (const name of FRIENDS) await addFriend(page, name)
+  await page.addStyleTag({ content: LARGE_TEXT })
+  await page.getByRole('button', { name: 'Log meetup' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
+  for (const name of FRIENDS) await sheet.getByRole('group', { name: 'Friends', exact: true }).getByRole('button', { name }).click()
+  await sheet.getByRole('button', { name: 'Meal', exact: true }).click()
+  await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
+
+  const note = page.locator('.day-logged')
+  await expect(note).toContainText('Logged with Mariya, Jessie and Brandon')
+  const box = await note.boundingBox()
+  const words = await note.locator('.day-logged__message').boundingBox()
+  if (!box || !words) throw new Error('The Logged note is not on screen')
+  expect(words.height, 'The words wrap at this size').toBeGreaterThan(50)
+  expect(words.y, 'The words start inside the note').toBeGreaterThanOrEqual(box.y)
+  expect(words.y + words.height, 'The words end inside the note').toBeLessThanOrEqual(box.y + box.height + 0.5)
+})
+
+test('logged with words, a photo or an activity, the Logged note never offers Undo, and keeps its room', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  const note = page.locator('.day-logged')
+  const cases: [string, (sheet: Locator) => Promise<void>][] = [
+    ['words for the day', (sheet) => sheet.getByRole('textbox', { name: 'The day' }).fill('Tacos')],
+    ['a photo', (sheet) => addPhotos(sheet, [tinyPhoto()])],
+    ['an activity', (sheet) => pickActivity(sheet, 'Karaoke')],
+  ]
+  for (const [what, fill] of cases) {
+    await page.goto('/')
+    await writeAfterLogging(page, fill)
+    await expect(note, `Logged with ${what}`).toContainText('Logged with Alex')
+    await expect(note.getByRole('button', { name: 'Undo' }), `No Undo with ${what}`).toHaveCount(0)
+    // Its room stays, as after a change: the button is there, only hidden.
+    await expect(note.locator('.day-logged__undo')).toHaveCSS('visibility', 'hidden')
+  }
+  expect(await readMeetups(page)).toHaveLength(3)
 })
 
 test('after the first change the Logged note has no Undo, and nothing below it moves', async ({ page }) => {

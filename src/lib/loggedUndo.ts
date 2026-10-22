@@ -17,6 +17,15 @@ function readStored(): string[] {
   }
 }
 
+/**
+ * Whether a meetup was logged with nothing in it but who and what: no words for the day, no photos and no
+ * activities. Only then does the "Logged" note offer Undo, which deletes the meetup, so it never takes a day that was
+ * written or photos that were added with it.
+ */
+export function loggedEmpty(log: { note: string; activities: readonly string[]; photosAdded: number }): boolean {
+  return log.note.trim() === '' && log.activities.every((activity) => activity.trim() === '') && log.photosAdded === 0
+}
+
 /** Whether a change on this meetup's day page has already ended its "Logged" note's Undo. */
 export function loggedUndoSpent(meetupId: string): boolean {
   return spent.has(meetupId) || readStored().includes(meetupId)

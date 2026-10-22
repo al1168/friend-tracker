@@ -25,6 +25,7 @@ import { activitySuggestions } from '../lib/activities'
 import { addDays, formatDate, isISODate, todayISO } from '../lib/dates'
 import { BOX_FULL, DAY_MAX_TYPED } from '../lib/dayText'
 import { isPlainEnter } from '../lib/keys'
+import { loggedEmpty } from '../lib/loggedUndo'
 import { askToKeepData } from '../lib/persist'
 import { compareNames, formatNameList } from '../lib/text'
 import { revealOffset } from '../lib/viewport'
@@ -245,7 +246,9 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
         const presetFriend = initial?.presetFriendId ? friendById.get(initial.presetFriendId) : undefined
         const fromHere: NavState = { backLabel: presetFriend?.name, tab: (location.state as NavState | null)?.tab }
         navigate(`/meetups/${added}`, { state: fromHere })
-        navigate(`/meetups/${added}/day`, { state: { logged: true } satisfies NavState })
+        // The Logged note's Undo deletes the meetup, so it's offered only for one logged empty.
+        const undoable = loggedEmpty({ note, activities: typed, photosAdded: photoChanges.add.length })
+        navigate(`/meetups/${added}/day`, { state: { logged: true, undoable } satisfies NavState })
       }
     } catch (caught) {
       setError(caught instanceof ValidationError ? caught.message : "Couldn't save. Please try again.")

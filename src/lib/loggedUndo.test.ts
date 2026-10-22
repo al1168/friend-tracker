@@ -52,3 +52,14 @@ describe('the Logged note’s Undo', () => {
     expect(loggedUndoSpent('m1')).toBe(true)
   })
 })
+
+describe('which logs offer the Logged note’s Undo', () => {
+  it('only a meetup logged empty: no words for the day, no photos and no activities', async () => {
+    const { loggedEmpty } = await import('./loggedUndo')
+    expect(loggedEmpty({ note: '', activities: [], photosAdded: 0 })).toBe(true)
+    expect(loggedEmpty({ note: ' \n ', activities: [], photosAdded: 0 })).toBe(true)
+    expect(loggedEmpty({ note: 'Tacos', activities: [], photosAdded: 0 })).toBe(false)
+    expect(loggedEmpty({ note: '', activities: ['Karaoke'], photosAdded: 0 })).toBe(false)
+    expect(loggedEmpty({ note: '', activities: [], photosAdded: 1 })).toBe(false)
+  })
+})

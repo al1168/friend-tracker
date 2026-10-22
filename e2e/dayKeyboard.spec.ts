@@ -4,6 +4,8 @@ import { closeKeyboard, fakeVisualViewport, KEYBOARD, nextFrames, openKeyboard, 
 
 /** The room the app keeps between the caret's line and the edges of the day page's visible body. */
 const MARGIN = 12
+/** Where The day's top goes when the keyboard comes up for it: 8px under the nav bar, its focus ring still clear. */
+const START_MARGIN = 8
 
 test.beforeEach(async ({ page }) => {
   await fakeVisualViewport(page)
@@ -130,7 +132,7 @@ test('The day comes into view when the keyboard opens, before any typing', async
   await expectLineShown(page, await lineSpan(dayBox(page), 1), 'The first line of The day')
 })
 
-test('The day goes to the top when the keyboard comes up for it, its top 12px under the nav bar', async ({ page }) => {
+test('The day goes to the top when the keyboard comes up for it, its top 8px under the nav bar', async ({ page }) => {
   await openDayPage(page)
   await tapFocus(dayBox(page))
 
@@ -139,7 +141,7 @@ test('The day goes to the top when the keyboard comes up for it, its top 12px un
   const at = await layout(page)
   const box = await dayBox(page).boundingBox()
   if (!box) throw new Error('The day is not on screen')
-  expect(Math.abs(box.y - (at.visibleTop + MARGIN)), 'Its top is 12px under the nav bar').toBeLessThanOrEqual(2)
+  expect(Math.abs(box.y - (at.visibleTop + START_MARGIN)), 'Its top is 8px under the nav bar').toBeLessThanOrEqual(2)
   await expectLineShown(page, await lineSpan(dayBox(page), 1), 'The caret’s line')
 })
 

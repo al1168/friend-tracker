@@ -62,9 +62,16 @@
 .day-page__body :is(input, textarea) {
   scroll-margin-block: var(--space-3);
 }
+/* The day aligns its top 8px under the nav bar when the keyboard comes up for it: room for its 4px focus ring, and
+   the hint above stays out of sight rather than showing a sliver under the bar. */
+.day-page__body textarea[data-reveal='start'] {
+  scroll-margin-top: var(--space-2);
+}
 /* The Logged note: a Paper White box with the toast's check, "Logged with Mariya and Jessie" and an Undo that lasts
-   until the first change on the page. Hidden once used up, Undo keeps its room, so the box keeps its height. */
+   until the first change on the page. Hidden once used up, Undo keeps its room, so the box keeps its height. It never
+   shrinks in the body's column: wrapped at large text sizes, its words stay inside it. */
 .day-logged {
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--space-3);
