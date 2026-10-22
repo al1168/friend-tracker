@@ -62,14 +62,9 @@ export function shortName(friend: Named, among: readonly Named[]): string {
   return shared ? friend.name.trim() : firstName(friend)
 }
 
-/** Each friend's short name among these friends, in order: "Logged with Mariya, Jessie and Brandon". */
-export function shortNames(friends: readonly Named[]): string[] {
-  return friends.map((friend) => shortName(friend, friends))
-}
-
 /**
  * Every friend's short name among them all, by id: what `shortName(friend, friends)` gives, in one pass. Meetup rows
- * name people this way, so a list of many rows reads each name once.
+ * and "Logged with" name people this way, so a list of many rows reads each name once.
  */
 export function shortNameById(friends: readonly (Named & { id: string })[]): Map<string, string> {
   const counts = new Map<string, number>()

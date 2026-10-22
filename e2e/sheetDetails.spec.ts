@@ -357,8 +357,8 @@ test.describe('swiping through friends', () => {
     await expect(twelfth).toHaveAttribute('aria-pressed', 'true')
     await expect(sheet.getByRole('group', { name: 'Selected friends' })).toContainText('Friend 12')
     await sheetSave(sheet).click()
-    // Friend 12 is the only friend on it, so their first name is enough.
-    await expect(page.locator('.toast__message')).toHaveText('Logged with Friend')
+    // Every friend's first name is "Friend", so Friend 12 is named in full, as the meetup rows name them.
+    await expect(page.locator('.toast__message')).toHaveText('Logged with Friend 12')
   })
 
   test('the swiping strip has room for a focused tile’s ring, and its tiles stay where they were', async ({ page }) => {
@@ -440,7 +440,7 @@ test.describe('names in the Log sheet', () => {
     await expect(sheet.getByRole('group', { name: 'Selected friends' })).toHaveCount(0)
   })
 
-  test('"Logged with" names each friend by first name, or in full when two on it share one', async ({ page }) => {
+  test('"Logged with" names each friend by first name, or in full when another friend shares it', async ({ page }) => {
     await page.goto('/')
     await seedMeetups(page, {
       friends: ['Mariya', 'Jessie', 'Brandon Cao', 'Sam Chen', 'Sam Lee'].map((name) =>
@@ -451,14 +451,25 @@ test.describe('names in the Log sheet', () => {
     await expect(page.locator('.toast__message')).toHaveText('Logged with Mariya, Jessie and Brandon')
     await logMeetup(page, ['Sam Chen', 'Sam Lee'])
     await expect(page.locator('.toast__message')).toHaveText('Logged with Sam Chen and Sam Lee')
+    // Shared with a friend who wasn't there: still in full, as the Recent meetups row says it.
+    await logMeetup(page, ['Sam Lee'])
+    await expect(page.locator('.toast__message')).toHaveText('Logged with Sam Lee')
+    await expect(page.getByRole('region', { name: 'Recent meetups' }).locator('.row__title').first()).toHaveText(
+      'Sam Lee',
+    )
 
     // The day page's Logged note says it the same way.
-    const sheet = await openLogMeetup(page)
-    await sheet.getByLabel('Search all friends').fill('Brandon')
-    await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name: 'Brandon Cao' }).click()
-    await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
-    await expect(page.locator('.day-logged')).toContainText('Logged with Brandon')
-    await expect(page.locator('.day-logged')).not.toContainText('Cao')
+    for (const [name, said] of [
+      ['Brandon Cao', 'Logged with Brandon'],
+      ['Sam Chen', 'Logged with Sam Chen'],
+    ]) {
+      await page.goto('/')
+      const sheet = await openLogMeetup(page)
+      await sheet.getByLabel('Search all friends').fill(name)
+      await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name }).click()
+      await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
+      await expect(page.locator('.day-logged__message')).toHaveText(said)
+    }
   })
 })
 

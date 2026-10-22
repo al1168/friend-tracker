@@ -130,7 +130,7 @@ test('shows a friend’s stats and history', async ({ page }) => {
   const thisYear = page.locator('.stat-row__item').first()
   await expect(thisYear).toHaveText(/This year\s*1$/)
   const history = page.getByRole('region', { name: 'History' })
-  await expect(history.getByRole('link', { name: /^Sam\s*Meal · .* · Tacos$/ })).toBeVisible()
+  await expect(history.getByRole('link', { name: /^Sam ?, Meal · .* · Tacos$/ })).toBeVisible()
 })
 
 test('history rows show activities and the first photo', async ({ page }) => {
@@ -147,7 +147,7 @@ test('history rows show activities and the first photo', async ({ page }) => {
   await friendLink(page, 'Alex').click()
 
   const history = page.getByRole('region', { name: 'History' })
-  const meal = history.getByRole('link', { name: /^Sam\s*Meal · .* · Karaoke, Walk · Tacos$/ })
+  const meal = history.getByRole('link', { name: /^Sam ?, Meal · .* · Karaoke, Walk · Tacos$/ })
   await expect(meal).toBeVisible()
   // The photo sits in its 40px box, which a row without a photo doesn't have.
   await expect(meal.locator('.meetup-thumb img.history-thumb')).toHaveAttribute('src', /^data:image\/jpeg/)
@@ -167,7 +167,7 @@ test('history rows show the day’s first places, or its first line cut at 80 ch
 
   const history = page.getByRole('region', { name: 'History' })
   await expect(history.getByRole('link', { name: /Meal/ })).toHaveAccessibleName(
-    /^Sam\s*Meal · .* · Cafe, Park, Bar and 1 more$/,
+    /^Sam ?, Meal · .* · Cafe, Park, Bar and 1 more$/,
   )
   await expect(history.getByRole('link', { name: /Drinks/ })).toHaveAccessibleName(
     / · We walked all the way along the river to the old bridge and back again before…$/,

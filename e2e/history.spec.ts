@@ -120,7 +120,7 @@ test('Recent meetups shows the latest that happened, naming everyone, with "See 
   await expect(links).toHaveCount(2)
   await expect(links.nth(0)).toHaveAccessibleName('See all meetups')
   await expect(links.nth(0)).toHaveText('See all')
-  await expect(links.nth(1)).toHaveAccessibleName(/^Alex and Sam\s*Meal · Sat, Oct 3 · Tacos$/)
+  await expect(links.nth(1)).toHaveAccessibleName(/^Alex and Sam ?, Meal · Sat, Oct 3 · Tacos$/)
   await expect(recent).not.toContainText('Party')
   await expect(recent).not.toContainText('Coffee')
 
@@ -246,13 +246,13 @@ test('a row is titled by who was there; on a friend’s page, by the others, or 
 }) => {
   await openWith(page, { friends: [ALEX, SAM, KIM], meetups: [MEAL, COFFEE, CALL] })
   const meal = recentGroup(page).getByRole('link', { name: /Meal/ })
-  await expect(meal).toHaveAccessibleName(/^Alex and Sam\s*Meal · Sat, Oct 3 · Tacos$/)
+  await expect(meal).toHaveAccessibleName(/^Alex and Sam ?, Meal · Sat, Oct 3 · Tacos$/)
   await friendLink(page, 'Alex').click()
   await expect(page.getByRole('heading', { level: 1, name: 'Alex' })).toBeVisible()
   const history = page.getByRole('region', { name: 'History' })
-  await expect(history.getByRole('link', { name: /Meal/ })).toHaveAccessibleName(/^Sam\s*Meal · Sat, Oct 3 · Tacos$/)
+  await expect(history.getByRole('link', { name: /Meal/ })).toHaveAccessibleName(/^Sam ?, Meal · Sat, Oct 3 · Tacos$/)
   // A Coffee with Alex alone: the title is the type, and the subtitle starts with the date.
-  await expect(history.getByRole('link', { name: /Coffee/ })).toHaveAccessibleName(/^Coffee\s*Fri, Sep 25$/)
+  await expect(history.getByRole('link', { name: /Coffee/ })).toHaveAccessibleName(/^Coffee ?, Fri, Sep 25$/)
 })
 
 test('rows name friends by first name, or the full name when two friends share it', async ({ page }) => {
@@ -285,7 +285,7 @@ test('Recent meetups stops a subtitle at two lines; the Meetups page shows it al
   expect(clamped.height, 'Two lines at most').toBeLessThanOrEqual(2 * clamped.line + 1)
   // VoiceOver still reads the whole subtitle.
   await expect(row).toHaveAccessibleName(
-    /^Mariya, Jessie and Brandon\s*Meal · Sat, Oct 3 · Movie, Shopping · nonstopstyle, strand bookstore, Sammy L coffee and 5 more$/,
+    /^Mariya, Jessie and Brandon ?, Meal · Sat, Oct 3 · Movie, Shopping · nonstopstyle, strand bookstore, Sammy L coffee and 5 more$/,
   )
 
   await openMeetups(page)
@@ -325,11 +325,11 @@ test('See all opens the Meetups page: Upcoming, then each month', async ({ page 
 
   // The group's title says it, so its rows don't; Kim's History still does.
   const party = page.getByRole('region', { name: 'Upcoming' }).getByRole('link', { name: /Party/ })
-  await expect(party).toHaveAccessibleName(/^Kim\s*Party · Thu, Oct 8$/)
+  await expect(party).toHaveAccessibleName(/^Kim ?, Party · Thu, Oct 8$/)
   await page.locator('header.navbar .navbar__back').click()
   await friendLink(page, 'Kim').click()
   const kimsParty = page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Party/ })
-  await expect(kimsParty).toHaveAccessibleName(/^Party\s*Upcoming/)
+  await expect(kimsParty).toHaveAccessibleName(/^Party ?, Upcoming ?, Thu, Oct 8$/)
 })
 
 test('the Meetups search finds memories by their words', async ({ page }) => {

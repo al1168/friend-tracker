@@ -78,10 +78,13 @@ export const MeetupRow = memo(function MeetupRow({
       title={
         <>
           {meetupTitle(names, typeName)}
+          {/* VoiceOver pauses before the badge as after it: "Kim, Upcoming, Party · Thu, Oct 8". */}
+          {upcoming && <span className="visually-hidden">,</span>}
           {upcoming && ' '}
           {upcoming && <span className="upcoming-badge">Upcoming</span>}
         </>
       }
+      pauseAfterTitle
       subtitle={
         subtitleLines ? (
           // The whole subtitle stays in the DOM, so the link's name (what VoiceOver reads) is the full text.

@@ -1,4 +1,4 @@
-import type { ISODate } from '../lib/dates'
+import { yearOf, type ISODate } from '../lib/dates'
 import { compareNames } from '../lib/text'
 import type { Friend, Group, Meetup, MeetupType } from '../types'
 import { countsByFriendForYear, meetupsInYear } from './counts'
@@ -103,18 +103,30 @@ export function topFriends(
 }
 
 /**
- * Whether a friend was in the app by the end of `year`, on the phone's calendar. A `createdAt` that isn't a date
- * counts as in.
+ * Whether a friend was known by the end of `year`: added to the app by then (on the phone's calendar), or seen by
+ * then (`firstSeenYear`, the year of their earliest meetup, which can be dated before they were added). A `createdAt`
+ * that isn't a date counts as added.
  */
-function addedBy(friend: Friend, year: number): boolean {
+function knownBy(friend: Friend, year: number, firstSeenYear: number | undefined): boolean {
+  if (firstSeenYear !== undefined && firstSeenYear <= year) return true
   const added = new Date(friend.createdAt)
   return Number.isNaN(added.getTime()) || added.getFullYear() <= year
 }
 
-/** Friends with no meetups (up to today) in `year`, by name. Friends added after the year aren't listed. */
+/**
+ * Friends with no meetups (up to today) in `year`, by name. Friends not known by then (added after the year, with no
+ * meetup in or before it) aren't listed.
+ */
 export function friendsNotSeenInYear(meetups: Meetup[], friends: Friend[], year: number, today: ISODate): Friend[] {
   const counts = countsByFriendForYear(meetups, year, today)
+  const firstSeenYear = new Map<string, number>()
+  for (const meetup of meetups) {
+    const meetupYear = yearOf(meetup.date)
+    for (const friendId of meetup.friendIds) {
+      if (meetupYear < (firstSeenYear.get(friendId) ?? Infinity)) firstSeenYear.set(friendId, meetupYear)
+    }
+  }
   return friends
-    .filter((friend) => !counts.has(friend.id) && addedBy(friend, year))
+    .filter((friend) => !counts.has(friend.id) && knownBy(friend, year, firstSeenYear.get(friend.id)))
     .sort((a, b) => compareNames(a.name, b.name))
 }

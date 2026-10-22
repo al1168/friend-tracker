@@ -76,6 +76,11 @@ interface RowProps {
   describedBy?: string
   /** A button row's subtitle is read as its description, after its name (the title). */
   subtitleDescribes?: boolean
+  /**
+   * A visually hidden ", " between the title and the subtitle, so VoiceOver pauses there as it reads the row's name
+   * ("Mariya, Jessie and Brandon, Meal · Sat, Oct 3", a meetup row).
+   */
+  pauseAfterTitle?: boolean
   chevron?: boolean
   accent?: boolean
   destructive?: boolean
@@ -95,6 +100,7 @@ export function Row({
   disabled,
   describedBy,
   subtitleDescribes,
+  pauseAfterTitle,
   chevron,
   accent,
   destructive,
@@ -119,6 +125,7 @@ export function Row({
         <span className="row__title" id={describing ? titleId : undefined}>
           {title}
         </span>
+        {subtitle && pauseAfterTitle && <span className="visually-hidden">, </span>}
         {subtitle && (
           <span className="row__subtitle" id={describing ? subtitleId : undefined}>
             {subtitle}

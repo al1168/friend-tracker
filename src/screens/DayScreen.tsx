@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { useConfirmDiscard } from '../components/ActionSheet'
@@ -20,8 +20,9 @@ import { changeBetween, insertAtCaret, insertPaidLine, insertPlaceLine, lineCare
 import { BOX_FULL, DAY_MAX_TYPED, FEELINGS_MAX, readDay } from '../lib/dayText'
 import { loggedUndoSpent, spendLoggedUndo } from '../lib/loggedUndo'
 import { feelingsApply } from '../lib/moods'
-import { formatNameList, shortName, shortNames } from '../lib/text'
+import { formatNameList, shortName, shortNameById } from '../lib/text'
 import { cleanWeather, WEATHER } from '../lib/weather'
+import { meetupNames } from '../stats/meetupHistory'
 import type { Friend, Meetup, Mood, Weather } from '../types'
 import { DayHelperBar, type HelperRow, type Payer } from './DayHelperBar'
 import './DayScreen.css'
@@ -102,6 +103,7 @@ export function DayScreen() {
   useEffect(() => {
     if (meetup === null) leave('/')
   }, [meetup, leave])
+  const nameById = useMemo(() => shortNameById(friends ?? []), [friends])
 
   if (!meetup || !friends || !types) return null
   const typeName = types.find((type) => type.id === meetup.typeId)?.name ?? 'Meetup'
@@ -114,6 +116,7 @@ export function DayScreen() {
       key={meetup.id}
       meetup={meetup}
       people={people}
+      shortNames={meetupNames(meetup, nameById)}
       typeName={typeName}
       logged={logged}
       undoable={logged && state?.undoable === true}
@@ -125,6 +128,8 @@ export function DayScreen() {
 interface DayPageProps {
   meetup: Meetup
   people: Friend[]
+  /** Who was there, by short name among all friends (shortNameById), as the meetup rows and the toast name them. */
+  shortNames: string[]
   typeName: string
   /** Opened by "Save and write about the day", just after the meetup was logged: the body starts with the Logged note. */
   logged: boolean
@@ -134,7 +139,7 @@ interface DayPageProps {
   onLeave: (fallback: string) => void
 }
 
-function DayPage({ meetup, people, typeName, logged, undoable, onLeave }: DayPageProps) {
+function DayPage({ meetup, people, shortNames, typeName, logged, undoable, onLeave }: DayPageProps) {
   const today = useToday()
   const minutesNow = useMinutesNow()
   const confirmDiscard = useConfirmDiscard()
@@ -171,8 +176,8 @@ function DayPage({ meetup, people, typeName, logged, undoable, onLeave }: DayPag
   // the note shows without it, its room kept as after a change: Undo deletes the meetup, and all that with it.
   const [undoOffered, setUndoOffered] = useState(() => undoable && !loggedUndoSpent(meetup.id))
   const [undoFailed, setUndoFailed] = useState(false)
-  // First names, unless two friends on it share one, as the toast and the Paid chips say them.
-  const loggedWith = people.length > 0 ? `Logged with ${formatNameList(shortNames(people))}` : 'Logged'
+  // Short names among all friends, as the toast and the meetup rows say them.
+  const loggedWith = shortNames.length > 0 ? `Logged with ${formatNameList(shortNames)}` : 'Logged'
 
   const { saver, status } = useAutosave<DayFields>((changes) => updateDay(meetup.id, changes), {
     beforeHide: commitPlaceDraft,

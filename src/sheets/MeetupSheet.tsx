@@ -27,9 +27,10 @@ import { BOX_FULL, DAY_MAX_TYPED } from '../lib/dayText'
 import { isPlainEnter } from '../lib/keys'
 import { loggedEmpty } from '../lib/loggedUndo'
 import { askToKeepData } from '../lib/persist'
-import { compareNames, formatNameList, shortNames } from '../lib/text'
+import { compareNames, formatNameList, shortNameById } from '../lib/text'
 import { revealOffset } from '../lib/viewport'
 import { friendsToPick } from '../stats/friendsToPick'
+import { meetupNames } from '../stats/meetupHistory'
 import { suggestMeetupType } from '../stats/suggestType'
 import type { Friend } from '../types'
 import { MeetupActivities } from './MeetupActivities'
@@ -229,8 +230,8 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
         // "Save and write about the day" confirms on the day page itself, which never shows a toast.
         if (!writeDay) {
           toast({
-            // First names, unless two friends on it share one, as the Paid chips name them.
-            message: `Logged with ${formatNameList(shortNames(selected))}`,
+            // Short names among all friends, as the meetup rows name them: "Sam Lee" while there's a Sam Chen.
+            message: `Logged with ${formatNameList(meetupNames(meetup, shortNameById(friends ?? [])))}`,
             actionLabel: 'Undo',
             onAction: () => {
               deleteMeetup(meetup.id).catch(() => toast({ message: UNDO_FAILED, tone: 'plain' }))

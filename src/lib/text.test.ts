@@ -12,7 +12,6 @@ import {
   sameName,
   shortName,
   shortNameById,
-  shortNames,
 } from './text'
 
 describe('formatSince', () => {
@@ -134,18 +133,6 @@ describe('shortName', () => {
     const spaced = { name: '  Brandon   Cao ' }
     expect(shortName(spaced, [spaced])).toBe('Brandon')
     expect(shortName(spaced, [spaced, brandonLee])).toBe('Brandon   Cao')
-  })
-})
-
-describe('shortNames', () => {
-  it('gives each friend’s short name among these friends, in order', () => {
-    expect(shortNames([{ name: 'Mariya' }, { name: 'Jessie' }, { name: 'Brandon Cao' }])).toEqual([
-      'Mariya',
-      'Jessie',
-      'Brandon',
-    ])
-    expect(shortNames([{ name: 'Sam Chen' }, { name: 'sam lee' }, { name: 'Kim' }])).toEqual(['Sam Chen', 'sam lee', 'Kim'])
-    expect(shortNames([])).toEqual([])
   })
 })
 

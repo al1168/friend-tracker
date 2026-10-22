@@ -125,4 +125,15 @@ describe('friendsNotSeenInYear', () => {
     const result = friendsNotSeenInYear([], [later, lastNight, unknown], 2025, TODAY)
     expect(result.map((f) => f.id)).toEqual(['eve', 'odd'])
   })
+
+  it('lists a friend added later who was seen in or before the year: known by then', () => {
+    // Added in 2026, with a meetup logged for 2024 and none in 2025.
+    const old = { ...friend('old', 'Old'), createdAt: '2026-03-01T12:00:00.000Z' }
+    const later = { ...friend('new', 'New'), createdAt: '2026-03-01T12:00:00.000Z' }
+    const meetups = [meetup('m1', '2024-06-01', ['old']), meetup('m2', '2026-04-01', ['old', 'new'])]
+    expect(friendsNotSeenInYear(meetups, [old, later], 2025, TODAY).map((f) => f.id)).toEqual(['old'])
+    // Seen in 2024 itself, so not listed for it; and not known by 2023.
+    expect(friendsNotSeenInYear(meetups, [old, later], 2024, TODAY)).toEqual([])
+    expect(friendsNotSeenInYear(meetups, [old, later], 2023, TODAY)).toEqual([])
+  })
 })
