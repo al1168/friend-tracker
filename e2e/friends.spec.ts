@@ -122,6 +122,76 @@ test('under the chips the groups sit 24px apart, Birthdays soon 8px under its ti
   expect(near((await spanOf(list)).top - (await spanOf(chips)).bottom, 16), 'The list 16px under the chips').toBe(true)
 })
 
+test('a friend never seen has no "this year" count; one seen has it', async ({ page }) => {
+  await page.goto('/')
+  await seedMeetups(page, {
+    friends: [friendRow('alex', 'Alex'), friendRow('sam', 'Sam')],
+    meetups: [meetupRow('coffee', '2026-01-05', ['alex'])],
+  })
+  const alex = page.locator('a.row[href="#/friends/alex"]')
+  const sam = page.locator('a.row[href="#/friends/sam"]')
+  await expect(alex.locator('.friend-count')).toHaveText(/this year/)
+  await expect(sam).toContainText('Not seen yet')
+  await expect(sam.locator('.friend-count')).toHaveCount(0)
+})
+
+test('filtering by a group leaves its name out of each row', async ({ page }) => {
+  await page.goto('/')
+  const groups = [
+    { id: 'climbing', name: 'Climbing' },
+    { id: 'work', name: 'Work' },
+  ]
+  await seedMeetups(page, {
+    friends: [friendRow('kenji', 'Kenji', { groupId: 'climbing' }), friendRow('kim', 'Kim', { groupId: 'work' })],
+    groups,
+  })
+  const kenji = page.locator('a.row[href="#/friends/kenji"] .row__subtitle')
+  await expect(kenji).toHaveText('Climbing · Not seen yet')
+  const chips = page.getByRole('group', { name: 'Filter by group' })
+  await chips.getByRole('button', { name: 'Climbing' }).click()
+  await expect(kenji).toHaveText('Not seen yet')
+  await chips.getByRole('button', { name: 'All' }).click()
+  await expect(kenji).toHaveText('Climbing · Not seen yet')
+})
+
+test('there is no Sort button until there is a friend', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByText('Add the people you want to keep up with.')).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Sort/ })).toHaveCount(0)
+  await addFriend(page, 'Alex')
+  await expect(page.getByRole('button', { name: /^Sort/ })).toBeVisible()
+})
+
+test.describe('in dark mode', () => {
+  test.use({ colorScheme: 'dark' })
+
+  test('the toast is a raised dark surface with light words, not a bright pill', async ({ page }) => {
+    await page.goto('/')
+    await addFriend(page, 'Alex')
+    const toast = page.locator('.toast')
+    await expect(toast).toContainText('Added Alex')
+    // Each color as the screen draws it (any CSS color, oklch included), then its relative luminance.
+    const luminance = (property: 'background-color' | 'color') =>
+      toast.evaluate((element, property) => {
+        const canvas = document.createElement('canvas')
+        canvas.width = canvas.height = 1
+        const context = canvas.getContext('2d')
+        if (!context) throw new Error('No canvas')
+        context.fillStyle = getComputedStyle(element).getPropertyValue(property)
+        context.fillRect(0, 0, 1, 1)
+        const [r, g, b] = [...context.getImageData(0, 0, 1, 1).data].map((value) => {
+          const channel = value / 255
+          return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+        })
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+      }, property)
+    const background = await luminance('background-color')
+    const text = await luminance('color')
+    expect(background, 'A dark surface').toBeLessThan(0.15)
+    expect((text + 0.05) / (background + 0.05), 'AA contrast').toBeGreaterThanOrEqual(4.5)
+  })
+})
+
 test('adds friends and lists them', async ({ page }) => {
   await page.goto('/')
   await addFriend(page, 'Alex Smith')

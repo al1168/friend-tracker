@@ -21,8 +21,8 @@
   padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
   /* Half the minimum height: a pill on one line, a soft box when a long message wraps. */
   border-radius: 26px;
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--toast-bg);
+  color: var(--toast-ink);
   box-shadow: var(--shadow-float);
   pointer-events: auto;
   animation: toast-in var(--dur-sheet) var(--ease-out-expo);
@@ -43,8 +43,9 @@
   min-height: var(--tap);
   padding: 0 var(--space-4);
   border-radius: var(--radius-pill);
-  background: color-mix(in oklch, var(--bg) 18%, transparent);
-  color: var(--bg);
+  /* 6.2:1 for Undo in dark mode. */
+  background: color-mix(in oklch, var(--toast-ink) 18%, transparent);
+  color: var(--toast-ink);
   font-weight: 600;
 }
 

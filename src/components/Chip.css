@@ -47,6 +47,20 @@
   text-align: start;
 }
 
+/* At most the row's width: the label shortens with "…" and nothing else shrinks, so a long name keeps its ×. */
+.chip--truncate {
+  max-width: 100%;
+}
+.chip--truncate > * {
+  flex: none;
+}
+.chip--truncate > .chip__label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .chip:active {
     transform: none;

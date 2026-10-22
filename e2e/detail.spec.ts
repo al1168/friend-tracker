@@ -213,22 +213,33 @@ test('the meetup just logged scrolls clear of its toast and opens with one tap',
   await expect(page.locator('.toast')).toHaveCount(0)
 })
 
+/** Two friends who share a first name, so "Logged with" names them both in full and the toast wraps at large text. */
+const NAME = 'Bartholomew Fitzgerald-Montgomery'
+const OTHER = 'Bartholomew Ashworth-Pemberton'
+
+/** From NAME's page: logs a meetup with NAME (picked already) and OTHER, from the search. */
+async function logWithBoth(page: Page) {
+  await addFriend(page, NAME)
+  await addFriend(page, OTHER)
+  await friendLink(page, NAME).click()
+  await page.getByRole('button', { name: 'Log meetup' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
+  await sheet.getByLabel('Search all friends').fill('Ashworth')
+  await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name: OTHER }).click()
+  await sheetSave(sheet).click()
+  await expect(sheet).toBeHidden()
+}
+
 test('at large text, the meetup just logged scrolls clear of a toast that wraps, and opens with one tap', async ({
   page,
 }) => {
   await page.goto('/')
   await page.addStyleTag({ content: LARGE_TEXT })
-  const name = 'Bartholomew Fitzgerald-Montgomery'
-  await addFriend(page, name)
-  await friendLink(page, name).click()
-  await page.getByRole('button', { name: 'Log meetup' }).click()
-  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
-  await sheetSave(sheet).click()
-  await expect(sheet).toBeHidden()
+  await logWithBoth(page)
   const toast = page.getByRole('status')
-  await expect(toast).toContainText(`Logged with ${name}`)
+  await expect(toast).toContainText(`Logged with ${NAME} and ${OTHER}`)
   const toastHeight = await toast.locator('.toast').evaluate((element) => element.getBoundingClientRect().height)
-  // About 159px here: the name wraps the message onto several lines, three times the one-line 52px.
+  // The names wrap the message onto several lines, more than twice the one-line 52px.
   expect(toastHeight, 'The toast wraps onto several lines').toBeGreaterThan(100)
 
   const row = page.getByRole('region', { name: 'History' }).getByRole('link', { name: /Coffee/ })
@@ -248,15 +259,9 @@ test('at large text, the room for a toast that wrapped stays after it goes, unti
   await page.clock.install()
   await page.goto('/')
   await page.addStyleTag({ content: LARGE_TEXT })
-  const name = 'Bartholomew Fitzgerald-Montgomery'
-  await addFriend(page, name)
-  await friendLink(page, name).click()
-  await page.getByRole('button', { name: 'Log meetup' }).click()
-  const sheet = page.getByRole('dialog', { name: 'Log meetup' })
-  await sheetSave(sheet).click()
-  await expect(sheet).toBeHidden()
+  await logWithBoth(page)
   const toast = page.getByRole('status')
-  await expect(toast).toContainText(`Logged with ${name}`)
+  await expect(toast).toContainText(`Logged with ${NAME} and ${OTHER}`)
   const toastSpace = () => page.evaluate(() => document.documentElement.style.getPropertyValue('--toast-space'))
   const pageEnd = () => page.evaluate(() => document.documentElement.scrollHeight)
   await expect.poll(async () => parseFloat(await toastSpace()), 'Room for the wrapped toast').toBeGreaterThan(100)

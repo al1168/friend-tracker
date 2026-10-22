@@ -37,6 +37,35 @@ test('adds likes, several at once, and says when one is already there', async ({
   await expect(likes.locator('.chip--wrap')).toHaveText(['Sushi', 'board games', 'Hiking'])
 })
 
+test('the Log pill steps aside while a field on the page is being typed in', async ({ page }) => {
+  await page.goto('/')
+  await addFriend(page, 'Alex')
+  const pill = page.getByRole('button', { name: 'Log meetup' })
+  // The Friends search.
+  const search = page.getByLabel('Search friends')
+  await search.focus()
+  await expect(pill).toBeHidden()
+  await search.blur()
+  await expect(pill).toBeVisible()
+
+  await openFriend(page, 'Alex')
+  await expect(pill).toBeVisible()
+  const likes = section(page, 'Likes')
+  await likes.getByRole('button', { name: 'Add a like', exact: true }).click()
+  const field = likes.getByRole('textbox', { name: 'New like', exact: true })
+  await expect(field).toBeFocused()
+  await expect(pill).toBeHidden()
+  await field.fill('Sushi')
+  await field.press('Enter')
+  // Still typing: still aside.
+  await expect(pill).toBeHidden()
+  await field.press('Escape')
+  await expect(field).toBeHidden()
+  await expect(pill).toBeVisible()
+  await pill.click()
+  await expect(page.getByRole('dialog', { name: 'Log meetup' })).toBeVisible()
+})
+
 test('moves a dislike to Likes, removes with Undo, and keeps the lists after a reload', async ({ page }) => {
   await page.goto('/')
   await addFriend(page, 'Alex')

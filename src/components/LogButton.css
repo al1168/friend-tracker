@@ -22,7 +22,33 @@
   box-shadow: var(--shadow-float);
   transition:
     transform var(--dur-fast) var(--ease-out-quart),
-    background-color var(--dur-fast) var(--ease-out-quart);
+    background-color var(--dur-fast) var(--ease-out-quart),
+    opacity var(--dur-fast) var(--ease-out-quart),
+    visibility 0s;
+}
+/* It steps aside while a text field on the page has focus (a Likes or Dislikes field, a search), so it never covers
+   what's being typed: it fades out, then can't be tapped or reached by VoiceOver. It comes back, fading in, when the
+   field loses focus or goes. Sheets are outside .page, so their fields don't count (a sheet covers the pill anyway). */
+body:has(
+    .page
+      :is(
+        textarea,
+        input:not([type]),
+        input[type='text'],
+        input[type='search'],
+        input[type='email'],
+        input[type='url'],
+        input[type='tel'],
+        input[type='number'],
+        input[type='password']
+      ):focus
+  )
+  > .log-button {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-fast) var(--ease-out-quart),
+    visibility 0s var(--dur-fast);
 }
 /* The plus grows with the label. */
 .log-button svg {

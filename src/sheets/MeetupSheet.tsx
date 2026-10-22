@@ -27,7 +27,7 @@ import { BOX_FULL, DAY_MAX_TYPED } from '../lib/dayText'
 import { isPlainEnter } from '../lib/keys'
 import { loggedEmpty } from '../lib/loggedUndo'
 import { askToKeepData } from '../lib/persist'
-import { compareNames, formatNameList } from '../lib/text'
+import { compareNames, formatNameList, shortNames } from '../lib/text'
 import { revealOffset } from '../lib/viewport'
 import { friendsToPick } from '../stats/friendsToPick'
 import { suggestMeetupType } from '../stats/suggestType'
@@ -229,7 +229,8 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
         // "Save and write about the day" confirms on the day page itself, which never shows a toast.
         if (!writeDay) {
           toast({
-            message: `Logged with ${formatNameList(selected.map((f) => f.name))}`,
+            // First names, unless two friends on it share one, as the Paid chips name them.
+            message: `Logged with ${formatNameList(shortNames(selected))}`,
             actionLabel: 'Undo',
             onAction: () => {
               deleteMeetup(meetup.id).catch(() => toast({ message: UNDO_FAILED, tone: 'plain' }))
@@ -345,11 +346,12 @@ export function MeetupSheet({ request, onClose }: MeetupSheetProps) {
                 <Chip
                   key={friend.id}
                   active
+                  truncate
                   onClick={() => toggleFriend(friend.id)}
                   ariaLabel={`Remove ${friend.name}`}
                 >
                   <Avatar name={friend.name} photo={friend.photo} seed={friend.id} size={24} />
-                  {friend.name}
+                  <span className="chip__label">{friend.name}</span>
                   <IconClose size={14} strokeWidth={2.6} />
                 </Chip>
               ))}

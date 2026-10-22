@@ -64,6 +64,9 @@
   --danger: oklch(55% 0.19 27);
   --scrim: oklch(22% 0.02 45 / 0.32);
   --shadow-float: 0 10px 30px oklch(35% 0.04 45 / 0.16), 0 2px 6px oklch(35% 0.04 45 / 0.1);
+  /* The toast: an inverted pill in light (Warm Ink, Warm Paper text, 14.4:1), a raised warm surface in dark. */
+  --toast-bg: oklch(25% 0.014 50);
+  --toast-ink: oklch(96.4% 0.009 60);
 
   /* The photo viewer, the one near-black ground, the same in both themes so photos look true. */
   --viewer-bg: oklch(13% 0.006 55);
@@ -91,6 +94,9 @@
     --danger: oklch(70% 0.17 25);
     --scrim: oklch(8% 0.01 45 / 0.55);
     --shadow-float: 0 10px 30px oklch(5% 0 0 / 0.5), 0 2px 6px oklch(5% 0 0 / 0.4);
+    /* A step above Linen Pressed, so the toast rises off the page instead of glaring: Warm Ink on it is 9.8:1. */
+    --toast-bg: oklch(35% 0.012 55);
+    --toast-ink: oklch(95% 0.008 70);
   }
 }
 

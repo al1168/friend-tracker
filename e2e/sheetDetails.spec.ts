@@ -357,7 +357,8 @@ test.describe('swiping through friends', () => {
     await expect(twelfth).toHaveAttribute('aria-pressed', 'true')
     await expect(sheet.getByRole('group', { name: 'Selected friends' })).toContainText('Friend 12')
     await sheetSave(sheet).click()
-    await expect(page.getByRole('status')).toContainText('Logged with Friend 12')
+    // Friend 12 is the only friend on it, so their first name is enough.
+    await expect(page.locator('.toast__message')).toHaveText('Logged with Friend')
   })
 
   test('the swiping strip has room for a focused tile’s ring, and its tiles stay where they were', async ({ page }) => {
@@ -408,6 +409,56 @@ test.describe('swiping through friends', () => {
     expect(Math.abs(fifth.x - first.x)).toBeLessThanOrEqual(1)
     expect(fifth.y).toBeGreaterThan(first.y)
     expect(await strip.evaluate((element) => element.scrollWidth <= element.clientWidth), 'Nothing to swipe').toBe(true)
+  })
+})
+
+test.describe('names in the Log sheet', () => {
+  const LONG_NAME = 'Maximiliana Alexandra Featherstonehaugh-Worthington'
+
+  test('a long selected name ends in "…" inside the sheet, and its × still shows', async ({ page }) => {
+    await page.goto('/')
+    await seedMeetups(page, { friends: [friendRow('maxi', LONG_NAME), friendRow('kim', 'Kim')] })
+    const sheet = await openLogMeetup(page)
+    await sheet.getByRole('group', { name: 'Friends', exact: true }).getByRole('button', { name: LONG_NAME }).click()
+    const selected = sheet.getByRole('group', { name: 'Selected friends' })
+    const chip = selected.getByRole('button', { name: `Remove ${LONG_NAME}` })
+    await expect(chip).toBeVisible()
+    const [chipBox, close, body] = await Promise.all([
+      chip.boundingBox(),
+      chip.locator('svg').boundingBox(),
+      sheet.locator('.sheet__body').boundingBox(),
+    ])
+    if (!chipBox || !close || !body) throw new Error('Not on screen')
+    expect(chipBox.x + chipBox.width, 'The chip ends inside the sheet’s margin').toBeLessThanOrEqual(
+      body.x + body.width - 16 + 1,
+    )
+    expect(close.x + close.width, 'and so does its ×').toBeLessThanOrEqual(chipBox.x + chipBox.width)
+    const label = chip.locator('.chip__label')
+    const cut = await label.evaluate((element) => element.scrollWidth > element.clientWidth)
+    expect(cut, 'The name ends in …').toBe(true)
+    await chip.click()
+    await expect(sheet.getByRole('group', { name: 'Selected friends' })).toHaveCount(0)
+  })
+
+  test('"Logged with" names each friend by first name, or in full when two on it share one', async ({ page }) => {
+    await page.goto('/')
+    await seedMeetups(page, {
+      friends: ['Mariya', 'Jessie', 'Brandon Cao', 'Sam Chen', 'Sam Lee'].map((name) =>
+        friendRow(name.toLowerCase().replace(' ', '-'), name),
+      ),
+    })
+    await logMeetup(page, ['Mariya', 'Jessie', 'Brandon Cao'])
+    await expect(page.locator('.toast__message')).toHaveText('Logged with Mariya, Jessie and Brandon')
+    await logMeetup(page, ['Sam Chen', 'Sam Lee'])
+    await expect(page.locator('.toast__message')).toHaveText('Logged with Sam Chen and Sam Lee')
+
+    // The day page's Logged note says it the same way.
+    const sheet = await openLogMeetup(page)
+    await sheet.getByLabel('Search all friends').fill('Brandon')
+    await sheet.getByRole('group', { name: 'Search results' }).getByRole('button', { name: 'Brandon Cao' }).click()
+    await sheet.getByRole('button', { name: 'Save and write about the day' }).click()
+    await expect(page.locator('.day-logged')).toContainText('Logged with Brandon')
+    await expect(page.locator('.day-logged')).not.toContainText('Cao')
   })
 })
 

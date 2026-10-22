@@ -20,7 +20,7 @@ import { changeBetween, insertAtCaret, insertPaidLine, insertPlaceLine, lineCare
 import { BOX_FULL, DAY_MAX_TYPED, FEELINGS_MAX, readDay } from '../lib/dayText'
 import { loggedUndoSpent, spendLoggedUndo } from '../lib/loggedUndo'
 import { feelingsApply } from '../lib/moods'
-import { formatNameList, shortName } from '../lib/text'
+import { formatNameList, shortName, shortNames } from '../lib/text'
 import { cleanWeather, WEATHER } from '../lib/weather'
 import type { Friend, Meetup, Mood, Weather } from '../types'
 import { DayHelperBar, type HelperRow, type Payer } from './DayHelperBar'
@@ -171,7 +171,8 @@ function DayPage({ meetup, people, typeName, logged, undoable, onLeave }: DayPag
   // the note shows without it, its room kept as after a change: Undo deletes the meetup, and all that with it.
   const [undoOffered, setUndoOffered] = useState(() => undoable && !loggedUndoSpent(meetup.id))
   const [undoFailed, setUndoFailed] = useState(false)
-  const loggedWith = people.length > 0 ? `Logged with ${formatNameList(people.map((friend) => friend.name))}` : 'Logged'
+  // First names, unless two friends on it share one, as the toast and the Paid chips say them.
+  const loggedWith = people.length > 0 ? `Logged with ${formatNameList(shortNames(people))}` : 'Logged'
 
   const { saver, status } = useAutosave<DayFields>((changes) => updateDay(meetup.id, changes), {
     beforeHide: commitPlaceDraft,

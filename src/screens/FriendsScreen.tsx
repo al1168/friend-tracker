@@ -112,14 +112,17 @@ export function FriendsScreen() {
       title="Friends"
       actions={
         <>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={chooseSort}
-            aria-label={`Sort: ${FRIEND_SORT_LABELS[sort]}`}
-          >
-            <IconSort />
-          </button>
+          {/* Nothing to sort until there's a friend. */}
+          {friends.length > 0 && (
+            <button
+              type="button"
+              className="icon-button"
+              onClick={chooseSort}
+              aria-label={`Sort: ${FRIEND_SORT_LABELS[sort]}`}
+            >
+              <IconSort />
+            </button>
+          )}
           <button type="button" className="icon-button" onClick={() => openFriendSheet()} aria-label="Add friend">
             <IconPlus />
           </button>
@@ -209,17 +212,21 @@ export function FriendsScreen() {
                   leading={<Avatar name={friend.name} photo={friend.photo} seed={friend.id} />}
                   title={friend.name}
                   subtitle={[
-                    friend.groupId ? groupNames.get(friend.groupId) : undefined,
+                    // While filtering by a group, every row is in it: the name would only repeat.
+                    friend.groupId && !activeGroup ? groupNames.get(friend.groupId) : undefined,
                     lastSeen ? formatSince(daysBetween(lastSeen, today)) : 'Not seen yet',
                     matchSubtitle(match),
                   ]
                     .filter(Boolean)
                     .join(' · ')}
+                  // A friend never seen has no count: "Not seen yet" says it, without a column of zeros.
                   trailing={
-                    <span className="friend-count">
-                      <span className="numeric friend-count__value">{count}</span>
-                      <span className="friend-count__label">this year</span>
-                    </span>
+                    lastSeen ? (
+                      <span className="friend-count">
+                        <span className="numeric friend-count__value">{count}</span>
+                        <span className="friend-count__label">this year</span>
+                      </span>
+                    ) : undefined
                   }
                 />
               ))}
