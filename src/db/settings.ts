@@ -4,6 +4,8 @@ import { db } from './db'
 
 export interface Settings {
   lastBackupAt: string | null
+  /** When Settings was last opened while its tab showed the backup dot (src/backup/nudge.ts). */
+  backupNudgeSeenAt: string | null
   installHintDismissed: boolean
   appLock: AppLock
   appLockFailures: LockFailures
@@ -12,6 +14,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   lastBackupAt: null,
+  backupNudgeSeenAt: null,
   installHintDismissed: false,
   appLock: LOCK_OFF,
   appLockFailures: NO_FAILURES,

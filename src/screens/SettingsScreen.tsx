@@ -1,11 +1,14 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { exportBackup, shareBackupFile } from '../backup/exportBackup'
+import { meetupsSinceBackup } from '../backup/nudge'
 import { parseBackupFile, readAllData, replaceAllData } from '../backup/storage'
+import { useBackupDot } from '../backup/useBackupDot'
 import { useConfirm } from '../components/ActionSheet'
 import { InsetGroup, Row } from '../components/InsetGroup'
 import { Page } from '../components/Page'
 import { useToast } from '../components/Toast'
 import { useFriends, useGroups, useMeetups, useMeetupTypes, usePhotoCount, useSetting } from '../data/hooks'
+import { setSetting } from '../db/settings'
 import { useToday } from '../hooks/useToday'
 import { describeBackup, plural } from '../lib/text'
 import { AppLockSection } from '../lock/AppLockSection'
@@ -30,6 +33,13 @@ export function SettingsScreen() {
   const fileInput = useRef<HTMLInputElement>(null)
   const exportingRef = useRef(false)
   const [importError, setImportError] = useState<{ message: string; n: number } | null>(null)
+  const backupDot = useBackupDot()
+
+  // Opening Settings while the tab shows the backup dot is seeing it: the dot goes, and comes back 30 days later only
+  // if a backup is still due. The Backup footer keeps the facts.
+  useEffect(() => {
+    if (backupDot) void setSetting('backupNudgeSeenAt', new Date().toISOString())
+  }, [backupDot])
 
   if (!friends || !groups || !meetupTypes || !meetups || lastBackupAt === undefined) return null
   if (appLock === undefined || passkeyAvailable === undefined || birthdayReminders === undefined) return null
@@ -111,7 +121,10 @@ export function SettingsScreen() {
 
       <RemindersSection reminders={birthdayReminders} />
 
-      <InsetGroup title="Backup" footer={describeBackup(lastBackupAt, today, photoCount)}>
+      <InsetGroup
+        title="Backup"
+        footer={describeBackup(lastBackupAt, today, photoCount, meetupsSinceBackup(meetups, lastBackupAt))}
+      >
         <Row title="Export backup" accent onClick={exportData} />
         <Row title="Import backup" accent onClick={() => fileInput.current?.click()} />
       </InsetGroup>

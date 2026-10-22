@@ -88,8 +88,22 @@ export function describeLastBackup(lastBackupAt: string | null, today: ISODate):
   return `Last backup: ${since.charAt(0).toLowerCase()}${since.slice(1)}`
 }
 
-/** The Backup group's footer: the last backup, then how many photos a backup carries (they make it large). */
-export function describeBackup(lastBackupAt: string | null, today: ISODate, photoCount: number): string {
+/**
+ * The Backup group's footer, facts only: the last backup, how many meetups were logged since it (when there was one
+ * and some since), then how many photos a backup carries (they make it large).
+ */
+export function describeBackup(
+  lastBackupAt: string | null,
+  today: ISODate,
+  photoCount: number,
+  meetupsSince: number,
+): string {
   const last = describeLastBackup(lastBackupAt, today)
-  return photoCount > 0 ? `${last}. Includes ${plural(photoCount, 'photo')}.` : last
+  const backedUp = lastBackupAt !== null && !Number.isNaN(new Date(lastBackupAt).getTime())
+  const parts = [
+    last,
+    backedUp && meetupsSince > 0 ? `${plural(meetupsSince, 'meetup')} since then` : null,
+    photoCount > 0 ? `Includes ${plural(photoCount, 'photo')}` : null,
+  ].filter((part): part is string => part !== null)
+  return parts.length === 1 ? last : `${parts.join('. ')}.`
 }

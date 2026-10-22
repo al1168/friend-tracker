@@ -25,8 +25,22 @@
   text-decoration: none;
   transition: color var(--dur-fast);
 }
-.tabbar__item svg {
+.tabbar__icon {
+  position: relative;
   flex: none;
+  display: grid;
+}
+/* The backup suggestion: an 8px Terracotta Ink dot at the top right of the Settings icon, ringed in the bar's Paper
+   White so it stands off the icon's lines. Never red, never a number, never moving. */
+.tabbar__dot {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-ink);
+  box-shadow: 0 0 0 2px var(--surface);
 }
 .tabbar__item[aria-current='page'] {
   color: var(--accent-ink);

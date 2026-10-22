@@ -92,9 +92,23 @@ describe('describeLastBackup', () => {
 describe('describeBackup', () => {
   it('adds the photo count when there are photos', () => {
     const today = new Date(2026, 9, 2, 9, 30).toISOString()
-    expect(describeBackup(today, '2026-10-02', 0)).toBe('Last backup: today')
-    expect(describeBackup(today, '2026-10-02', 12)).toBe('Last backup: today. Includes 12 photos.')
-    expect(describeBackup(null, '2026-10-02', 1)).toBe('Never backed up. Includes 1 photo.')
+    expect(describeBackup(today, '2026-10-02', 0, 0)).toBe('Last backup: today')
+    expect(describeBackup(today, '2026-10-02', 12, 0)).toBe('Last backup: today. Includes 12 photos.')
+    expect(describeBackup(null, '2026-10-02', 1, 0)).toBe('Never backed up. Includes 1 photo.')
+  })
+
+  it('says how many meetups were logged since the last backup', () => {
+    const sixWeeks = new Date(2026, 7, 20, 9, 30).toISOString()
+    const twoMonths = new Date(2026, 7, 2, 9, 30).toISOString()
+    expect(describeBackup(sixWeeks, '2026-10-02', 9, 12)).toBe(
+      'Last backup: 6 weeks ago. 12 meetups since then. Includes 9 photos.',
+    )
+    expect(describeBackup(twoMonths, '2026-10-02', 0, 1)).toBe('Last backup: 2 months ago. 1 meetup since then.')
+  })
+
+  it('never counts meetups when there has been no backup', () => {
+    expect(describeBackup(null, '2026-10-02', 9, 39)).toBe('Never backed up. Includes 9 photos.')
+    expect(describeBackup('garbage', '2026-10-02', 0, 3)).toBe('Never backed up')
   })
 })
 
